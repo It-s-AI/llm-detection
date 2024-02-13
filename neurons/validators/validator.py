@@ -50,6 +50,7 @@ class Validator(BaseValidatorNeuron):
         # TODO(developer): Anything specific to your use case you can do here
 
     async def build_queries(self) -> (list[str], torch.FloatTensor):
+
         return ['Here is my human-written text'], torch.FloatTensor([0.0])
 
     async def count_reward(self, y_pred: torch.FloatTensor, y_true: torch.FloatTensor) -> float:
