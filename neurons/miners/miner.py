@@ -2,7 +2,7 @@
 # Copyright © 2023 Yuma Rao
 # TODO(developer): Set your name
 # Copyright © 2023 <your name>
-
+import random
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -59,7 +59,7 @@ class Miner(BaseMinerNeuron):
         the miner's intended operation. This method demonstrates a basic transformation of input data.
         """
         # TODO(developer): Replace with actual implementation logic.
-        synapse.dummy_output = synapse.dummy_input * 2
+        synapse.dummy_output = random.random()
         return synapse
 
     async def blacklist(

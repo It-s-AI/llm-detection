@@ -22,6 +22,7 @@ import time
 
 # Bittensor
 import bittensor as bt
+import torch
 
 # Bittensor Validator Template:
 import template
@@ -48,6 +49,22 @@ class Validator(BaseValidatorNeuron):
 
         # TODO(developer): Anything specific to your use case you can do here
 
+    async def build_queries(self) -> (list[str], torch.FloatTensor):
+        return ['Here is my human-written text'], torch.FloatTensor([0.0])
+
+    async def count_reward(self, y_pred: torch.FloatTensor, y_true: torch.FloatTensor) -> float:
+        return (y_pred == y_true).mean()
+
+    async def count_penalty(self, y_pred: torch.FloatTensor, y_true: torch.FloatTensor) -> float:
+        return 1.0
+
+    async def get_uids(self):
+        # return miners uids, which we want to validate
+        return []
+
+    async def query_miner(self, uid, texts: list[str]) -> torch.FloatTensor:
+        return torch.FloatTensor([0] * len(texts))
+
     async def forward(self):
         """
         Validator forward pass. Consists of:
@@ -57,7 +74,19 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-        # TODO(developer): Rewrite this function based on your protocol definition.
+
+        uids = await self.get_uids()
+        texts, y_true = await self.build_queries()
+
+        rewards = []
+        for uid in uids:
+            y_pred = await self.query_miner(uid, texts)
+            reward = await self.count_reward(y_pred, y_true)
+            reward *= await self.count_penalty(y_pred, y_true)
+            rewards.append(reward)
+
+        self.update_scores(torch.FloatTensor(rewards), uids)
+
         return await forward(self)
 
 

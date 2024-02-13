@@ -52,12 +52,12 @@ class Dummy(bt.Synapse):
     """
 
     # Required request input, filled by sending dendrite caller.
-    dummy_input: int
+    dummy_input: str
 
     # Optional request output, filled by recieving axon.
-    dummy_output: typing.Optional[int] = None
+    dummy_output: typing.Optional[float] = None
 
-    def deserialize(self) -> int:
+    def deserialize(self) -> float:
         """
         Deserialize the dummy output. This method retrieves the response from
         the miner in the form of dummy_output, deserializes it and returns it
