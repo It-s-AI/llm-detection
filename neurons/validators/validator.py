@@ -2,7 +2,7 @@
 # Copyright © 2023 Yuma Rao
 # TODO(developer): Set your name
 # Copyright © 2023 <your name>
-
+import random
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -62,8 +62,8 @@ class Validator(BaseValidatorNeuron):
         # return miners uids, which we want to validate
         return []
 
-    async def query_miner(self, uid, texts: list[str]) -> torch.FloatTensor:
-        return torch.FloatTensor([0] * len(texts))
+    async def query_miner(self, uid, text: str) -> float:
+        return random.random()
 
     async def forward(self):
         """
@@ -80,7 +80,7 @@ class Validator(BaseValidatorNeuron):
 
         rewards = []
         for uid in uids:
-            y_pred = await self.query_miner(uid, texts)
+            y_pred = torch.FloatTensor([await self.query_miner(uid, text) for text in texts])
             reward = await self.count_reward(y_pred, y_true)
             reward *= await self.count_penalty(y_pred, y_true)
             rewards.append(reward)
