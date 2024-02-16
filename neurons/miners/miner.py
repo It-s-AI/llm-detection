@@ -23,6 +23,7 @@ import bittensor as bt
 
 # Bittensor Miner Template:
 import template
+from neurons.miners.deepfake.deepfake import DeepfakeTextDetect
 
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
@@ -39,8 +40,7 @@ class Miner(BaseMinerNeuron):
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-
-        # TODO(developer): Anything specific to your use case you can do here
+        self.model = DeepfakeTextDetect()
 
     async def forward(
         self, synapse: template.protocol.Dummy
@@ -59,7 +59,7 @@ class Miner(BaseMinerNeuron):
         the miner's intended operation. This method demonstrates a basic transformation of input data.
         """
         # TODO(developer): Replace with actual implementation logic.
-        synapse.dummy_output = random.random()
+        synapse.dummy_output = self.model(synapse.dummy_input)
         return synapse
 
     async def blacklist(
