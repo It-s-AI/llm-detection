@@ -24,12 +24,22 @@ import time
 import bittensor as bt
 import torch
 
+from typing import List
+
 # Bittensor Validator Template:
-import template
-from template.validator import forward
+import detection
+from detection.validator import forward
 
 # import base validator class which takes care of most of the boilerplate
-from template.base.validator import BaseValidatorNeuron
+from detection.base.validator import BaseValidatorNeuron
+
+
+import random
+import string
+
+def generate_random_string(length):
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for _ in range(length))
 
 
 class Validator(BaseValidatorNeuron):
@@ -49,22 +59,9 @@ class Validator(BaseValidatorNeuron):
 
         # TODO(developer): Anything specific to your use case you can do here
 
-    async def build_queries(self) -> (list[str], torch.FloatTensor):
+    async def build_queries(self) -> tuple[List[str], torch.FloatTensor]:
+        return [generate_random_string(5)], torch.FloatTensor([0.0])
 
-        return ['Here is my human-written text'], torch.FloatTensor([0.0])
-
-    async def count_reward(self, y_pred: torch.FloatTensor, y_true: torch.FloatTensor) -> float:
-        return (y_pred == y_true).mean()
-
-    async def count_penalty(self, y_pred: torch.FloatTensor, y_true: torch.FloatTensor) -> float:
-        return 1.0
-
-    async def get_uids(self):
-        # return miners uids, which we want to validate
-        return []
-
-    async def query_miner(self, uid, text: str) -> float:
-        return random.random()
 
     async def forward(self):
         """
@@ -75,19 +72,6 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-
-        uids = await self.get_uids()
-        texts, y_true = await self.build_queries()
-
-        rewards = []
-        for uid in uids:
-            y_pred = torch.FloatTensor([await self.query_miner(uid, text) for text in texts])
-            reward = await self.count_reward(y_pred, y_true)
-            reward *= await self.count_penalty(y_pred, y_true)
-            rewards.append(reward)
-
-        self.update_scores(torch.FloatTensor(rewards), uids)
-
         return await forward(self)
 
 

@@ -18,7 +18,7 @@
 
 import random
 import bittensor as bt
-from datasets import load_dataset
+from neurons.datasets import load_dataset
 from collections.abc import Iterator
 
 

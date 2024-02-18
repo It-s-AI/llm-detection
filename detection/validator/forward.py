@@ -19,9 +19,12 @@
 
 import bittensor as bt
 
-from template.protocol import Dummy
-from template.validator.reward import get_rewards
-from template.utils.uids import get_random_uids
+from detection.protocol import TextSynapse
+from detection.validator.reward import get_rewards
+from detection.utils.uids import get_random_uids
+
+import time
+from typing import List
 
 
 async def forward(self):
@@ -34,19 +37,38 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
-    # TODO(developer): Define how the validator selects a miner to query, how often, etc.
-    # get_random_uids is an example method, but you can replace it with your own.
-    miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+    bt.logging.info("Updating and querying available uids")
+    # Define how the validator selects a miner to query, how often, etc.
+    # bt.logging.info(f"STEPS {self.step} {self.step%300} {not (self.step % 300)}")
 
-    # The dendrite client queries the network.
-    responses = self.dendrite.query(
-        # Send the query to selected miner axons in the network.
-        axons=[self.metagraph.axons[uid] for uid in miner_uids],
-        # Construct a dummy query. This simply contains a single integer.
-        synapse=Dummy(dummy_input=self.step),
-        # All responses have the deserialize function called on them before returning.
-        # You are encouraged to define your own deserialization function.
+    # if self.step % 100:
+    #     return
+    
+    start_time = time.time()
+    bt.logging.info(f"ALL axons {self.metagraph.axons}")
+
+    available_axon_size = len(self.metagraph.axons) - 1 # Except our own
+    bt.logging.info(f"available_axon_size {available_axon_size}")
+
+    miner_selection_size = min(available_axon_size, self.config.neuron.sample_size)
+    bt.logging.info(f"miner_selection_size {miner_selection_size}")
+
+    miner_uids = get_random_uids(self, k=miner_selection_size)
+    bt.logging.info(f"miner_uids {miner_uids}")
+
+    axons = [self.metagraph.axons[uid] for uid in miner_uids]
+    bt.logging.info(f"axons {axons}")
+
+    texts, labels = await self.build_queries()
+    bt.logging.info(f"texts {texts}")
+    bt.logging.info(f"labels {labels}")
+
+
+    responses: List[TextSynapse]  = await self.dendrite(
+        axons=axons,
+        synapse=TextSynapse(texts=texts, predictions=[]),
         deserialize=True,
+        timeout=self.config.neuron.timeout,
     )
 
     # Log the results for monitoring purposes.
@@ -54,7 +76,7 @@ async def forward(self):
 
     # TODO(developer): Define how the validator scores responses.
     # Adjust the scores based on responses from miners.
-    rewards = get_rewards(self, query=self.step, responses=responses)
+    rewards = get_rewards(self, labels=labels, responses=responses)
 
     bt.logging.info(f"Scored responses: {rewards}")
     # Update the scores based on the rewards. You may want to define your own update_scores function for custom behavior.

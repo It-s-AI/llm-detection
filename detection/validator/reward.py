@@ -19,6 +19,7 @@
 
 import torch
 from typing import List
+import bittensor as bt
 
 
 def reward(query: int, response: int) -> float:
@@ -35,7 +36,7 @@ def reward(query: int, response: int) -> float:
 
 def get_rewards(
     self,
-    query: int,
+    labels: torch.FloatTensor,
     responses: List[float],
 ) -> torch.FloatTensor:
     """
@@ -49,6 +50,8 @@ def get_rewards(
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
     # Get all the reward results by iteratively calling your reward() function.
-    return torch.FloatTensor(
-        [reward(query, response) for response in responses]
-    ).to(self.device)
+    bt.logging.info(f"First response {responses[0].predictions}")
+
+    rewards = [reward(synapse.predictions, labels) for synapse in responses]
+    bt.logging.info(f"get_rewards() {rewards}")
+    return torch.FloatTensor(rewards)

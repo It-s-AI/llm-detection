@@ -23,7 +23,7 @@ import traceback
 
 import bittensor as bt
 
-from template.base.neuron import BaseNeuron
+from detection.base.neuron import BaseNeuron
 
 
 class BaseMinerNeuron(BaseNeuron):
@@ -46,6 +46,7 @@ class BaseMinerNeuron(BaseNeuron):
 
         # The axon handles request processing, allowing validators to send this miner requests.
         self.axon = bt.axon(wallet=self.wallet, config=self.config)
+        # self.axon = bt.axon(wallet=self.wallet, config=self.config, port=self.config.neuron.port)
 
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info(f"Attaching forward function to miner axon.")

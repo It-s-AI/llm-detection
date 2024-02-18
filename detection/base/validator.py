@@ -27,7 +27,9 @@ import bittensor as bt
 from typing import List
 from traceback import print_exception
 
-from template.base.neuron import BaseNeuron
+from detection.base.neuron import BaseNeuron
+
+import time
 
 
 class BaseValidatorNeuron(BaseNeuron):
@@ -73,6 +75,7 @@ class BaseValidatorNeuron(BaseNeuron):
         bt.logging.info("serving ip to chain...")
         try:
             self.axon = bt.axon(wallet=self.wallet, config=self.config)
+            # self.axon = bt.axon(wallet=self.wallet, config=self.config
 
             try:
                 self.subtensor.serve_axon(
@@ -140,6 +143,9 @@ class BaseValidatorNeuron(BaseNeuron):
                 self.sync()
 
                 self.step += 1
+
+                # TODO: REMOVE THAT
+                time.sleep(12)
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:
@@ -253,6 +259,14 @@ class BaseValidatorNeuron(BaseNeuron):
             wait_for_inclusion=True,
             version_key=self.spec_version,
         )
+        print("RESULT ", result)
+        print(f"""
+            {self.wallet}
+            {self.config.netuid}
+            {uint_uids}
+            {uint_weights}
+            {self.spec_version}
+        """)
         if result is True:
             bt.logging.info("set_weights on chain successfully!")
         else:
