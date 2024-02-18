@@ -2,6 +2,7 @@
 # Copyright © 2023 Yuma Rao
 # TODO(developer): Set your name
 # Copyright © 2023 <your name>
+import os
 import random
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -22,14 +23,19 @@ import time
 
 # Bittensor
 import bittensor as bt
+import numpy as np
 import torch
 
 # Bittensor Validator Template:
 import template
+from neurons.validators.data_generator import DataGenerator
+from neurons.validators.text_completion import OpenAiModel, OllamaModel
 from template.validator import forward
 
 # import base validator class which takes care of most of the boilerplate
 from template.base.validator import BaseValidatorNeuron
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, average_precision_score
+import openai
 
 
 class Validator(BaseValidatorNeuron):
@@ -47,17 +53,35 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
 
-        # TODO(developer): Anything specific to your use case you can do here
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        models = [OpenAiModel(model_name='gpt-3.5-turbo'),
+                  OpenAiModel(model_name='gpt-4-turbo-preview'),
+                  OllamaModel(model_name='vicuna'),
+                  OllamaModel(model_name='mistral')]
+        self.generator = DataGenerator(models, [0.25, 0.25, 0.25, 0.25])
 
-    async def build_queries(self) -> (list[str], torch.FloatTensor):
+    async def build_queries(self) -> (list[str], np.array):
+        data = self.generator.generate_data(n_samples=200)
+        return [el.text for el in data], np.array([int(el.label) for el in data])
 
-        return ['Here is my human-written text'], torch.FloatTensor([0.0])
+    async def count_reward(self, y_true: np.array, y_pred: np.array) -> float:
+        preds = y_pred.astype(int)
 
-    async def count_reward(self, y_pred: torch.FloatTensor, y_true: torch.FloatTensor) -> float:
-        return (y_pred == y_true).mean()
+        # accuracy = accuracy_score(y_true, preds)
+        cm = confusion_matrix(y_true, preds)
+        tn, fp, fn, tp = cm.ravel()
+        f1 = f1_score(y_true, preds)
+        ap_score = average_precision_score(y_true, y_pred)
 
-    async def count_penalty(self, y_pred: torch.FloatTensor, y_true: torch.FloatTensor) -> float:
-        return 1.0
+        res = {'fp_score': 1 - fp / len(y_pred),
+               'f1_score': f1,
+               'ap_score': ap_score}
+        reward = sum([v for v in res.values()]) / len(res)
+        return reward
+
+    async def count_penalty(self, y_pred: np.array, y_true: np.array) -> float:
+        bad = np.any((y_pred < 0) | (y_pred > 1))
+        return 0 if bad else 1
 
     async def get_uids(self):
         # return miners uids, which we want to validate
@@ -81,9 +105,9 @@ class Validator(BaseValidatorNeuron):
 
         rewards = []
         for uid in uids:
-            y_pred = torch.FloatTensor([await self.query_miner(uid, text) for text in texts])
-            reward = await self.count_reward(y_pred, y_true)
-            reward *= await self.count_penalty(y_pred, y_true)
+            y_pred = np.array([await self.query_miner(uid, text) for text in texts])
+            reward = await self.count_reward(y_true, y_pred)
+            reward *= await self.count_penalty(y_true, y_pred)
             rewards.append(reward)
 
         self.update_scores(torch.FloatTensor(rewards), uids)
