@@ -56,18 +56,18 @@ class DataGenerator:
 
         return res
 
-    def generate_data(self, n_samples) -> list[ValDataRow]:
-        human_samples = n_samples // 2
-        ai_samples = n_samples - human_samples
-        return self.generate_human_data(human_samples) + self.generate_ai_data(ai_samples)
+    def generate_data(self, n_human_samples, n_ai_samples) -> list[ValDataRow]:
+        return self.generate_human_data(n_human_samples) + self.generate_ai_data(n_ai_samples)
 
 
 if __name__ == '__main__':
     openai.api_key = os.getenv("OPENAI_API_KEY")
-    models = [OpenAiModel(model_name='gpt-3.5-turbo'), OpenAiModel(model_name='gpt-4-turbo-preview'),
-              OllamaModel(model_name='vicuna'), OllamaModel(model_name='mistral')]
+    models = [OpenAiModel(model_name='gpt-3.5-turbo'),
+              OpenAiModel(model_name='gpt-4-turbo-preview'),
+              OllamaModel(model_name='vicuna'),
+              OllamaModel(model_name='mistral')]
     generator = DataGenerator(models, [0.25, 0.25, 0.25, 0.25])
 
-    data = generator.generate_data(n_samples=10)
+    data = generator.generate_data(n_human_samples=5, n_ai_samples=5)
     data = pd.DataFrame([el.dict() for el in data])
     data.to_csv('val_data.csv', index=False)

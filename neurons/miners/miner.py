@@ -2,6 +2,7 @@
 # Copyright © 2023 Yuma Rao
 # TODO(developer): Set your name
 # Copyright © 2023 <your name>
+import logging
 import random
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -27,6 +28,7 @@ from neurons.miners.deepfake.deepfake import DeepfakeTextDetect
 
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
+from neurons.miners.gpt_zero import GPT2PPL
 
 
 class Miner(BaseMinerNeuron):
@@ -40,7 +42,8 @@ class Miner(BaseMinerNeuron):
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-        self.model = DeepfakeTextDetect()
+        # self.model = DeepfakeTextDetect()
+        self.model = GPT2PPL(device='cpu') #TODO use device
 
     async def forward(
         self, synapse: template.protocol.Dummy
@@ -59,7 +62,14 @@ class Miner(BaseMinerNeuron):
         the miner's intended operation. This method demonstrates a basic transformation of input data.
         """
         # TODO(developer): Replace with actual implementation logic.
-        synapse.dummy_output = self.model(synapse.dummy_input)
+        try:
+            pred = self.model(synapse.dummy_input) > 0.8
+        except Exception as e:
+            pred = 0
+            logging.error('Coulndt proceed text "{}..."'.format(synapse.dummy_input[:100]))
+            logging.exception(e)
+
+        synapse.dummy_output = pred
         return synapse
 
     async def blacklist(

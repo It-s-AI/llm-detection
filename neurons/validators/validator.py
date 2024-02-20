@@ -61,7 +61,7 @@ class Validator(BaseValidatorNeuron):
         self.generator = DataGenerator(models, [0.25, 0.25, 0.25, 0.25])
 
     async def build_queries(self) -> (list[str], np.array):
-        data = self.generator.generate_data(n_samples=200)
+        data = self.generator.generate_data(n_human_samples=100, n_ai_samples=100)
         return [el.text for el in data], np.array([int(el.label) for el in data])
 
     async def count_reward(self, y_true: np.array, y_pred: np.array) -> float:

@@ -1,45 +1,43 @@
 import logging
 import random
+
+import pandas as pd
 # import bittensor as bt
 from datasets import load_dataset
 from collections.abc import Iterator
 from pylatexenc.latex2text import LatexNodes2Text
+from tqdm import tqdm
 
 
 class HumanDataset(Iterator):
     def __init__(self):
         super().__init__()
         seed = random.randint(0, 1000)
-        self.openwebtext = iter(
-            load_dataset("openwebtext", split="train", streaming=True).shuffle(
+        # self.openwebtext = iter(
+        #     load_dataset("openwebtext", split="train", streaming=True).shuffle(
+        #         seed=seed, buffer_size=1000
+        #     )
+        # )
+
+        self.c4 = iter(
+            load_dataset("c4", 'en',  streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=1000
             )
-        )
-        self.red_pajama = iter(
-            load_dataset(
-                "togethercomputer/RedPajama-Data-1T",
-                "default",
-                split="train",
-                streaming=True,
-            ).shuffle(seed=seed, buffer_size=1000)
         )
 
     def __next__(self) -> dict:
         while True:
-            # bt.logging.debug("Retrieving data from HumanDataset...")
-            if random.random() < 0.5:
-                res = {'text': next(self.openwebtext)["text"], 'data_source': 'openwebtext'}
-            else:
-                res = {'text': next(self.red_pajama)["text"], 'data_source': 'red_pajama'}
+            el = next(self.c4)
+            res = {'text': el['text'], 'data_source': 'c4_en'}
 
-            cnt_words = random.randint(25, 500)
-            if len(res['text'].split()) < cnt_words:
-                logging.info('skipping, due to small amout of words')
-                continue
+            # cnt_words = random.randint(25, 500)
+            # if len(res['text'].split()) < cnt_words:
+            #     logging.info('skipping, due to small amout of words')
+            #     continue
 
-            res['text'] = ' '.join(res['text'].split()[:cnt_words])
-            res['text'] = res['text'][:res['text'].rfind('.') + 1]
-            res['text'] = LatexNodes2Text().latex_to_text(res['text'])
+            # res['text'] = ' '.join(res['text'].split()[:cnt_words])
+            # res['text'] = res['text'][:res['text'].rfind('.') + 1]
+            # res['text'] = LatexNodes2Text().latex_to_text(res['text'])
             return res
 
 
@@ -76,5 +74,10 @@ if __name__ == '__main__':
     # print(next(dataset))
 
     dataset = HumanDataset()
-    for i in range(5):
-        print(next(dataset))
+    data = []
+    for i in tqdm(range(200)):
+        data.append(next(dataset))
+    print(data[:5])
+    df = pd.DataFrame(data)
+    df['label'] = 0
+    df.to_csv('../../notebooks/val_data_human_c4.csv', index=False)
