@@ -34,7 +34,6 @@ class TextSynapse(bt.Synapse):
 
     """
 
-    # TODO: определить максимальное и минимальное кол-во текстов для проверки
     texts: List[str] = pydantic.Field(
         ...,
         title="Texts",
@@ -42,7 +41,7 @@ class TextSynapse(bt.Synapse):
         allow_mutation=False,
     )
 
-    predictions: Optional[List[float]] = pydantic.Field(
+    predictions: List[float] = pydantic.Field(
         ...,
         title="Predictions",
         description="List of predicted probabilities. This attribute is mutable and can be updated.",

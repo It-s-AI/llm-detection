@@ -1,13 +1,12 @@
-import torch
-import os
 from transformers import AutoModelForSequenceClassification,AutoTokenizer
-from miners.deepfake.utils import preprocess, detect
 import bittensor as bt
+from tqdm import tqdm
+
+from miners.deepfake.utils import preprocess, detect
 
 
 class DeepfakeTextDetect:
     def __init__(self, config): # use 'cuda:0' if GPU is available
-        print("CONFIG ", config)
         model_dir = "yaful/DeepfakeTextDetection"  # model in the online demo
         self.config = config
         self.device = self.config.neuron.device
@@ -18,14 +17,17 @@ class DeepfakeTextDetect:
         bt.logging.info(f"DeepfakeTextDetect Model Loaded on {self.device}!")
 
 
-    def __call__(self, text):
-        bt.logging.info(f"Text to process: {text}")
-        text = preprocess(text)
-        bt.logging.info(f"Procced: {text}")
-        result = detect(text, self.tokenizer, self.model, self.device)
-        bt.logging.info(f"Result: {result}")
-
-        return [float(result == 'machine-generated')]
+    def __call__(self, texts):
+        bt.logging.info(f"Texts to process: {len(texts)}")
+        results = []
+        for text in tqdm(texts, desc="Processing texts"):
+            text = preprocess(text)
+            bt.logging.info(f"Procced: {text}")
+            result = detect(text, self.tokenizer, self.model, self.device)
+            bt.logging.info(f"Result: {result}")
+            results.append(float(result == 'machine-generated'))
+        bt.logging.info(f"OVERALL RESULTS {results}")
+        return results
 
 
 if __name__ == '__main__':

@@ -48,21 +48,15 @@ async def forward(self):
     bt.logging.info(f"ALL axons {self.metagraph.axons}")
 
     available_axon_size = len(self.metagraph.axons) - 1 # Except our own
-    bt.logging.info(f"available_axon_size {available_axon_size}")
 
     miner_selection_size = min(available_axon_size, self.config.neuron.sample_size)
-    bt.logging.info(f"miner_selection_size {miner_selection_size}")
 
     miner_uids = get_random_uids(self, k=miner_selection_size)
-    bt.logging.info(f"miner_uids {miner_uids}")
 
     axons = [self.metagraph.axons[uid] for uid in miner_uids]
-    bt.logging.info(f"axons {axons}")
+    bt.logging.info(f"axons to serve {axons}")
 
     texts, labels = await self.build_queries()
-    bt.logging.info(f"texts {texts}")
-    bt.logging.info(f"labels {labels}")
-
 
     responses: List[TextSynapse]  = await self.dendrite(
         axons=axons,
@@ -74,10 +68,10 @@ async def forward(self):
     # Log the results for monitoring purposes.
     bt.logging.info(f"Received responses: {responses}")
 
-    # TODO(developer): Define how the validator scores responses.
     # Adjust the scores based on responses from miners.
     rewards = get_rewards(self, labels=labels, responses=responses)
 
+    bt.logging.info(f"Miners: {axons}")
     bt.logging.info(f"Scored responses: {rewards}")
     # Update the scores based on the rewards. You may want to define your own update_scores function for custom behavior.
     self.update_scores(rewards, miner_uids)

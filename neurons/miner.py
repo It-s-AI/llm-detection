@@ -40,7 +40,7 @@ class Miner(BaseMinerNeuron):
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-        print("ULTRA ", self.config)
+
         self.model = DeepfakeTextDetect(self.config)
 
         self.load_state()
@@ -63,18 +63,14 @@ class Miner(BaseMinerNeuron):
         the miner's intended operation. This method demonstrates a basic transformation of input data.
         """
         # TODO(developer): Replace with actual implementation logic.
-        bt.logging.info(f"SHIT")
 
         input_data = synapse.texts
-        bt.logging.info(f"FORWARD PHASE {input_data}")
+        bt.logging.info(f"INPUT: {input_data}")
 
-        bt.logging.info(f"Got texts {input_data}")
+        preds = self.model(input_data)
+        bt.logging.info(f"Made predictions {preds}")
 
-        preds = self.model(input_data[0])
         synapse.predictions = preds
-        # synapse.predictions = [random.random()] * len(input_data)
-        bt.logging.info(f"Made predictions {synapse.predictions}")
-
         return synapse
 
 

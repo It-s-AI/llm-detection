@@ -20,9 +20,11 @@
 import torch
 from typing import List
 import bittensor as bt
+import numpy as np
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, average_precision_score
 
 
-def reward(query: int, response: int) -> float:
+def reward(y_pred: np.array, y_true: np.array) -> float:
     """
     Reward the miner response to the dummy request. This method returns a reward
     value for the miner, which is used to update the miner's score.
@@ -30,10 +32,26 @@ def reward(query: int, response: int) -> float:
     Returns:
     - float: The reward value for the miner.
     """
+    preds = y_pred.astype(int)
 
-    return 1.0 if response == query * 2 else 0
+    # accuracy = accuracy_score(y_true, preds)
+    cm = confusion_matrix(y_true, preds)
+    tn, fp, fn, tp = cm.ravel()
+    f1 = f1_score(y_true, preds)
+    ap_score = average_precision_score(y_true, y_pred)
+
+    res = {'fp_score': 1 - fp / len(y_pred),
+            'f1_score': f1,
+            'ap_score': ap_score}
+    reward = sum([v for v in res.values()]) / len(res)
+    return reward
 
 
+def count_penalty(y_pred: np.array) -> float:
+    bad = np.any((y_pred < 0) | (y_pred > 1))
+    return 0 if bad else 1
+
+    
 def get_rewards(
     self,
     labels: torch.FloatTensor,
@@ -50,8 +68,23 @@ def get_rewards(
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
     # Get all the reward results by iteratively calling your reward() function.
-    bt.logging.info(f"First response {responses[0].predictions}")
+    predictions_list = [synapse.predictions for synapse in responses]
+    bt.logging.info(f"Predictions {predictions_list}")
 
-    rewards = [reward(synapse.predictions, labels) for synapse in responses]
-    bt.logging.info(f"get_rewards() {rewards}")
+    rewards = []
+    for uid in range(len(predictions_list)):
+        # if there is no answer reward should be 0
+        if not predictions_list[uid]:
+            rewards.append(0)
+            continue
+
+        predictions_array = np.array(predictions_list[uid])
+        miner_reward = reward(predictions_array, labels)
+        bt.logging.info(f"#{uid} reward: {miner_reward}")
+
+        miner_reward *= count_penalty(predictions_array)
+        bt.logging.info(f"#{uid} reward with penalty: {miner_reward}")
+        rewards.append(miner_reward)
+
+    bt.logging.info(f"OVERALL REWARDS: {rewards}")
     return torch.FloatTensor(rewards)

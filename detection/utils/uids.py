@@ -18,12 +18,12 @@ def check_uid_availability(
     # Filter non serving axons.
     if not metagraph.axons[uid].is_serving:
         return False
+    
     # Filter validator permit > 1024 stake.
-    # TODO: ПОМЕНЯТЬ КАК БЫЛО
-    print("PERMIT", metagraph.validator_permit[uid])
-    # if metagraph.validator_permit[uid]:
-    if metagraph.S[uid] > vpermit_tao_limit:
-        return False
+    if metagraph.validator_permit[uid]:
+        if metagraph.S[uid] > vpermit_tao_limit:
+            return False
+        
     # Available otherwise.
     return True
 
@@ -45,8 +45,8 @@ def get_random_uids(
     avail_uids = []
 
     for uid in range(self.metagraph.n.item()):
-        print("CHECKING UID")
-        print(uid, self.metagraph.axons[uid])
+        
+        bt.logging.info(f"Running for {self.metagraph.axons[uid]}")
         uid_is_available = check_uid_availability(
             self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
@@ -56,7 +56,8 @@ def get_random_uids(
             avail_uids.append(uid)
             if uid_is_not_excluded:
                 candidate_uids.append(uid)
-        print("AVLB ", avail_uids)
+        bt.logging.info(f"Availability {uid_is_available}")
+
 
     # Check if candidate_uids contain enough for querying, if not grab all avaliable uids
     available_uids = candidate_uids

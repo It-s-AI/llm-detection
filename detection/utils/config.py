@@ -114,14 +114,14 @@ def add_args(cls, parser):
             "--neuron.sample_size",
             type=int,
             help="The number of miners to query in a single step.",
-            default=10,
+            default=2,
         )
 
         parser.add_argument(
             "--neuron.timeout",
             type=int,
             help="Timeout",
-            default=10,
+            default=100,
         )        
 
         parser.add_argument(

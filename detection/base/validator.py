@@ -259,18 +259,11 @@ class BaseValidatorNeuron(BaseNeuron):
             wait_for_inclusion=True,
             version_key=self.spec_version,
         )
-        print("RESULT ", result)
-        print(f"""
-            {self.wallet}
-            {self.config.netuid}
-            {uint_uids}
-            {uint_weights}
-            {self.spec_version}
-        """)
-        if result is True:
+ 
+        if result[0] is True:
             bt.logging.info("set_weights on chain successfully!")
         else:
-            bt.logging.error("set_weights failed")
+            bt.logging.error(f"set_weights failed {result}")
 
     def resync_metagraph(self):
         """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph."""

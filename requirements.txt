@@ -3,3 +3,10 @@ torch
 datasets==2.14.6
 transformers==4.26.0
 clean-text
+openai==0.27.2
+pandas
+numpy
+langchain
+pydantic
+pylatexenc
+scikit-learn
