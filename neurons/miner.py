@@ -41,7 +41,7 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
 
-        self.model = GPT2PPL(device='cpu') #TODO use device
+        self.model = GPT2PPL(device=self.device) #TODO use device
         self.load_state()
 
 

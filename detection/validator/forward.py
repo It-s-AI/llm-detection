@@ -25,6 +25,7 @@ from detection.utils.uids import get_random_uids
 
 import time
 from typing import List
+import torch
 
 
 async def forward(self):
@@ -74,4 +75,4 @@ async def forward(self):
     bt.logging.info(f"Miners: {axons}")
     bt.logging.info(f"Scored responses: {rewards}")
     # Update the scores based on the rewards. You may want to define your own update_scores function for custom behavior.
-    self.update_scores(rewards, miner_uids)
+    self.update_scores(torch.tensor(rewards).to(self.device), torch.tensor(miner_uids).to(self.device))
