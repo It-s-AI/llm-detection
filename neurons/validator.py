@@ -65,7 +65,7 @@ class Validator(BaseValidatorNeuron):
 
 
     async def build_queries(self) -> tuple[List[str], np.array]:
-        data = self.generator.generate_data(n_samples=2)
+        data = self.generator.generate_data(n_human_samples=1, n_ai_samples=1)        
         texts = [el.text for el in data]
         labels = np.array([int(el.label) for el in data])
 

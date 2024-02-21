@@ -60,10 +60,8 @@ class DataGenerator:
             processed += cnt_samples
         return res
 
-    def generate_data(self, n_samples) -> list[ValDataRow]:
-        human_samples = n_samples // 2
-        ai_samples = n_samples - human_samples
-        return self.generate_human_data(human_samples) + self.generate_ai_data(ai_samples)
+    def generate_data(self, n_human_samples, n_ai_samples) -> list[ValDataRow]:
+        return self.generate_human_data(n_human_samples) + self.generate_ai_data(n_ai_samples)
 
 
 if __name__ == '__main__':

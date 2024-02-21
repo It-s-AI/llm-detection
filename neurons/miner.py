@@ -26,7 +26,7 @@ import detection
 
 # import base miner class which takes care of most of the boilerplate
 from detection.base.miner import BaseMinerNeuron
-from miners.deepfake.deepfake import DeepfakeTextDetect
+from miners.gpt_zero import GPT2PPL
 
 
 class Miner(BaseMinerNeuron):
@@ -41,8 +41,7 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
 
-        self.model = DeepfakeTextDetect(self.config)
-
+        self.model = GPT2PPL(device='cpu') #TODO use device
         self.load_state()
 
 
@@ -67,7 +66,17 @@ class Miner(BaseMinerNeuron):
         input_data = synapse.texts
         bt.logging.info(f"INPUT: {input_data}")
 
-        preds = self.model(input_data)
+        preds = []
+        for text in input_data:
+            try:
+                pred_prob = self.model(text) > 0.8
+            except Exception as e:
+                pred_prob = 0
+                bt.logging.error('Coulndt proceed text "{}..."'.format(input_data))
+                bt.logging.errro(e)
+
+            preds.append(pred_prob)
+
         bt.logging.info(f"Made predictions {preds}")
 
         synapse.predictions = preds

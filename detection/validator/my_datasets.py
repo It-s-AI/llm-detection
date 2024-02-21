@@ -10,37 +10,17 @@ class HumanDataset(Iterator):
     def __init__(self):
         super().__init__()
         seed = random.randint(0, 1000)
-        self.openwebtext = iter(
-            load_dataset("openwebtext", split="train", streaming=True).shuffle(
+
+        self.c4 = iter(
+            load_dataset("c4", 'en',  streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=1000
             )
-        )
-        
-        self.red_pajama = iter(
-            load_dataset(
-                "togethercomputer/RedPajama-Data-1T",
-                "default",
-                split="train",
-                streaming=True,
-            ).shuffle(seed=seed, buffer_size=1000)
         )
 
     def __next__(self) -> dict:
         while True:
-            # bt.logging.debug("Retrieving data from HumanDataset...")
-            if random.random() < 0.5:
-                res = {'text': next(self.openwebtext)["text"], 'data_source': 'openwebtext'}
-            else:
-                res = {'text': next(self.red_pajama)["text"], 'data_source': 'red_pajama'}
-
-            cnt_words = random.randint(25, 500)
-            if len(res['text'].split()) < cnt_words:
-                # logging.info('skipping, due to small amout of words')
-                continue
-
-            res['text'] = ' '.join(res['text'].split()[:cnt_words])
-            res['text'] = res['text'][:res['text'].rfind('.') + 1]
-            res['text'] = LatexNodes2Text().latex_to_text(res['text'])
+            el = next(self.c4)
+            res = {'text': el['text'], 'data_source': 'c4_en'}
             return res
 
 
