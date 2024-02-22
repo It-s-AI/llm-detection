@@ -7,9 +7,9 @@
 
 ---
 
-### The Incentivized Internet <!-- omit in toc -->
+## Decentralized AI Detection <!-- omit in toc -->
 
-[Discord](https://discord.gg/bittensor) • [Network](https://taostats.io/) • [Research](https://bittensor.com/whitepaper)
+### [⛏️ Mining Docs](docs/mining.md)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🧑‍🏫 Validating Docs](docs/validating.md) 
 
 </div>
 
@@ -21,9 +21,6 @@ and audio. Given the rapid growth of AI-generated content, such as
 ChatGPT's output of 100 billion words daily compared to humans' 100 trillion,
 we believe that the ability to accurately determine AI-generated text will become increasingly necessary.
 
-## [⛏️ Mining Docs](docs/mining.md)
-
-## [🧑‍🏫 Validating Docs](docs/validating.md) 
 
 ## Problem
 
