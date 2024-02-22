@@ -63,16 +63,16 @@ with codecs.open(
     version_string = version_match.group(1)
 
 setup(
-    name="detection",  # TODO(developer): Change this value to your module subnet name.
+    name="detection",
     version=version_string,
-    description="Bittensor LLM Generated Content Detection",  # TODO(developer): Change this value to your module subnet description.
+    description="Bittensor LLM Generated Content Detection",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/opentensor/bittensor-subnet-template",  # TODO(developer): Change this url to your module subnet github url.
-    author="Nikita Dilman",  # TODO(developer): Change this value to your module subnet author name.
+    url="https://github.com/sergak0/llm-detection", 
+    author="Sergey Volnov & Nikita Dilman",
     packages=find_packages(),
     include_package_data=True,
-    author_email="",  # TODO(developer): Change this value to your module subnet author email.
+    author_email="dalmannikita@gmail.com",
     license="MIT",
     python_requires=">=3.8",
     install_requires=requirements,

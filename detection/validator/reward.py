@@ -69,7 +69,6 @@ def get_rewards(
     """
     # Get all the reward results by iteratively calling your reward() function.
     predictions_list = [synapse.predictions for synapse in responses]
-    bt.logging.info(f"Predictions {predictions_list}")
 
     rewards = []
     for uid in range(len(predictions_list)):
@@ -80,11 +79,8 @@ def get_rewards(
 
         predictions_array = np.array(predictions_list[uid])
         miner_reward = reward(predictions_array, labels)
-        bt.logging.info(f"#{uid} reward: {miner_reward}")
 
         miner_reward *= count_penalty(predictions_array)
-        bt.logging.info(f"#{uid} reward with penalty: {miner_reward}")
         rewards.append(miner_reward)
 
-    bt.logging.info(f"OVERALL REWARDS: {rewards}")
     return torch.FloatTensor(rewards)

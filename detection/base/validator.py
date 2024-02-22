@@ -144,9 +144,6 @@ class BaseValidatorNeuron(BaseNeuron):
 
                 self.step += 1
 
-                # TODO: REMOVE THAT
-                time.sleep(12)
-
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:
             self.axon.stop()

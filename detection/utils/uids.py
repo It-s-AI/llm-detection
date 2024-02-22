@@ -46,7 +46,6 @@ def get_random_uids(
 
     for uid in range(self.metagraph.n.item()):
         
-        bt.logging.info(f"Running for {self.metagraph.axons[uid]}")
         uid_is_available = check_uid_availability(
             self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
@@ -56,7 +55,6 @@ def get_random_uids(
             avail_uids.append(uid)
             if uid_is_not_excluded:
                 candidate_uids.append(uid)
-        bt.logging.info(f"Availability {uid_is_available}")
 
 
     # Check if candidate_uids contain enough for querying, if not grab all avaliable uids

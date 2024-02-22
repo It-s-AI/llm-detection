@@ -78,7 +78,7 @@ def add_args(cls, parser):
         "--neuron.device",
         type=str,
         help="Device to run on.",
-        default="cpu",
+        default="cuda:0",
     )
 
     parser.add_argument(
@@ -121,7 +121,7 @@ def add_args(cls, parser):
             "--neuron.timeout",
             type=int,
             help="Timeout",
-            default=100,
+            default=20,
         )        
 
         parser.add_argument(

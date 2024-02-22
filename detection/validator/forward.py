@@ -45,8 +45,6 @@ async def forward(self):
     # if self.step % 100:
     #     return
     
-    start_time = time.time()
-    bt.logging.info(f"ALL axons {self.metagraph.axons}")
 
     available_axon_size = len(self.metagraph.axons) - 1 # Except our own
 
@@ -55,9 +53,11 @@ async def forward(self):
     miner_uids = get_random_uids(self, k=miner_selection_size)
 
     axons = [self.metagraph.axons[uid] for uid in miner_uids]
-    bt.logging.info(f"axons to serve {axons}")
 
+    start_time = time.time()
     texts, labels = await self.build_queries()
+    end_time = time.time()
+    bt.logging.info(f"Time to generate challenges: {int(end_time - start_time)}")
 
     responses: List[TextSynapse]  = await self.dendrite(
         axons=axons,
@@ -67,12 +67,11 @@ async def forward(self):
     )
 
     # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {responses}")
+    bt.logging.info(f"Received responses: {len(responses)}")
 
     # Adjust the scores based on responses from miners.
     rewards = get_rewards(self, labels=labels, responses=responses)
 
-    bt.logging.info(f"Miners: {axons}")
-    bt.logging.info(f"Scored responses: {rewards}")
-    # Update the scores based on the rewards. You may want to define your own update_scores function for custom behavior.
-    self.update_scores(torch.tensor(rewards).to(self.device), torch.tensor(miner_uids).to(self.device))
+    rewards = torch.tensor(rewards).to(self.device)
+    miner_uids = torch.tensor(miner_uids).to(self.device)
+    self.update_scores(rewards, miner_uids)

@@ -62,9 +62,10 @@ class Miner(BaseMinerNeuron):
         the miner's intended operation. This method demonstrates a basic transformation of input data.
         """
         # TODO(developer): Replace with actual implementation logic.
+        start_time = time.time()
 
         input_data = synapse.texts
-        bt.logging.info(f"INPUT: {input_data}")
+        bt.logging.info(f"Amount of texts recieved: {len(input_data)}")
 
         preds = []
         for text in input_data:
@@ -77,7 +78,7 @@ class Miner(BaseMinerNeuron):
 
             preds.append(pred_prob)
 
-        bt.logging.info(f"Made predictions {preds}")
+        bt.logging.info(f"Made predictions in {int(time.time() - start_time)}s")
 
         synapse.predictions = preds
         return synapse

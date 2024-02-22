@@ -1,0 +1,29 @@
+# ⛏️ Mining Docs
+
+## Installation
+```bash
+git clone https://github.com/sergak0/llm-detection
+cd llm-detection
+pip install -e . 
+```
+
+## Usage
+
+To start mining on the Bittranslate subnetwork you need to create your coldkey, hotkey, and register it on netuid *87*.
+
+Creating Coldkey
+```bash
+btcli w new_coldkey
+```
+Creating Hotkey
+```bash
+btcli w new_hotkey
+```
+Registering your Hotkey
+```bash
+btcli s register --netuid 87 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY
+```
+Now you are ready to start mining!
+```bash
+python3 neurons/miner.py --netuid 87 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --logging.debug --neuron.device cuda:0 --axon.port 70000
+```
