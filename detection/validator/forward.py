@@ -53,6 +53,7 @@ async def forward(self):
     miner_uids = get_random_uids(self, k=miner_selection_size)
 
     axons = [self.metagraph.axons[uid] for uid in miner_uids]
+ 
 
     start_time = time.time()
     texts, labels = await self.build_queries()
@@ -67,7 +68,7 @@ async def forward(self):
     )
 
     # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {len(responses)}")
+    bt.logging.info(f"Received responses: {responses}")
 
     # Adjust the scores based on responses from miners.
     rewards = get_rewards(self, labels=labels, responses=responses)
