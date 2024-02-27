@@ -15,9 +15,7 @@
 
 ## Introduction
 
-Our subnet focuses on the detection of AI-generated content,
-starting primarily with text, but with the potential to extend to images
-and audio. Given the rapid growth of AI-generated content, such as
+Our subnet focuses on the detection of AI-generated content. Given the rapid growth of LLM-generated text, such as
 ChatGPT's output of 100 billion words daily compared to humans' 100 trillion,
 we believe that the ability to accurately determine AI-generated text will become increasingly necessary.
 
