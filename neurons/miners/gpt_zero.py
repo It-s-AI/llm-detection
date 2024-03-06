@@ -47,16 +47,15 @@ class GPT2PPL:
         results = OrderedDict()
 
         total_valid_char = re.findall("[a-zA-Z0-9]+", sentence)
-        total_valid_char = sum([len(x) for x in total_valid_char])  # finds len of all the valid characters a sentence
+        total_valid_char = sum([len(x) for x in total_valid_char]) # finds len of all the valid characters a sentence
 
         # if total_valid_char < 100:
         #     return {"status": "Please input more text (min 100 characters)"}, "Please input more text (min 100 characters)"
 
-        lines = re.split(r'(?<=[.?!][ \[\(])|(?<=\n)\s*', sentence)
+        lines = re.split(r'(?<=[.?!][ \[\(])|(?<=\n)\s*',sentence)
         lines = list(filter(lambda x: (x is not None) and (len(x) > 0), lines))
 
         ppl = self.getPPL(sentence)
-        # print(f"Perplexity {ppl}")
         results["Perplexity"] = ppl
 
         offset = ""
@@ -76,21 +75,17 @@ class GPT2PPL:
                 offset = line[-1]
                 line = line[:-1]
             ppl = self.getPPL(line)
-            if ppl is None:
-                # print('skipping line "{}" due to None ppl'.format(line))
-                continue
+            if ppl is not None:
+                Perplexity_per_line.append(ppl)
 
-            Perplexity_per_line.append(ppl)
+        results["Perplexity per line"] = sum(Perplexity_per_line)/len(Perplexity_per_line)
 
-        results["Perplexity per line"] = sum(Perplexity_per_line) / len(Perplexity_per_line)
-
-        # print(f"Burstiness {max(Perplexity_per_line)}")
         results["Burstiness"] = max(Perplexity_per_line)
 
         out, label = self.getResults(results["Perplexity per line"])
         results["label"] = label
 
-        return results, out
+        return (100 - results['Perplexity']) / 100
 
     def getPPL(self, sentence):
         encodings = self.tokenizer(sentence, return_tensors="pt")
