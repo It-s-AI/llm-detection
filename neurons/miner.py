@@ -70,10 +70,7 @@ class Miner(BaseMinerNeuron):
         preds = []
         for text in input_data:
             try:
-                output = self.model(text)
-                pred_prob = output > 0.8
-                if output is None:
-                    bt.logging.info('Got None PPL on text "{}..."'.format(input_data))
+                pred_prob = self.model(text) > 0.8
             except Exception as e:
                 pred_prob = 0
                 bt.logging.error('Couldnt proceed text "{}..."'.format(input_data))
