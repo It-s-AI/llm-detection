@@ -1,10 +1,26 @@
-## General
+
+<div align="center">
+
+# **Bittensor SN87** <!-- omit in toc -->
+[![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+
+---
+
+## Decentralized AI Detection <!-- omit in toc -->
+
+### [⛏️ Mining Docs](docs/mining.md)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🧑‍🏫 Validating Docs](docs/validating.md) 
+
+</div>
+
+## Introduction
 
 Our subnet focuses on the detection of AI-generated content,
 starting primarily with text, but with the potential to extend to images
 and audio. Given the rapid growth of AI-generated content, such as
 ChatGPT's output of 100 billion words daily compared to humans' 100 trillion,
 we believe that the ability to accurately determine AI-generated text will become increasingly necessary.
+
 
 ## Problem
 
@@ -39,7 +55,7 @@ but also encourages competition to make better and smarter ways to spot AI-gener
 We made a solid baseline model - [open-source implementation](https://github.com/BurhanUlTayyab/GPTZero/tree/main) of GPTZero, which is based on [DetectGPT: Zero-Shot Machine-Generated Text Detection
 using Probability Curvature](https://arxiv.org/pdf/2301.11305v1.pdf) and counting [perplexity of fixed-length models](https://huggingface.co/docs/transformers/perplexity).
 
-On our local validation we got overall accuracy about 85% and f1 score 77%, while
+On our local validation with baseline model we got overall accuracy about 85% and f1 score 77%, while
 the percantage of human-written text, which were recognized as ai-written was only 8%.
 
 | Data Source               | Accuracy |
@@ -48,7 +64,7 @@ the percantage of human-written text, which were recognized as ai-written was on
 | LLM (gpt-4-turbo-preview) | 0.720    |
 | LLM (vicuna)              | 0.840    |
 | LLM (mistral)             | 0.880    |
-| Human-data (c4)           | 0.895    |
+| Human-data                | 0.895    |
 
 ## Validators
 
@@ -71,7 +87,7 @@ We use the [Ollama GitHub repository](https://github.com/ollama) to run Large La
 Currently, we are using only Vicuna and Mistral models for text completion, but we are going
 to extend them in future to improve the robustness of our metrics.
 
-### Reward counting
+## Reward counting
 Based on [Detecting LLM-Generated Text in Computing Education](https://arxiv.org/pdf/2307.07411.pdf) 
 article we decided to dived our reward on 3 parts:
 
