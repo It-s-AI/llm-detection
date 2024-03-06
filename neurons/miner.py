@@ -74,7 +74,7 @@ class Miner(BaseMinerNeuron):
             except Exception as e:
                 pred_prob = 0
                 bt.logging.error('Coulndt proceed text "{}..."'.format(input_data))
-                bt.logging.errro(e)
+                bt.logging.error(e)
 
             preds.append(pred_prob)
 
