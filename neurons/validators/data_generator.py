@@ -62,12 +62,15 @@ class DataGenerator:
 
 if __name__ == '__main__':
     openai.api_key = os.getenv("OPENAI_API_KEY")
-    models = [OpenAiModel(model_name='gpt-3.5-turbo'),
-              OpenAiModel(model_name='gpt-4-turbo-preview'),
-              OllamaModel(model_name='vicuna'),
-              OllamaModel(model_name='mistral')]
-    generator = DataGenerator(models, [0.25, 0.25, 0.25, 0.25])
+    # models = [OpenAiModel(model_name='gpt-3.5-turbo'),
+    #           OpenAiModel(model_name='gpt-4-turbo-preview'),
+    #           OllamaModel(model_name='vicuna'),
+    #           OllamaModel(model_name='mistral')]
+    # generator = DataGenerator(models, [0.25, 0.25, 0.25, 0.25])
 
-    data = generator.generate_data(n_human_samples=5, n_ai_samples=5)
+    models = [OllamaModel(model_name='llama2'), OllamaModel(model_name='neural-chat')]
+    generator = DataGenerator(models, [0.5, 0.5])
+
+    data = generator.generate_data(n_human_samples=0, n_ai_samples=100)
     data = pd.DataFrame([el.dict() for el in data])
-    data.to_csv('val_data.csv', index=False)
+    data.to_csv('val_data_ai.csv', index=False)
