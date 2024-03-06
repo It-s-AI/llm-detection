@@ -76,7 +76,7 @@ class Miner(BaseMinerNeuron):
                     bt.logging.info('Got None PPL on text "{}..."'.format(input_data))
             except Exception as e:
                 pred_prob = 0
-                bt.logging.error('Coulndt proceed text "{}..."'.format(input_data))
+                bt.logging.error('Couldnt proceed text "{}..."'.format(input_data))
                 bt.logging.error(e)
 
             preds.append(pred_prob)
