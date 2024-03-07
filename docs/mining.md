@@ -9,7 +9,7 @@ python3 -m pip install -e .
 
 ## Usage
 
-To start mining on the Bittranslate subnetwork you need to create your coldkey, hotkey, and register it on netuid *32*.
+To start mining on our subnetwork you need to create your coldkey, hotkey, and register it on netuid *32*.
 
 Creating Coldkey
 ```bash
