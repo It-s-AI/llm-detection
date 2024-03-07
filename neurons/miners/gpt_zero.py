@@ -57,7 +57,7 @@ class GPT2PPL:
             if end_loc == seq_len:
                 break
 
-        if torch.isnan(torch.Tensor(nlls)).any():
+        if torch.isnan(torch.Tensor(nlls)).any() or len(nlls) == 0:
             return None
 
         ppl = int(torch.exp(torch.stack(nlls).sum() / end_loc))
