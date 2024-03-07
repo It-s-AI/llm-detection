@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# **Bittensor SN87** <!-- omit in toc -->
+# **Bittensor SN32** <!-- omit in toc -->
 [![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
