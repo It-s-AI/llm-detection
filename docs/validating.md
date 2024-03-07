@@ -4,7 +4,7 @@
 ```bash
 git clone https://github.com/sergak0/llm-detection
 cd llm-detection
-pip install -e . 
+python3 -m pip install -e . 
 ```
 
 
