@@ -68,7 +68,7 @@ setup(
     description="Bittensor LLM Generated Content Detection",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/sergak0/llm-detection", 
+    url="https://github.com/It-s-AI/llm-detection",
     author="Sergey Volnov & Nikita Dilman",
     packages=find_packages(),
     include_package_data=True,
