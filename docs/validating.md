@@ -18,7 +18,7 @@ btcli w new_hotkey
 ```
 Registering your Hotkey
 ```bash
-btcli s register --netuid 87 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY
+btcli s register --netuid 32 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY
 ```
 
 ## Install driver
@@ -54,5 +54,5 @@ ollama run mistral
 
 ## Usage
 ```bash
-python3 neurons/validator.py --netuid 87 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --logging.debug --neuron.device cuda:0 --axon.port 70000
+python3 neurons/validator.py --netuid 32 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --logging.debug --neuron.device cuda:0 --axon.port 70000
 ```
