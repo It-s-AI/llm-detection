@@ -9,7 +9,7 @@ pip install -e .
 
 ## Usage
 
-To start mining on the Bittranslate subnetwork you need to create your coldkey, hotkey, and register it on netuid *87*.
+To start mining on the Bittranslate subnetwork you need to create your coldkey, hotkey, and register it on netuid *32*.
 
 Creating Coldkey
 ```bash
@@ -21,9 +21,9 @@ btcli w new_hotkey
 ```
 Registering your Hotkey
 ```bash
-btcli s register --netuid 87 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY
+btcli s register --netuid 32 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY
 ```
 Now you are ready to start mining!
 ```bash
-python3 neurons/miner.py --netuid 87 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --logging.debug --neuron.device cuda:0 --axon.port 70000
+python3 neurons/miner.py --netuid 32 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --logging.debug --neuron.device cuda:0 --axon.port 70000
 ```
