@@ -36,18 +36,18 @@ Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-In new window do
+Run ollama in background
 ```
-ollama serve
+nohup ollama serve&
 ```
 
 Then download models
 ```
-ollama run vicuna
+ollama pull vicuna
 ```
 
 ```
-ollama run mistral
+ollama pull mistral
 ```
 
 
