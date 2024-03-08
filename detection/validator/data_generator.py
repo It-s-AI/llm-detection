@@ -75,7 +75,7 @@ if __name__ == '__main__':
         start_time = time.time()
         data = generator.generate_data(n_ai_samples=20, n_human_samples=20)
         epoch += 1
-        print('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
+        bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
         time.sleep(1)
 
     # data = pd.DataFrame([el.dict() for el in data])
