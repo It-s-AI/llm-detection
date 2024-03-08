@@ -53,10 +53,13 @@ class DataGenerator:
             model_name = self.model_names[i]
 
             for j in tqdm(range(cnt_samples), desc=f"Generating with {model_name} model"):
-                el = next(self.prompt_dataset)
+                while True:
+                    el = next(self.prompt_dataset)
+                    el['text'] = model(el['prompt'])
+                    el['model_name'] = model_name
+                    if el['text'] is not None:
+                        break
 
-                el['text'] = model(el['prompt'])
-                el['model_name'] = model_name
                 res.append(ValDataRow(**el, label=True))
 
             processed += cnt_samples
