@@ -15,7 +15,7 @@ class HumanDataset(Iterator):
         seed = random.randint(0, 1000)
 
         c4 = iter(
-            load_dataset("c4", 'en',  streaming=True)['train'].shuffle(
+            load_dataset("allenai/c4", 'en',  streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=1000
             )
         )
