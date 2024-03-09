@@ -13,7 +13,7 @@ class OllamaModel:
         """
         bt.logging.info(f'Initializing OllamaModel {model_name}')
         self.model_name = model_name
-        self.model = Ollama(model=model_name, timeout=100, num_thread=2)
+        self.model = Ollama(model=model_name, timeout=100, num_thread=2, num_predict=1500)
         self.text_cleaner = TextCleaner()
 
     def __call__(self, prompt: str) -> str | None:

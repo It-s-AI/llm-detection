@@ -1,5 +1,5 @@
 bittensor==6.9.1
-datasets==2.14.6
+datasets==2.18.0
 langchain_community==0.0.27
 loguru==0.7.0
 numpy==1.24.1

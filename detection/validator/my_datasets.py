@@ -15,7 +15,7 @@ class HumanDataset(Iterator):
         seed = random.randint(0, 1000)
 
         c4 = iter(
-            load_dataset("c4", 'en',  streaming=True)['train'].shuffle(
+            load_dataset("allenai/c4", 'en',  streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=1000
             )
         )
@@ -25,8 +25,13 @@ class HumanDataset(Iterator):
         while True:
             try:
                 el = next(self.c4)
-            except StopIteration:
-                bt.logging.info('Human dataset ended: reinitializing it')
+            except Exception as e:
+                if type(e) == StopIteration:
+                    bt.logging.info('Human dataset ended: reinitializing it')
+                else:
+                    bt.logging.error("Got exception during loading data from human dataset, reinitializing it")
+                    bt.logging.exception(e)
+
                 self.c4 = self.init_dataset()
                 continue
 
@@ -59,12 +64,20 @@ class PromptDataset(Iterator):
                 else:
                     while el['source'] != 'reddit_eli5':
                         el = next(self.hc3)
-            except StopIteration:
-                bt.logging.info('Prompt dataset ended: reinitializing it')
+            except Exception as e:
+                if type(e) == StopIteration:
+                    bt.logging.info('Prompt dataset ended: reinitializing it')
+                else:
+                    bt.logging.error("Got exception during loading data from prompt dataset, reinitializing it")
+                    bt.logging.exception(e)
+
                 self.hc3 = self.init_dataset()
                 continue
 
-            res = {'prompt': el["question"], 'data_source': el['source']}
+            if len(el['question']) > 400:
+                bt.logging.info("Prompt has len {}, truncating it to 400 chars".format(len(el['question'])))
+
+            res = {'prompt': el["question"][:400], 'data_source': el['source']}
 
             # Check if the text is not empty or does not consist only of newline characters
             if res['prompt'].strip():
