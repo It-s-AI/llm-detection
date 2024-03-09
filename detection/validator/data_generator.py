@@ -73,14 +73,15 @@ if __name__ == '__main__':
     models = [OllamaModel(model_name='vicuna'), OllamaModel(model_name='mistral')]
     generator = DataGenerator(models, [0.5, 0.5])
 
-    epoch = 0
-    while True:
-        start_time = time.time()
-        data = generator.generate_data(n_ai_samples=20, n_human_samples=20)
-        epoch += 1
-        bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
-        time.sleep(1)
+    # epoch = 0
+    # while True:
+    #     start_time = time.time()
+    #     data = generator.generate_data(n_ai_samples=20, n_human_samples=20)
+    #     epoch += 1
+    #     bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
+    #     time.sleep(1)
 
-    # data = pd.DataFrame([el.dict() for el in data])
-    # print(data)
-    # data.to_csv('val_data.csv', index=False)
+    data = generator.generate_data(n_ai_samples=50, n_human_samples=0)
+    data = pd.DataFrame([el.dict() for el in data])
+    print(data)
+    data.to_csv('val_data.csv', index=False)

@@ -74,7 +74,10 @@ class PromptDataset(Iterator):
                 self.hc3 = self.init_dataset()
                 continue
 
-            res = {'prompt': el["question"], 'data_source': el['source']}
+            if len(el['question']) > 400:
+                bt.logging.info("Prompt has len {}, truncating it to 400 chars".format(len(el['question'])))
+
+            res = {'prompt': el["question"][:400], 'data_source': el['source']}
 
             # Check if the text is not empty or does not consist only of newline characters
             if res['prompt'].strip():
