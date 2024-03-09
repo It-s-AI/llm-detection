@@ -25,8 +25,13 @@ class HumanDataset(Iterator):
         while True:
             try:
                 el = next(self.c4)
-            except StopIteration:
-                bt.logging.info('Human dataset ended: reinitializing it')
+            except Exception as e:
+                if type(e) == StopIteration:
+                    bt.logging.info('Human dataset ended: reinitializing it')
+                else:
+                    bt.logging.error("Got exception during loading data from human dataset, reinitializing it")
+                    bt.logging.exception(e)
+
                 self.c4 = self.init_dataset()
                 continue
 
@@ -59,8 +64,13 @@ class PromptDataset(Iterator):
                 else:
                     while el['source'] != 'reddit_eli5':
                         el = next(self.hc3)
-            except StopIteration:
-                bt.logging.info('Prompt dataset ended: reinitializing it')
+            except Exception as e:
+                if type(e) == StopIteration:
+                    bt.logging.info('Prompt dataset ended: reinitializing it')
+                else:
+                    bt.logging.error("Got exception during loading data from prompt dataset, reinitializing it")
+                    bt.logging.exception(e)
+
                 self.hc3 = self.init_dataset()
                 continue
 
