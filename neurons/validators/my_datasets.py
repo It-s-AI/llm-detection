@@ -20,7 +20,7 @@ class HumanDataset(Iterator):
         # )
 
         self.c4 = iter(
-            load_dataset("c4", 'en',  streaming=True)['train'].shuffle(
+            load_dataset("allenai/c4", 'en',  streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=1000
             )
         )
@@ -80,4 +80,4 @@ if __name__ == '__main__':
     print(data[:5])
     df = pd.DataFrame(data)
     df['label'] = 0
-    df.to_csv('../../notebooks/val_data_human_c4.csv', index=False)
+    df.to_csv('../../../llm-detection-sergak0/notebooks/val_data_human_allenai_c4_1.csv', index=False)
