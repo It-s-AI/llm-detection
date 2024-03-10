@@ -7,8 +7,9 @@
 
 ---
 
-## Decentralized AI Detection <!-- omit in toc -->
+## Decentralized AI Detection <!-- omit in toc -->  
 
+### [🌐 Website](https://its-ai.streamlit.app/)  
 ### [⛏️ Mining Docs](docs/mining.md)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🧑‍🏫 Validating Docs](docs/validating.md) 
 
 </div>
