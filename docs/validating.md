@@ -39,13 +39,18 @@ curl -fsSL https://ollama.com/install.sh | sh
 Update ollama systemd service configuration
 
 ```bash
-./configure_ollama.sh
+sh configure_ollama.sh
 ```
 
 Start ollama service
 ```
 sudo systemctl daemon-reload
 sudo systemctl enable ollama
+```
+
+To view logs of Ollama running as a startup service, run:
+```
+journalctl -u ollama
 ```
 
 Then download models
