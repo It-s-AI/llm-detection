@@ -50,6 +50,7 @@ class DataGenerator:
                     el['model_name'] = model_name
                     if el['text'] is not None:
                         break
+                    time.sleep(1)
 
                 res.append(ValDataRow(**el, label=True))
 

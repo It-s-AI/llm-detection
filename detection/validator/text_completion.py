@@ -1,3 +1,5 @@
+import logging
+
 import bittensor as bt
 import requests
 
@@ -19,12 +21,8 @@ class OllamaModel:
     def __call__(self, prompt: str) -> str | None:
         try:
             text = self.model.invoke(prompt)
-        except requests.exceptions.Timeout as e:
-            bt.logging.error("Got timeout exception during calling ollama with model {} and prompt: {}".format(self.model_name, prompt))
-            return None
         except Exception as e:
-            bt.logging.error("Got unknown exception during calling ollama with model {} and prompt: {}".format(self.model_name, prompt))
-            bt.logging.exception(e)
+            logging.info("Couldn't get response from Ollama, probably it's restarting: {}".format(e))
             return None
 
         return self.text_cleaner.clean_text(text)

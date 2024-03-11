@@ -29,24 +29,41 @@ apt update
 apt install lshw
 ```
 
-## Download models
+## Setup Ollama
 
 Install Ollama
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-Run ollama in background
+Configurate systemd service. Change file `/etc/systemd/system/ollama.service` with following:
+
+```bash
+Description=Ollama Service
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ollama serve
+User=ollama
+Group=ollama
+Restart=always
+RestartSec=3
+RuntimeMaxSec=3m
+
+[Install]
+WantedBy=default.target
 ```
-nohup ollama serve&
+
+Start ollama service
+```
+sudo systemctl daemon-reload
+sudo systemctl enable ollama
 ```
 
 Then download models
 ```
 ollama pull vicuna
-```
 
-```
 ollama pull mistral
 ```
 
