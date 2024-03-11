@@ -1,9 +1,6 @@
-import logging
-
 import bittensor as bt
-import requests
-
 from langchain_community.llms import Ollama
+
 from detection.validator.text_postprocessing import TextCleaner
 
 
