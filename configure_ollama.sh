@@ -17,7 +17,7 @@ User=ollama
 Group=ollama
 Restart=always
 RestartSec=3
-RuntimeMaxSec=3m
+RuntimeMaxSec=60m
 Environment="PATH=$PATH"
 
 [Install]
