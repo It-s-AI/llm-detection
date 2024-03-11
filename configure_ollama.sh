@@ -1,3 +1,5 @@
+status() { echo ">>> $*" >&2; }
+
 for BINDIR in /usr/local/bin /usr/bin /bin; do
     echo $PATH | grep -q $BINDIR && break || continue
 done
