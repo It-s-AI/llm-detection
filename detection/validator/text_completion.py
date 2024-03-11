@@ -22,7 +22,8 @@ class OllamaModel:
         try:
             text = self.model.invoke(prompt)
         except Exception as e:
-            logging.info("Couldn't get response from Ollama, probably it's restarting: {}".format(e))
+            bt.logging.error("Couldn't get response from Ollama, probably it's restarting")
+            # bt.logging.exception(e)
             return None
 
         return self.text_cleaner.clean_text(text)

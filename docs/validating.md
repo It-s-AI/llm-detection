@@ -43,18 +43,18 @@ sh configure_ollama.sh
 ```
 
 Start ollama service
-```
+```bash
 sudo systemctl daemon-reload
 sudo systemctl enable ollama
 ```
 
 To view logs of Ollama running as a startup service, run:
-```
-journalctl -u ollama
+```bash
+journalctl -u ollama -n 100
 ```
 
 Then download models
-```
+```bash
 ollama pull vicuna
 
 ollama pull mistral
