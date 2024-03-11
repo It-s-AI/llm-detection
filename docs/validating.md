@@ -36,22 +36,10 @@ Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-Configurate systemd service. Change file `/etc/systemd/system/ollama.service` with following:
+Update ollama systemd service configuration
 
 ```bash
-Description=Ollama Service
-After=network-online.target
-
-[Service]
-ExecStart=/usr/bin/ollama serve
-User=ollama
-Group=ollama
-Restart=always
-RestartSec=3
-RuntimeMaxSec=3m
-
-[Install]
-WantedBy=default.target
+./configure_ollama.sh
 ```
 
 Start ollama service
