@@ -80,13 +80,13 @@ if __name__ == '__main__':
     while True:
         start_time = time.time()
         data = generator.generate_data(n_ai_samples=25, n_human_samples=25)
-        full_data += [el.dict() for el in data]
+        # full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
-        if epoch % 5 == 0:
-            df = pd.DataFrame(full_data)
-            df.to_csv("generated_data.csv", index=False)
-            bt.logging.info("Saved {} samples into generated_data.csv".format(len(full_data)))
+        # if epoch % 5 == 0:
+        #     df = pd.DataFrame(full_data)
+        #     df.to_csv("generated_data.csv", index=False)
+        #     bt.logging.info("Saved {} samples into generated_data.csv".format(len(full_data)))
 
         epoch += 1
         time.sleep(1)
