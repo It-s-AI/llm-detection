@@ -27,7 +27,7 @@ compute_spec:
       cuda_cores: 1024                     # Minimum number of CUDA cores (if applicable)
       min_compute_capability: 6.0          # Minimum CUDA compute capability
       recommended_compute_capability: 7.0  # Recommended CUDA compute capability
-      recommended_gpu: "NVIDIA RTX 4090"       # provide a recommended GPU to purchase/rent
+      recommended_gpu: "NVIDIA RTX A4000"       # provide a recommended GPU to purchase/rent
 
     memory:
       min_ram: 16          # Minimum RAM (GB)
