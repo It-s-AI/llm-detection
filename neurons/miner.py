@@ -41,7 +41,7 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
 
-        self.model = GPT2PPL(device=self.device) #TODO use device
+        self.model = GPT2PPL(device=self.device)
         self.load_state()
 
 
@@ -167,4 +167,4 @@ if __name__ == "__main__":
     with Miner() as miner:
         while True:
             bt.logging.info("Miner running...", time.time())
-            time.sleep(5)
+            time.sleep(30)

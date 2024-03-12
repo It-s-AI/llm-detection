@@ -36,7 +36,8 @@ class BaseValidatorNeuron(BaseNeuron):
     """
     Base class for Bittensor validators. Your validator should inherit from this class.
     """
-
+    neuron_type: str = "ValidatorNeuron"
+    
     def __init__(self, config=None):
         super().__init__(config=config)
 
@@ -247,7 +248,7 @@ class BaseValidatorNeuron(BaseNeuron):
         bt.logging.debug("uint_uids", uint_uids)
 
         # Set the weights on chain via our subtensor connection.
-        result = self.subtensor.set_weights(
+        result, msg = self.subtensor.set_weights(
             wallet=self.wallet,
             netuid=self.config.netuid,
             uids=uint_uids,
@@ -257,10 +258,10 @@ class BaseValidatorNeuron(BaseNeuron):
             version_key=self.spec_version,
         )
  
-        if result[0] is True:
+        if result is True:
             bt.logging.info("set_weights on chain successfully!")
         else:
-            bt.logging.error(f"set_weights failed {result}")
+            bt.logging.error(f"set_weights failed {msg}")
 
     def resync_metagraph(self):
         """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph."""
