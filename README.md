@@ -11,6 +11,7 @@
 
 ### [🌐 Website](https://its-ai.streamlit.app/)  
 ### [⛏️ Mining Docs](docs/mining.md)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🧑‍🏫 Validating Docs](docs/validating.md) 
+### [🗺 Vision & Roadmap](docs/vision_and_roadmap.md)  
 
 </div>
 
@@ -48,6 +49,11 @@ As you can see there are a lot of areas where AI detection can
 be very helpful. We believe that creating llm-detection subnet
 not only provides a useful tool at a good price for people to use,
 but also encourages competition to make better and smarter ways to spot AI-generated content.
+
+## Vision and Roadmap
+
+We've outlined our project objectives and end goals in the [Vision & Roadmap](docs/vision_and_roadmap.md) document.
+
 
 ## Miners
 
