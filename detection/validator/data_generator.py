@@ -72,8 +72,10 @@ class DataGenerator:
 
 
 if __name__ == '__main__':
-    models = [OllamaModel(model_name='vicuna'), OllamaModel(model_name='mistral')]
-    generator = DataGenerator(models, [0.5, 0.5])
+    models = [OllamaModel(model_name='neural-chat'), #vicuna
+              OllamaModel(model_name='gemma:7b'),
+              OllamaModel(model_name='llama2:13b')]
+    generator = DataGenerator(models, None)
 
     epoch = 0
     full_data = []
@@ -83,10 +85,13 @@ if __name__ == '__main__':
         # full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
-        # if epoch % 5 == 0:
-        #     df = pd.DataFrame(full_data)
-        #     df.to_csv("generated_data.csv", index=False)
-        #     bt.logging.info("Saved {} samples into generated_data.csv".format(len(full_data)))
+        if epoch % 5 == 0:
+            df = pd.DataFrame(full_data)
+            try:
+                df.to_csv("generated_data.csv", index=False)
+                bt.logging.info("Saved {} samples into generated_data.csv".format(len(full_data)))
+            except:
+                bt.logging.error("Coudnt save data into file")
 
         epoch += 1
         time.sleep(1)
