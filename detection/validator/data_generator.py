@@ -74,14 +74,15 @@ class DataGenerator:
 if __name__ == '__main__':
     models = [OllamaModel(model_name='neural-chat'), #vicuna
               OllamaModel(model_name='gemma:7b'),
-              OllamaModel(model_name='llama2:13b')]
+              OllamaModel(model_name='llama2:13b'),
+              OllamaModel(model_name='zephyr:7b-beta'),]
     generator = DataGenerator(models, None)
 
     epoch = 0
     full_data = []
     while True:
         start_time = time.time()
-        data = generator.generate_data(n_ai_samples=25, n_human_samples=25)
+        data = generator.generate_data(n_ai_samples=20, n_human_samples=20)
         # full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
