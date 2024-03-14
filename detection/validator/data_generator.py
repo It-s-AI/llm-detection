@@ -83,7 +83,7 @@ if __name__ == '__main__':
     while True:
         start_time = time.time()
         data = generator.generate_data(n_ai_samples=100, n_human_samples=0)
-        # full_data += [el.dict() for el in data]
+        full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
         if epoch % 5 == 0:
