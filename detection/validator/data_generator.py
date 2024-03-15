@@ -73,7 +73,7 @@ class DataGenerator:
 
 
 @click.command()
-@click.command("--input_path", defualt=None)
+@click.command("--input_path", default=None)
 @click.command("--output_path", default='generated_data.csv')
 @click.command("--n_samples", default=None)
 @click.command("--batch_size", default=100)
