@@ -7,11 +7,9 @@ Both this code and the orignal code are published under the MIT license.
 by Burhan Ul tayyab and Nicholas Chua
 """
 
-import torch
-import re
-from transformers import GPT2LMHeadModel, GPT2TokenizerFast
-from collections import OrderedDict
 import bittensor as bt
+import torch
+from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
 
 class GPT2PPL:

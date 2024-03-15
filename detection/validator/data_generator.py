@@ -2,6 +2,7 @@ import random
 import time
 
 import bittensor as bt
+import click
 import pandas as pd
 from tqdm import tqdm
 
@@ -71,28 +72,49 @@ class DataGenerator:
         return res
 
 
-if __name__ == '__main__':
-    models = [OllamaModel(model_name='neural-chat'), #vicuna
+@click.command()
+@click.command("--input_path", defualt=None)
+@click.command("--output_path", default='generated_data.csv')
+@click.command("--n_samples", default=None)
+@click.command("--batch_size", default=100)
+def main(input_path, output_path, n_samples, batch_size):
+    models = [OllamaModel(model_name='neural-chat'),
+              OllamaModel(model_name='vicuna'),
               OllamaModel(model_name='gemma:7b'),
-              OllamaModel(model_name='llama2:13b'),
-              OllamaModel(model_name='zephyr:7b-beta'),]
+              OllamaModel(model_name='mistral'),
+              OllamaModel(model_name='zephyr:7b-beta'), ]
     generator = DataGenerator(models, None)
+
+    if input_path is not None:
+        # path_to_prompts = 'prompts.csv'
+        data = pd.read_csv(input_path)
+        generator.prompt_dataset = iter(data)
+        n_samples = len(data)
 
     epoch = 0
     full_data = []
     while True:
         start_time = time.time()
-        data = generator.generate_data(n_ai_samples=100, n_human_samples=0)
+        if len(full_data) == n_samples:
+            bt.logging.info("Successfully generated {} samples, finishing".format(n_samples))
+            break
+
+        cur_batch_size = batch_size if n_samples is None else min(batch_size, n_samples - len(full_data))
+        data = generator.generate_data(n_ai_samples=cur_batch_size, n_human_samples=0)
         full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
-        if epoch % 5 == 0:
+        if epoch % 5 == 0 or len(full_data) == n_samples:
             df = pd.DataFrame(full_data)
             try:
-                df.to_csv("generated_data.csv", index=False)
-                bt.logging.info("Saved {} samples into generated_data.csv".format(len(full_data)))
+                df.to_csv(output_path, index=False)
+                bt.logging.info("Saved {} samples into {}".format(len(full_data), output_path))
             except:
                 bt.logging.error("Coudnt save data into file")
 
         epoch += 1
         time.sleep(1)
+
+
+if __name__ == '__main__':
+    main()
