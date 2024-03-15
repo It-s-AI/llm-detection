@@ -73,10 +73,10 @@ class DataGenerator:
 
 
 @click.command()
-@click.command("--input_path", default=None)
-@click.command("--output_path", default='generated_data.csv')
-@click.command("--n_samples", default=None)
-@click.command("--batch_size", default=100)
+@click.option("--input_path", default=None)
+@click.option("--output_path", default='generated_data.csv')
+@click.option("--n_samples", default=None)
+@click.option("--batch_size", default=100)
 def main(input_path, output_path, n_samples, batch_size):
     models = [OllamaModel(model_name='neural-chat'),
               OllamaModel(model_name='vicuna'),
