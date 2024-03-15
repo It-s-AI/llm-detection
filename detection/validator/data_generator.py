@@ -88,7 +88,7 @@ def main(input_path, output_path, n_samples, batch_size):
     if input_path is not None:
         # path_to_prompts = 'prompts.csv'
         data = pd.read_csv(input_path)
-        generator.prompt_dataset = iter(data)
+        generator.prompt_dataset = iter(data.to_dict('records'))
         n_samples = len(data)
 
     epoch = 0
