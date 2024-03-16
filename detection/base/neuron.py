@@ -80,8 +80,14 @@ class BaseNeuron(ABC):
         # The wallet holds the cryptographic key pairs for the miner.
 
         self.wallet = bt.wallet(config=self.config)
-        self.subtensor = bt.subtensor(config=self.config)
-        self.metagraph = self.subtensor.metagraph(self.config.netuid)
+        while True:
+            try:
+                bt.logging.info("Initializing subtensor and metagraph")
+                self.subtensor = bt.subtensor(config=self.config)
+                self.metagraph = self.subtensor.metagraph(self.config.netuid)
+                break
+            except Exception as e:
+                bt.logging.error("Coulndt init subtensor and metagraph with error: {}".format(e))
 
         bt.logging.info(f"Wallet: {self.wallet}")
         bt.logging.info(f"Subtensor: {self.subtensor}")
@@ -114,14 +120,17 @@ class BaseNeuron(ABC):
         # Ensure miner or validator hotkey is still registered on the network.
         self.check_registered()
 
-        if self.should_sync_metagraph():
-            self.resync_metagraph()
+        try:
+            if self.should_sync_metagraph():
+                self.resync_metagraph()
 
-        if self.should_set_weights():
-            self.set_weights()
+            if self.should_set_weights():
+                self.set_weights()
 
-        # Always save state.
-        self.save_state()
+            # Always save state.
+            self.save_state()
+        except Exception as e:
+            bt.logging.warning("Coundnt sync metagraph or set weights: {}".format(e))
 
     def check_registered(self):
         # --- Check for registration.
