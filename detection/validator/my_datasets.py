@@ -5,6 +5,8 @@ from datasets import load_dataset
 from collections.abc import Iterator
 from pylatexenc.latex2text import LatexNodes2Text
 
+from detection.validator.prompt_generator import PromptGenerator
+
 
 class HumanDataset(Iterator):
     def __init__(self):
@@ -43,6 +45,7 @@ class PromptDataset(Iterator):
     def __init__(self):
         super().__init__()
         self.hc3 = self.init_dataset()
+        self.prompt_generator = PromptGenerator()
 
     def init_dataset(self):
         seed = random.randint(0, 1000)
@@ -53,9 +56,8 @@ class PromptDataset(Iterator):
         )
         return hc3
 
-    def __next__(self) -> dict:
+    def get_hc3_prompt(self):
         while True:
-            # bt.logging.debug("Retrieving data from PromptDataset...")
             try:
                 el = next(self.hc3)
                 if random.random() < 0.5:
@@ -74,10 +76,27 @@ class PromptDataset(Iterator):
                 self.hc3 = self.init_dataset()
                 continue
 
-            if len(el['question']) > 400:
-                bt.logging.info("Prompt has len {}, truncating it to 400 chars".format(len(el['question'])))
+            el['prompt'] = el['question']
+            return el
 
-            res = {'prompt': el["question"][:400], 'data_source': el['source']}
+    def __next__(self) -> dict:
+        while True:
+            # bt.logging.debug("Retrieving data from PromptDataset...")
+            res = {}
+            if random.random() < 0.5:
+                bt.logging.info("Getting prompt from hc3")
+                el = self.get_hc3_prompt()
+                res['data_source'] = 'hc3'
+            else:
+                bt.logging.info("Getting prompt from prompt_generator")
+                el = self.prompt_generator.get_challenge(None)
+                res['data_source'] = 'prompt_generator'
+
+            if len(el['prompt']) > 400:
+                bt.logging.info("Prompt has len {}, truncating it to 400 chars".format(len(el['prompt'])))
+
+            res['prompt'] = el["prompt"][:400]
+            res['task_name'] = el['task'] if res['data_source'] == 'prompt_generator' else el['source']
 
             # Check if the text is not empty or does not consist only of newline characters
             if res['prompt'].strip():
@@ -85,9 +104,9 @@ class PromptDataset(Iterator):
 
 
 if __name__ == '__main__':
-    dataset = PromptDataset()
+    dataset = HumanDataset()
     print(next(dataset))
 
-    dataset = HumanDataset()
-    for i in range(5):
+    dataset = PromptDataset()
+    for i in range(15):
         print(next(dataset))
