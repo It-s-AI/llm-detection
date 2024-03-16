@@ -84,7 +84,7 @@ def get_rewards(
             miner_reward *= count_penalty(predictions_array)
             rewards.append(miner_reward)
         except Exception as e:
-            bt.logging.error("Couldnt count miner reward for {}, his predictinos = {} and his labels = {}".format(uid, predictions_list, labels))
+            bt.logging.error("Couldnt count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels))
             bt.logging.exception(e)
             rewards.append(0)
 
