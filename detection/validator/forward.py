@@ -64,6 +64,7 @@ async def forward(self):
 
     # Adjust the scores based on responses from miners.
     rewards = get_rewards(self, labels=labels, responses=responses)
+    bt.logging.info("Rewards: {}".format(rewards))
 
     rewards = torch.tensor(rewards).to(self.device)
     miner_uids = torch.tensor(miner_uids).to(self.device)
