@@ -28,6 +28,9 @@ import detection
 from detection.base.miner import BaseMinerNeuron
 from miners.gpt_zero import PPLModel
 
+from transformers.utils import logging as hf_logging
+hf_logging.set_verbosity(40)
+
 
 class Miner(BaseMinerNeuron):
     """
