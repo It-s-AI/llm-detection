@@ -12,7 +12,7 @@ import bittensor as bt
 class MyLLMPipeline:
     def __init__(self, model_name='zephyr:7b-beta'):
         self.model = OllamaModel(model_name,
-                                 num_predict=300)
+                                 num_predict=256)
         self.tokenizer = AutoTokenizer.from_pretrained('HuggingFaceH4/zephyr-7b-beta')
 
     def __call__(self, prompt, **kwargs):
@@ -22,7 +22,7 @@ class MyLLMPipeline:
 
 class PromptGenerator:
     def __init__(self,
-                 model_id='HuggingFaceH4/zephyr-7b-beta',
+                 model_id='zephyr:7b-beta',
                  tasks=['summarization', 'qa', 'debugging', 'math', 'date_qa'],
                  task_p=[0.25, 0.25, 0.0, 0.25, 0.25],
                  device='cuda'):
@@ -31,7 +31,8 @@ class PromptGenerator:
         self.model_id = model_id
         self.task_p = task_p
 
-        self.llm_pipeline = MyLLMPipeline()
+        self.llm_pipeline = MyLLMPipeline(model_id)
+
         # self.llm_pipeline = load_pipeline(
         #     model_id=model_id,
         #     torch_dtype=torch.bfloat16,

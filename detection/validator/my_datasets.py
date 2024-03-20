@@ -94,7 +94,7 @@ class PromptDataset(Iterator):
                 res['data_source'] = 'prompt_generator'
 
             if len(el['prompt']) > self.max_prompt_len:
-                bt.logging.info("Prompt has len {}, truncating it to {} chars".format(self.max_prompt_len, len(el['prompt'])))
+                bt.logging.info("Prompt has len {}, truncating it to {} chars".format(len(el['prompt']), self.max_prompt_len))
 
             res['prompt'] = el["prompt"][:self.max_prompt_len]
             res['task_name'] = el['task'] if res['data_source'] == 'prompt_generator' else el['source']
