@@ -2,8 +2,8 @@
 
 ## Installation
 
-Make sure that your server provider support systemd (RunPod doesn't support it), 
-otherwise ollama service won't be restarting automatically.
+Make sure that your server provider support systemd (RunPod doesn't support it).
+Otherwise ollama service won't be restarting automatically and you'll have to restart it on your own from time to time.
 
 ```bash
 git clone https://github.com/It-s-AI/llm-detection
