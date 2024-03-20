@@ -1,6 +1,5 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-
+ # Copyright © 2024 It's AI
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -16,7 +15,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import copy
-import typing
+import time
 
 import bittensor as bt
 
@@ -80,8 +79,16 @@ class BaseNeuron(ABC):
         # The wallet holds the cryptographic key pairs for the miner.
 
         self.wallet = bt.wallet(config=self.config)
-        self.subtensor = bt.subtensor(config=self.config)
-        self.metagraph = self.subtensor.metagraph(self.config.netuid)
+        while True:
+            try:
+                bt.logging.info("Initializing subtensor and metagraph")
+                self.subtensor = bt.subtensor(config=self.config)
+                self.metagraph = self.subtensor.metagraph(self.config.netuid)
+                break
+            except Exception as e:
+                bt.logging.error("Couldn't init subtensor and metagraph with error: {}".format(e))
+                bt.logging.error("If you use public RPC endpoint try to move to local node")
+                time.sleep(5)
 
         bt.logging.info(f"Wallet: {self.wallet}")
         bt.logging.info(f"Subtensor: {self.subtensor}")
@@ -114,15 +121,20 @@ class BaseNeuron(ABC):
         # Ensure miner or validator hotkey is still registered on the network.
         self.check_registered()
 
-        if self.should_sync_metagraph():
-            self.resync_metagraph()
+        try:
+            if self.should_sync_metagraph():
+                self.resync_metagraph()
 
-        if self.should_set_weights():
-            self.set_weights()
+            if self.should_set_weights():
+                self.set_weights()
 
-        # Always save state.
-        self.save_state()
-
+            # Always save state.
+            self.save_state()
+        except Exception as e:
+            bt.logging.error("Coundn't sync metagraph or set weights: {}".format(e))
+            bt.logging.error("If you use public RPC endpoint try to move to local node")
+            time.sleep(5)
+            
     def check_registered(self):
         # --- Check for registration.
         if not self.subtensor.is_hotkey_registered(

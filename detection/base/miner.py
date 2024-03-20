@@ -1,6 +1,5 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-
+ # Copyright © 2024 It's AI
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -183,4 +182,8 @@ class BaseMinerNeuron(BaseNeuron):
         # bt.logging.info("resync_metagraph()")
 
         # Sync the metagraph.
-        self.metagraph.sync(subtensor=self.subtensor)
+        try:
+            self.metagraph.sync(subtensor=self.subtensor)
+        except Exception as e:
+            bt.logging.error("Couldn't resync metagraph, failed with error: {}".format(e))
+            bt.logging.error("If you use public RPC endpoint try to move to local node")
