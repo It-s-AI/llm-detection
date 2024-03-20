@@ -46,22 +46,24 @@ class PromptGenerator:
             )
 
             if task_name is None:
-                task_name = np.random.choice(
+                cur_task = np.random.choice(
                     self.tasks, p=self.task_p
                 )
+            else:
+                cur_task = task_name
 
-            bt.logging.debug(f"📋 Creating {task_name} task... ")
+            bt.logging.debug(f"📋 Creating {cur_task} task... ")
 
             try:
-                task = create_task(llm_pipeline=self.llm_pipeline, task_name=task_name)
+                task = create_task(llm_pipeline=self.llm_pipeline, task_name=cur_task)
                 break
             except Exception as e:
                 bt.logging.error(
-                    f"Failed to create {task_name} task. {sys.exc_info()}. Skipping to next task."
+                    f"Failed to create {cur_task} task. {sys.exc_info()}. Skipping to next task."
                 )
                 continue
 
-        bt.logging.debug(f"🤖 Creating agent for {task_name} task... ")
+        bt.logging.debug(f"🤖 Creating agent for {cur_task} task... ")
         agent = HumanAgent(
             task=task, llm_pipeline=self.llm_pipeline, begin_conversation=True
         )
