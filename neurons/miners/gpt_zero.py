@@ -1,37 +1,58 @@
-"""
-This code a slight modification of perplexity by hugging face
-https://huggingface.co/docs/transformers/perplexity
-
-Both this code and the orignal code are published under the MIT license.
-
-by Burhan Ul tayyab and Nicholas Chua
-"""
-
-import bittensor as bt
 import torch
-from transformers import GPT2LMHeadModel, GPT2TokenizerFast
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from sklearn.linear_model import LogisticRegression
+from tqdm import tqdm
+import pickle
+import numpy as np
 
 
-class GPT2PPL:
-    def __init__(self, device="cuda", model_id="gpt2"):
+class PPLModel:
+    def __init__(self, device="cuda", model_id="microsoft/phi-2"):
         self.device = device
         self.model_id = model_id
-        self.model = GPT2LMHeadModel.from_pretrained(model_id).to(device)
-        self.tokenizer = GPT2TokenizerFast.from_pretrained(model_id)
+        self.model = AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True).to(device)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 
-        self.max_length = self.model.config.n_positions
+        self.max_length = 512 #self.model.config.n_positions
         self.stride = 512
+        self.logreg = LogisticRegression(class_weight='balanced')
 
-    def __call__(self, sentence):
-        ppl = self.getPPL(sentence)
+    def __call__(self, text):
+        ppl = self.getPPL(text)
         if ppl is None:
-            bt.logging.info('Got None PPL on text "{}..."'.format(sentence))
+            print('None ppl')
             return 0
 
-        return (100 - ppl) / 100
+        features = [(100 - ppl) / 100]
+        return self.logreg.predict_proba([features])[0][1]
 
-    def getPPL(self, sentence):
-        encodings = self.tokenizer(sentence, return_tensors="pt")
+    def fit(self, X, y):
+        features = []
+        mask = []
+        for text in tqdm(X):
+            ppl = self.getPPL(text)
+            ppl = (100 - ppl) / 100 if ppl is not None else None
+            features.append(ppl)
+            mask.append(ppl is not None)
+
+        features = np.array(features)
+        mask = np.array(mask)
+        print("Number of not-none ppl: {}".format(mask.sum()))
+
+        features = features[mask]
+        y = y[mask]
+        self.logreg.fit(features.reshape(-1, 1), y)
+
+    def save(self, path):
+        with open(path, 'wb') as f:
+            pickle.dump(self.logreg, f)
+
+    def load_pretrained(self, path):
+        with open(path, 'rb') as f:
+            self.logreg = pickle.load(f)
+
+    def getPPL(self, text):
+        encodings = self.tokenizer(text, return_tensors="pt")
         seq_len = encodings.input_ids.size(1)
 
         nlls = []
@@ -45,8 +66,8 @@ class GPT2PPL:
             target_ids[:, :-trg_len] = -100
 
             with torch.no_grad():
-                outputs = self.model(input_ids, labels=target_ids)
-                neg_log_likelihood = outputs.loss * trg_len
+                loss = self.model(input_ids, labels=target_ids).loss
+                neg_log_likelihood = loss * trg_len
                 likelihoods.append(neg_log_likelihood)
 
             nlls.append(neg_log_likelihood)
@@ -63,7 +84,8 @@ class GPT2PPL:
 
 
 if __name__ == '__main__':
-    model = GPT2PPL(device='cpu')
+    model = PPLModel(device='cpu')
+    model.load_pretrained('neurons/miners/ppl_model.pk')
     text = 'Hello world, i am here'
     res = model(text)
     print(res)

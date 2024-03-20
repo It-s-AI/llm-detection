@@ -6,6 +6,9 @@ Validators will need enough processing power to inference multiple models. It is
 
 ## Installation
 
+Make sure that your server provider support systemd (RunPod doesn't support it).
+Otherwise ollama service won't be restarting automatically and you'll have to restart it on your own from time to time.
+
 1. Clone the repo
 
 ```bash
@@ -17,7 +20,8 @@ git clone https://github.com/It-s-AI/llm-detection
 3. Install the requirements. From your virtual environment, run
 ```shell
 cd llm-detection
-python -m pip install -e .
+python3 -m pip install -e . 
+python3 -m nltk.downloader punkt averaged_perceptron_tagger
 ```
 
 4. Make sure you've [created a Wallet](https://docs.bittensor.com/getting-started/wallets) and [registered a hotkey](https://docs.bittensor.com/subnets/register-and-participate).
@@ -50,8 +54,7 @@ nohup ollama serve&
 
 Then download models
 ```
-ollama pull vicuna
-ollama pull mistral
+ollama pull vicuna && ollama pull mistral && ollama pull neural-chat && ollama pull gemma:7b && ollama pull zephyr:7b-beta
 ```
 
 
