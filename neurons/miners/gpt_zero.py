@@ -4,6 +4,7 @@ from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 import pickle
 import numpy as np
+import bittensor as bt
 
 
 class PPLModel:
@@ -20,7 +21,8 @@ class PPLModel:
     def __call__(self, text):
         ppl = self.getPPL(text)
         if ppl is None:
-            print('None ppl')
+            # print('None ppl')
+            bt.logging.info('Got none ppl on text: {}'.format(text))
             return 0
 
         features = [(100 - ppl) / 100]
