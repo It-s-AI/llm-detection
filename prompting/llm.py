@@ -123,7 +123,7 @@ class HuggingFaceLLM:
 
         response = response.replace(prompt, "").strip()
 
-        bt.logging.info(
+        bt.logging.debug(
             f"{self.__class__.__name__} generated the following output:\n{response}"
         )
         return response

@@ -41,7 +41,7 @@ class PromptGenerator:
 
     def get_challenge(self, task_name=None):
         while True:
-            bt.logging.info(
+            bt.logging.debug(
                 f"📋 Selecting task... from {self.tasks} with distribution {self.task_p}"
             )
 
@@ -50,7 +50,7 @@ class PromptGenerator:
                     self.tasks, p=self.task_p
                 )
 
-            bt.logging.info(f"📋 Creating {task_name} task... ")
+            bt.logging.debug(f"📋 Creating {task_name} task... ")
 
             try:
                 task = create_task(llm_pipeline=self.llm_pipeline, task_name=task_name)
@@ -61,7 +61,7 @@ class PromptGenerator:
                 )
                 continue
 
-        bt.logging.info(f"🤖 Creating agent for {task_name} task... ")
+        bt.logging.debug(f"🤖 Creating agent for {task_name} task... ")
         agent = HumanAgent(
             task=task, llm_pipeline=self.llm_pipeline, begin_conversation=True
         )

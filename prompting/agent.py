@@ -76,7 +76,7 @@ class HumanAgent(HuggingFaceLLM):
         )
 
         if begin_conversation:
-            bt.logging.info("🤖 Generating challenge query...")
+            bt.logging.debug("🤖 Generating challenge query...")
             # initiates the conversation with the miner
             self.challenge = self.create_challenge()
 
@@ -124,11 +124,11 @@ class HumanAgent(HuggingFaceLLM):
             self.task.complete = True
             self.messages.append({"content": top_response, "role": "user"})
 
-            bt.logging.info("Agent finished its goal")
+            bt.logging.debug("Agent finished its goal")
             return
 
         if continue_conversation:
-            bt.logging.info(
+            bt.logging.debug(
                 "↪ Agent did not finish its goal, continuing conversation..."
             )
             self.continue_conversation(miner_response=top_response)

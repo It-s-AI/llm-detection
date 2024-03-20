@@ -84,11 +84,11 @@ class PromptDataset(Iterator):
             # bt.logging.debug("Retrieving data from PromptDataset...")
             res = {}
             if random.random() < 0.3:
-                bt.logging.info("Getting prompt from hc3")
+                bt.logging.debug("Getting prompt from hc3")
                 el = self.get_hc3_prompt()
                 res['data_source'] = 'hc3'
             else:
-                bt.logging.info("Getting prompt from prompt_generator")
+                bt.logging.debug("Getting prompt from prompt_generator")
                 el = self.prompt_generator.get_challenge(None)
                 res['data_source'] = 'prompt_generator'
 
