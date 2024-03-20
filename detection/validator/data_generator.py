@@ -9,16 +9,19 @@ from tqdm import tqdm
 from detection.validator.models import ValDataRow
 from detection.validator.my_datasets import HumanDataset, PromptDataset
 from detection.validator.text_completion import OllamaModel
+from detection.validator.data_augmentation import DataAugmentator
 
 
 class DataGenerator:
-    def __init__(self, models: list, model_probs: list | None):
+    def __init__(self, models: list, model_probs: list | None, min_text_length=250):
         bt.logging.info(f"DataGenerator initializing...")
         bt.logging.info(f"Models {models}")
         bt.logging.info(f"model_probs {model_probs}")
 
+        self.min_text_length = min_text_length
         self.models = models
         self.model_names = [el.model_name for el in models]
+        self.augmentator = DataAugmentator()
 
         if model_probs is None:
             self.model_probs = [1 / len(self.models) for i in range(len(self.models))]
@@ -49,9 +52,16 @@ class DataGenerator:
                     el = next(self.prompt_dataset)
                     el['text'] = model(el['prompt'])
                     el['model_name'] = model_name
-                    if el['text'] is not None:
+                    if el['text'] is None:
+                        continue
+
+                    augs = self.augmentator(el['text'])
+                    el['text'] = augs['text']
+                    for k, v in augs.items():
+                        el['augmentation_{}'.format(k)] = v
+
+                    if el['text'] > self.min_text_length:
                         break
-                    time.sleep(1)
 
                 res.append(ValDataRow(**el, label=True))
 
@@ -63,7 +73,20 @@ class DataGenerator:
 
         res = []
         for i in tqdm(range(n_samples), desc="Generating Humand Data"):
-            res.append(ValDataRow(**next(self.human_dataset), label=False))
+            while True:
+                el = next(self.human_dataset)
+                if el['text'] is None:
+                    continue
+
+                augs = self.augmentator(el['text'])
+                el['text'] = augs['text']
+                for k, v in augs.items():
+                    el['augmentation_{}'.format(k)] = v
+
+                if el['text'] > self.min_text_length:
+                    break
+
+            res.append(ValDataRow(**el, label=False))
         return res
 
     def generate_data(self, n_human_samples, n_ai_samples) -> list[ValDataRow]:
