@@ -26,7 +26,7 @@ import detection
 
 # import base miner class which takes care of most of the boilerplate
 from detection.base.miner import BaseMinerNeuron
-from miners.gpt_zero import GPT2PPL
+from miners.gpt_zero import PPLModel
 
 
 class Miner(BaseMinerNeuron):
@@ -41,9 +41,9 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
 
-        self.model = GPT2PPL(device=self.device)
+        self.model = PPLModel(device=self.device)
+        self.model.load_pretrained('neurons/miners/ppl_model.pk')
         self.load_state()
-
 
     async def forward(
         self, synapse: detection.protocol.TextSynapse
