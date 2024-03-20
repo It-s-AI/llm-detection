@@ -42,10 +42,11 @@ class HumanDataset(Iterator):
 
 
 class PromptDataset(Iterator):
-    def __init__(self):
+    def __init__(self, max_prompt_len=512):
         super().__init__()
         self.hc3 = self.init_dataset()
         self.prompt_generator = PromptGenerator()
+        self.max_prompt_len = max_prompt_len
 
     def init_dataset(self):
         seed = random.randint(0, 1000)
@@ -92,10 +93,10 @@ class PromptDataset(Iterator):
                 el = self.prompt_generator.get_challenge(None)
                 res['data_source'] = 'prompt_generator'
 
-            if len(el['prompt']) > 400:
-                bt.logging.info("Prompt has len {}, truncating it to 400 chars".format(len(el['prompt'])))
+            if len(el['prompt']) > self.max_prompt_len:
+                bt.logging.info("Prompt has len {}, truncating it to {} chars".format(self.max_prompt_len, len(el['prompt'])))
 
-            res['prompt'] = el["prompt"][:400]
+            res['prompt'] = el["prompt"][:self.max_prompt_len]
             res['task_name'] = el['task'] if res['data_source'] == 'prompt_generator' else el['source']
 
             # Check if the text is not empty or does not consist only of newline characters

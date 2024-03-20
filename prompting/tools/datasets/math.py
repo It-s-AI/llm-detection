@@ -56,7 +56,7 @@ class MathDataset(Dataset):
         Returns:
             Dict: _description_
         """
-        bt.logging.info(f"Getting math problem {name!r}")
+        bt.logging.debug(f"Getting math problem {name!r}")
         info = mathgenerator.generate_context(name, **kwargs)
         if info["reward_type"] != "float":
             return None

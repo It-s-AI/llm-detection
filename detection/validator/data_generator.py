@@ -99,8 +99,9 @@ class DataGenerator:
 @click.option("--input_path", default=None)
 @click.option("--output_path", default='generated_data.csv')
 @click.option("--n_samples", default=None)
-@click.option("--batch_size", default=100)
-def main(input_path, output_path, n_samples, batch_size):
+@click.option("--ai_batch_size", default=100)
+@click.option("--human_batch_size", default=0)
+def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
     models = [OllamaModel(model_name='neural-chat'),
               OllamaModel(model_name='vicuna'),
               OllamaModel(model_name='gemma:7b'),
@@ -114,6 +115,9 @@ def main(input_path, output_path, n_samples, batch_size):
         generator.prompt_dataset = iter(data.to_dict('records'))
         n_samples = len(data)
 
+    if n_samples is not None:
+        assert human_batch_size == 0, "You cant set n_samples and human_batch_size at the same time"
+
     epoch = 0
     full_data = []
     while True:
@@ -122,8 +126,8 @@ def main(input_path, output_path, n_samples, batch_size):
             bt.logging.info("Successfully generated {} samples, finishing".format(n_samples))
             break
 
-        cur_batch_size = batch_size if n_samples is None else min(batch_size, n_samples - len(full_data))
-        data = generator.generate_data(n_ai_samples=cur_batch_size, n_human_samples=0)
+        cur_ai_batch_size = ai_batch_size if n_samples is None else min(ai_batch_size, n_samples - len(full_data))
+        data = generator.generate_data(n_ai_samples=cur_ai_batch_size, n_human_samples=human_batch_size)
         full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 

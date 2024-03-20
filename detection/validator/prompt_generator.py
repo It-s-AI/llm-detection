@@ -12,7 +12,7 @@ import bittensor as bt
 class MyLLMPipeline:
     def __init__(self, model_name='zephyr:7b-beta'):
         self.model = OllamaModel(model_name,
-                                 num_predict=512)
+                                 num_predict=300)
         self.tokenizer = AutoTokenizer.from_pretrained('HuggingFaceH4/zephyr-7b-beta')
 
     def __call__(self, prompt, **kwargs):

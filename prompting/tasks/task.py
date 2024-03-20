@@ -81,7 +81,7 @@ class Task(ABC):
         """Generates a reference answer to be used for scoring miner completions"""
         t0 = time.time()
         if not self.static_reference:
-            bt.logging.info("🤖 Generating reference...")
+            bt.logging.debug("🤖 Generating reference...")
 
             self.reference = self.generate(
                 system=self.reference_system_prompt,
@@ -97,7 +97,7 @@ class Task(ABC):
         """Generates a query to be used for generating the challenge"""
         t0 = time.time()
         if not self.static_query:
-            bt.logging.info("🤖 Generating query...")
+            bt.logging.debug("🤖 Generating query...")
             self.query = self.generate(
                 system=self.query_system_prompt,
                 prompt=self.query_prompt,
