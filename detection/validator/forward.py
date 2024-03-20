@@ -1,8 +1,6 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-# TODO(developer): Set your name
-# Copyright © 2023 <your name>
-
+ # Copyright © 2024 It's AI 
+ 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -42,25 +40,17 @@ async def forward(self):
     # Define how the validator selects a miner to query, how often, etc.
     # bt.logging.info(f"STEPS {self.step} {self.step%300} {not (self.step % 300)}")
 
-    # if self.step % 100:
-    #     return
-    
-
     available_axon_size = len(self.metagraph.axons) - 1 # Except our own
-
     miner_selection_size = min(available_axon_size, self.config.neuron.sample_size)
-
     miner_uids = get_random_uids(self, k=miner_selection_size)
-
     axons = [self.metagraph.axons[uid] for uid in miner_uids]
- 
 
     start_time = time.time()
     texts, labels = await self.build_queries()
     end_time = time.time()
     bt.logging.info(f"Time to generate challenges: {int(end_time - start_time)}")
 
-    responses: List[TextSynapse]  = await self.dendrite(
+    responses: List[TextSynapse] = await self.dendrite(
         axons=axons,
         synapse=TextSynapse(texts=texts, predictions=[]),
         deserialize=True,
@@ -72,6 +62,7 @@ async def forward(self):
 
     # Adjust the scores based on responses from miners.
     rewards = get_rewards(self, labels=labels, responses=responses)
+    bt.logging.info("Rewards: {}".format(rewards))
 
     rewards = torch.tensor(rewards).to(self.device)
     miner_uids = torch.tensor(miner_uids).to(self.device)
