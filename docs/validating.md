@@ -9,7 +9,7 @@ Otherwise ollama service won't be restarting automatically and you'll have to re
 git clone https://github.com/It-s-AI/llm-detection
 cd llm-detection
 python3 -m pip install -e . 
-python3 -m nltk.downloader punkt wordnet
+python3 -m nltk.downloader punkt averaged_perceptron_tagger
 ```
 
 

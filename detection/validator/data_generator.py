@@ -60,7 +60,7 @@ class DataGenerator:
                     for k, v in augs.items():
                         el['augmentation_{}'.format(k)] = v
 
-                    if el['text'] > self.min_text_length:
+                    if len(el['text']) > self.min_text_length:
                         break
 
                 res.append(ValDataRow(**el, label=True))
@@ -83,7 +83,7 @@ class DataGenerator:
                 for k, v in augs.items():
                     el['augmentation_{}'.format(k)] = v
 
-                if el['text'] > self.min_text_length:
+                if len(el['text']) > self.min_text_length:
                     break
 
             res.append(ValDataRow(**el, label=False))
