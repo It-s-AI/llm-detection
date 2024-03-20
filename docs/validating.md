@@ -1,6 +1,10 @@
 # 🧑‍🏫 Validating
 
 ## Installation
+
+Make sure that your server provider support systemd (RunPod doesn't support it), 
+otherwise ollama service won't be restarting automatically.
+
 ```bash
 git clone https://github.com/It-s-AI/llm-detection
 cd llm-detection
@@ -43,11 +47,7 @@ nohup ollama serve&
 
 Then download models
 ```
-ollama pull vicuna
-```
-
-```
-ollama pull mistral
+ollama pull vicuna && ollama pull mistral && ollama pull neural-chat && ollama pull gemma:7b && ollama pull zephyr:7b-beta
 ```
 
 
