@@ -26,7 +26,10 @@ import detection
 
 # import base miner class which takes care of most of the boilerplate
 from detection.base.miner import BaseMinerNeuron
-from miners.gpt_zero import GPT2PPL
+from miners.gpt_zero import PPLModel
+
+from transformers.utils import logging as hf_logging
+hf_logging.set_verbosity(40)
 
 
 class Miner(BaseMinerNeuron):
@@ -41,9 +44,9 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
 
-        self.model = GPT2PPL(device=self.device)
+        self.model = PPLModel(device=self.device)
+        self.model.load_pretrained('neurons/miners/ppl_model.pk')
         self.load_state()
-
 
     async def forward(
         self, synapse: detection.protocol.TextSynapse
@@ -69,7 +72,7 @@ class Miner(BaseMinerNeuron):
         preds = []
         for text in input_data:
             try:
-                pred_prob = self.model(text) > 0.8
+                pred_prob = self.model(text)
             except Exception as e:
                 pred_prob = 0
                 bt.logging.error('Couldnt proceed text "{}..."'.format(input_data))
@@ -121,6 +124,12 @@ class Miner(BaseMinerNeuron):
                 f"Blacklisting unrecognized hotkey {synapse.dendrite.hotkey}"
             )
             return True, "Unrecognized hotkey"
+
+        uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
+
+        stake = self.metagraph.S[uid].item()
+        if stake < self.config.blacklist.minimum_stake_requirement:
+            return True, "pubkey stake below min_allowed_stake"
 
         bt.logging.trace(
             f"Not Blacklisting recognized hotkey {synapse.dendrite.hotkey}"

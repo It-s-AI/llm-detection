@@ -113,7 +113,7 @@ def add_args(cls, parser):
             "--neuron.sample_size",
             type=int,
             help="The number of miners to query in a single step.",
-            default=30,
+            default=50,
         )
 
         parser.add_argument(
@@ -160,6 +160,13 @@ def add_args(cls, parser):
             action="store_true",
             help="If set, we will force incoming requests to have a permit.",
             default=False,
+        )
+
+        parser.add_argument(
+            "--blacklist.minimum_stake_requirement",
+            type=int,
+            help="Minimum amount of stake needed to send request to miners.",
+            default=1_000,
         )
 
         parser.add_argument(

@@ -2,6 +2,11 @@ commands.txt
 commands_testnet.txt
 check_vpermit.py
 
+wandb/
+wandb/*
+
+nohup.out
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
