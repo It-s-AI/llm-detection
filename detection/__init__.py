@@ -29,6 +29,6 @@ from . import protocol
 from . import base
 from . import validator
 
-WANDB_PROJECT = "sn32-test-de"
-WANDB_ENTITY = 'infin'
-MAX_RUN_STEPS_PER_WANDB_RUN = 1
+WANDB_PROJECT = "sn32-dev"
+WANDB_ENTITY = "itsai-dev"
+MAX_RUN_STEPS_PER_WANDB_RUN = 3

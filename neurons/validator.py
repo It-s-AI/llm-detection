@@ -34,7 +34,6 @@ from detection.validator.data_generator import DataGenerator
 from detection.validator.text_completion import OllamaModel
 
 
-
 class Validator(BaseValidatorNeuron):
     """
     Your validator neuron class. You should use this class to define your validator's behavior. In particular, you should replace the forward function with your own logic.
@@ -63,8 +62,7 @@ class Validator(BaseValidatorNeuron):
 
     async def build_queries(self) -> tuple[List[str], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
-        #BOMBO
-        data = self.generator.generate_data(n_human_samples=1, n_ai_samples=1)        
+        data = self.generator.generate_data(n_human_samples=25, n_ai_samples=25)        
         texts = [el.text for el in data]
         labels = np.array([int(el.label) for el in data])
         return texts, labels
@@ -78,15 +76,14 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-        # BOMBO
         
-        # try:
-        res = await forward(self)
-        return res
-        # except Exception as e:
-        #     bt.logging.error("Got error in forward function")
-        #     bt.logging.exception(e)
-        #     return None
+        try:
+            res = await forward(self)
+            return res
+        except Exception as e:
+            bt.logging.error("Got error in forward function")
+            bt.logging.exception(e)
+            return None
 
 # The main function parses the configuration and runs the validator.
 if __name__ == "__main__":

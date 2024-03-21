@@ -392,13 +392,8 @@ class BaseValidatorNeuron(BaseNeuron):
         metrics,
         rewards
     ):
-        print("STEP"*10)
-        print(self.step)
-        print(self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0)
-        print((self.step and self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0))
         # If we have already completed X steps then we will complete the current wandb run and make a new one.     
-        # BOMBO
-        if (self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0):
+        if (self.step and self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0):
             step_log = {
                 "timestamp": time.time(),
                 "uids": uids,
