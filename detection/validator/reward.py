@@ -23,6 +23,8 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, average_
 
 from detection.protocol import TextSynapse
 
+import time
+
 
 def reward(y_pred: np.array, y_true: np.array) -> float:
     """
@@ -44,7 +46,7 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
             'f1_score': f1,
             'ap_score': ap_score}
     reward = sum([v for v in res.values()]) / len(res)
-    return reward
+    return reward, res
 
 
 def count_penalty(y_pred: np.array) -> float:
@@ -71,6 +73,7 @@ def get_rewards(
     predictions_list = [synapse.predictions for synapse in responses]
 
     rewards = []
+    metrics = []
     for uid in range(len(predictions_list)):
         try:
             if not predictions_list[uid] or len(predictions_list[uid]) != len(labels):
@@ -78,12 +81,16 @@ def get_rewards(
                 continue
 
             predictions_array = np.array(predictions_list[uid])
-            miner_reward = reward(predictions_array, labels)
-            miner_reward *= count_penalty(predictions_array)
+            miner_reward, metric = reward(predictions_array, labels)
+            penalty = count_penalty(predictions_array)
+            miner_reward *= penalty
             rewards.append(miner_reward)
+            metric['penalty'] = penalty
+            metrics.append(metric)
         except Exception as e:
-            bt.logging.error("Couldnt count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels))
+            bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels))
             bt.logging.exception(e)
             rewards.append(0)
+            metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 1})
 
-    return torch.FloatTensor(rewards)
+    return torch.FloatTensor(rewards), metrics
