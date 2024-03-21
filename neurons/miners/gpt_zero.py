@@ -54,6 +54,7 @@ class PPLModel:
             self.logreg = pickle.load(f)
 
     def getPPL(self, text):
+        text = '.'.join(text.split('.')[:30])
         encodings = self.tokenizer(text, return_tensors="pt")
         seq_len = encodings.input_ids.size(1)
 
