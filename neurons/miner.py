@@ -125,6 +125,12 @@ class Miner(BaseMinerNeuron):
             )
             return True, "Unrecognized hotkey"
 
+        uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
+
+        stake = self.metagraph.S[uid].item()
+        if stake < self.config.blacklist.minimum_stake_requirement:
+            return True, "pubkey stake below min_allowed_stake"
+
         bt.logging.trace(
             f"Not Blacklisting recognized hotkey {synapse.dendrite.hotkey}"
         )

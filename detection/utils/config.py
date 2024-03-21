@@ -163,6 +163,13 @@ def add_args(cls, parser):
         )
 
         parser.add_argument(
+            "--blacklist.minimum_stake_requirement",
+            type=int,
+            help="Minimum amount of stake needed to send request to miners.",
+            default=1_000,
+        )
+
+        parser.add_argument(
             "--blacklist.allow_non_registered",
             action="store_true",
             help="If set, miners will accept queries from non registered entities. (Dangerous!)",
