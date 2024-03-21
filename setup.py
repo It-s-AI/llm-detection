@@ -94,10 +94,3 @@ setup(
 )
 
 
-import sys
-if 'install' in sys.argv:
-    import nltk
-    nltk.download('punkt')
-    nltk.download('averaged_perceptron_tagger')
-
-
