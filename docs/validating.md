@@ -21,7 +21,7 @@ git clone https://github.com/It-s-AI/llm-detection
 ```shell
 cd llm-detection
 python3 -m pip install -e . 
-python3 -m nltk.downloader punkt averaged_perceptron_tagger
+#python3 -m nltk.downloader punkt averaged_perceptron_tagger
 ```
 
 4. Make sure you've [created a Wallet](https://docs.bittensor.com/getting-started/wallets) and [registered a hotkey](https://docs.bittensor.com/subnets/register-and-participate).
