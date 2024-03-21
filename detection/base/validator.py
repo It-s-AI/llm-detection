@@ -153,10 +153,11 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:
+            if self.wandb_run:
+                print("Finishing wandb service...")
+                self.wandb_run.finish()             
             self.axon.stop()
             bt.logging.success("Validator killed by keyboard interrupt.")
-            if self.wandb_run:
-                self.wandb_run.finish()            
             exit()
 
         # In case of unforeseen errors, the validator will log the error and continue operations.
@@ -185,6 +186,9 @@ class BaseValidatorNeuron(BaseNeuron):
         """
         if self.is_running:
             bt.logging.debug("Stopping validator in background thread.")
+            if self.wandb_run:
+                print("Finishing wandb service...")
+                self.wandb_run.finish()              
             self.should_exit = True
             self.thread.join(5)
             self.is_running = False
@@ -209,6 +213,9 @@ class BaseValidatorNeuron(BaseNeuron):
         """
         if self.is_running:
             bt.logging.debug("Stopping validator in background thread.")
+            if self.wandb_run:
+                print("Finishing wandb service...")
+                self.wandb_run.finish()          
             self.should_exit = True
             self.thread.join(5)
             self.is_running = False
@@ -387,27 +394,33 @@ class BaseValidatorNeuron(BaseNeuron):
     ):
         print("STEP"*10)
         print(self.step)
-        # If we have already completed X steps then we will complete the current wandb run and make a new one.        
-        if (self.step and self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0):
+        print(self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0)
+        print((self.step and self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0))
+        # If we have already completed X steps then we will complete the current wandb run and make a new one.     
+        # BOMBO
+        if (self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0):
             step_log = {
                 "timestamp": time.time(),
                 "uids": uids,
-                "uid_data": {},
+                "uid_metrics": {},
             }
-            bt.logging.trace(
+            bt.logging.info(
                 f"Validator has completed {self.step} run steps. Creating a new wandb run."
             )
-            self.wandb_run.finish()
-            self.new_wandb_run()            
+            # self.wandb_run.finish()
+            # self.new_wandb_run()            
 
             for i, uid in enumerate(uids):
-                step_log["uid_data"][str(uid)] = {
+                step_log["uid_metrics"][str(uid)] = {
                     "uid": uid,
                     "weight": self.scores[uid].item(),
                     "reward": rewards[i]
                 }
-                step_log["uid_data"][str(uid)].update(metrics[i])
-            
+                step_log["uid_metrics"][str(uid)].update(metrics[i])
+
+            bt.logging.info(
+                f"step_log: {step_log}"
+            )            
             graphed_data = {
                 "time": time.time(),
                 "block": self.metagraph.block.item(),
@@ -416,9 +429,13 @@ class BaseValidatorNeuron(BaseNeuron):
                 },
                 "weight_data": {str(uid): self.scores[uid].item() for uid in uids},
             }    
-
+            bt.logging.info(
+                f"graphed_data: {graphed_data}"
+            )  
+            step_log.update(graphed_data)
+            
             bt.logging.trace("Logging to Wandb")
             self.wandb_run.log(
-                graphed_data,
+                step_log,
                 step=self.step,
             )

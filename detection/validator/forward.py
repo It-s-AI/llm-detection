@@ -67,5 +67,5 @@ async def forward(self):
     rewards_tensor = torch.tensor(rewards).to(self.device)
     uids_tensor = torch.tensor(miner_uids).to(self.device)
     self.update_scores(rewards_tensor, uids_tensor)
-
+    print("LENS", len(miner_uids), len(metrics), len(rewards))
     self.log_step(miner_uids, metrics, rewards)

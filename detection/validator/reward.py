@@ -78,6 +78,7 @@ def get_rewards(
         try:
             if not predictions_list[uid] or len(predictions_list[uid]) != len(labels):
                 rewards.append(0)
+                metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 1})
                 continue
 
             predictions_array = np.array(predictions_list[uid])
