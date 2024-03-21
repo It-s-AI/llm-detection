@@ -1,5 +1,5 @@
 # The MIT License (MIT)
- # Copyright © 2024 It's AI 
+# Copyright © 2024 It's AI 
  
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -28,3 +28,7 @@ __spec_version__ = (
 from . import protocol
 from . import base
 from . import validator
+
+WANDB_PROJECT = "sn32-dev"
+WANDB_ENTITY = "itsai-dev"
+MAX_RUN_STEPS_PER_WANDB_RUN = 3
