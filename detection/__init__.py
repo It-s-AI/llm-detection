@@ -31,7 +31,13 @@ from . import validator
 <<<<<<< HEAD
 =======
 
+<<<<<<< HEAD
 WANDB_PROJECT = "sn32-test-de"
 WANDB_ENTITY = 'infin'
 MAX_RUN_STEPS_PER_WANDB_RUN = 1
 >>>>>>> 0eb510a (wandb)
+=======
+WANDB_PROJECT = "sn32-dev"
+WANDB_ENTITY = "itsai-dev"
+MAX_RUN_STEPS_PER_WANDB_RUN = 3
+>>>>>>> b0697a3 (wandb fixes)
