@@ -1,3 +1,5 @@
+import time
+
 import bittensor as bt
 from langchain_community.llms import Ollama
 
@@ -22,13 +24,13 @@ class OllamaModel:
         self.text_cleaner = TextCleaner()
 
     def __call__(self, prompt: str) -> str | None:
-        try:
-            text = self.model.invoke(prompt)
-        except Exception as e:
-            bt.logging.info("Couldn't get response from Ollama, probably it's restarting now: {}".format(e))
-            return None
-
-        return self.text_cleaner.clean_text(text)
+        while True:
+            try:
+                text = self.model.invoke(prompt)
+                return self.text_cleaner.clean_text(text)
+            except Exception as e:
+                bt.logging.info("Couldn't get response from Ollama, probably it's restarting now: {}".format(e))
+                time.sleep(1)
 
     def __repr__(self) -> str:
         return f"{self.model_name}"
