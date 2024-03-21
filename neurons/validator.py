@@ -51,13 +51,15 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
 
-        models = [
-            OllamaModel(model_name='vicuna'),
-            OllamaModel(model_name='mistral')
-        ]
+        models = [OllamaModel(model_name='neural-chat'),
+                  OllamaModel(model_name='vicuna'),
+                  OllamaModel(model_name='gemma:7b'),
+                  OllamaModel(model_name='mistral'),
+                  OllamaModel(model_name='zephyr:7b-beta'),]
+
         bt.logging.info(f"Models loaded{models}")
 
-        self.generator = DataGenerator(models, [0.5, 0.5])
+        self.generator = DataGenerator(models, None)
         bt.logging.info(f"Generator initialized {self.generator}")
 
     async def build_queries(self) -> tuple[List[str], np.array]:
