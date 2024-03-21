@@ -59,25 +59,6 @@ ollama pull vicuna && ollama pull mistral && ollama pull neural-chat && ollama p
 
 
 ## Running the Validator
-## With auto-updates
-
-We highly recommend running the validator with auto-updates. This will help ensure your validator is always running the latest release, helping to maintain a high vtrust.
-
-Prerequisites:
-1. To run with auto-update, you will need to have [pm2](https://pm2.keymetrics.io/) installed.
-2. Make sure your virtual environment is activated. This is important because the auto-updater will automatically update the package dependencies with pip.
-3. Make sure you're using the main branch: `git checkout main`.
-
-
-```bash
-pm2 start --name net32-vali-updater --interpreter python3 scripts/start_validator.py -- --pm2_name net32-vali --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --neuron.device cuda:0 --axon.port 70000
-```
-
-This will start a process called `net32-vali-updater`. This process periodically checks for a new git commit on the current branch. When one is found, it performs a `pip install` for the latest packages, and restarts the validator process (who's name is given by the `--pm2_name` flag)
-
-## Without auto-updates
-
-If you'd prefer to manage your own validator updates...
 
 ```bash
 pm2 start --name net32-vali --interpreter python3 ./neurons/validator.py -- --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --neuron.device cuda:0 --axon.port 70000
