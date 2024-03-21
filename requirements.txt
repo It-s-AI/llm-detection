@@ -1,0 +1,15 @@
+bittensor==6.9.3
+datasets==2.18.0
+langchain_community==0.0.27
+loguru==0.7.0
+numpy==1.24.1
+pandas==2.2.1
+pydantic==1.10.14
+pylatexenc==2.10
+Requests==2.31.0
+rich==13.7.1
+scikit_learn==1.4.1.post1
+setuptools==68.2.2
+torch==2.1.0
+tqdm==4.66.2
+transformers==4.26.0
