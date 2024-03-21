@@ -77,13 +77,15 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-        try:
-            res = await forward(self)
-            return res
-        except Exception as e:
-            bt.logging.error("Got error in forward function")
-            bt.logging.exception(e)
-            return None
+        # BOMBO
+        
+        # try:
+        res = await forward(self)
+        return res
+        # except Exception as e:
+        #     bt.logging.error("Got error in forward function")
+        #     bt.logging.exception(e)
+        #     return None
 
 # The main function parses the configuration and runs the validator.
 if __name__ == "__main__":
