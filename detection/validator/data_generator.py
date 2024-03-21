@@ -52,8 +52,6 @@ class DataGenerator:
                     el = next(self.prompt_dataset)
                     el['text'] = model(el['prompt'])
                     el['model_name'] = model_name
-                    if el['text'] is None:
-                        continue
 
                     augs = self.augmentator(el['text'])
                     el['text'] = augs['text']
@@ -75,8 +73,6 @@ class DataGenerator:
         for i in tqdm(range(n_samples), desc="Generating Humand Data"):
             while True:
                 el = next(self.human_dataset)
-                if el['text'] is None:
-                    continue
 
                 augs = self.augmentator(el['text'])
                 el['text'] = augs['text']
