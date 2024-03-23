@@ -400,8 +400,8 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.info(
                 f"Validator has completed {self.step} run steps. Creating a new wandb run."
             )
-            # self.wandb_run.finish()
-            # self.new_wandb_run()            
+            self.wandb_run.finish()
+            self.new_wandb_run()            
 
             for i, uid in enumerate(uids):
                 step_log["uid_metrics"][str(uid)] = {
