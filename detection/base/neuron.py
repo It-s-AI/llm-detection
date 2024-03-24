@@ -83,7 +83,7 @@ class BaseNeuron(ABC):
             try:
                 bt.logging.info("Initializing subtensor and metagraph")
                 self.subtensor = bt.subtensor(config=self.config)
-                self.metagraph = self.subtensor.metagraph(self.config.netuid, lite=False)
+                self.metagraph = self.subtensor.metagraph(self.config.netuid)
                 break
             except Exception as e:
                 bt.logging.error("Couldn't init subtensor and metagraph with error: {}".format(e))
