@@ -49,7 +49,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 Run ollama service in background
 ```
-nohup ollama serve&
+pm2 start "ollama serve"
 ```
 
 Then download models

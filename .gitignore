@@ -1,6 +1,7 @@
 commands.txt
 commands_testnet.txt
 check_vpermit.py
+setup_runpod.sh
 
 wandb/
 wandb/*
