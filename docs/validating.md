@@ -21,6 +21,7 @@ git clone https://github.com/It-s-AI/llm-detection
 ```shell
 cd llm-detection
 python3 -m pip install -e .
+python3 -m pip uninstall mathgenerator -y
 python3 -m pip install git+https://github.com/synapse-alpha/mathgenerator.git
 ```
 

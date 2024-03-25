@@ -6,6 +6,9 @@ import pickle
 import numpy as np
 import bittensor as bt
 
+import logging
+logging.getLogger("transformers.tokenization_utils").setLevel(logging.ERROR)
+
 
 class PPLModel:
     def __init__(self, device="cuda", model_id="microsoft/phi-2"):
