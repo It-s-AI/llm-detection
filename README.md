@@ -93,7 +93,7 @@ We combined two approaches for collecting prompts:
 
 2) Prompt generation (70% of prompts). For prompt generation we implemented the same approach that is used in [prompting subnet](https://github.com/opentensor/prompting/tree/main).
 Here we use different contexts (Wikipedia API, StackOverflow and mathgenerator), different tasks (Question answering, Summarization, Code debugging, Mathematics and more) and
-agents to generate variable prompts on wide range of themes.
+different agents to generate variable prompts on wide range of topics.
 
 
 When prompts are obtained, we use the [Ollama GitHub repository](https://github.com/ollama) to run Large Language Models and generate completions for these prompts.
