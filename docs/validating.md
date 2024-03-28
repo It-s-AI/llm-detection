@@ -35,6 +35,16 @@ btcli s register --netuid 32 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOT
 
 ## Install driver
 
+Install PM2 and the jq package on your system.
+```bash
+sudo apt update && sudo apt install jq && sudo apt install npm && sudo npm install pm2 -g && pm2 update
+```
+
+Make `run.sh` file executable.  
+```bash
+chmod +x run.sh
+```
+
 So Ollama models can detect GPUs on your system
 ```bash
 apt update
@@ -48,7 +58,7 @@ Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-Run ollama service in background
+Run ollama service in background (make sure that you don't have any running instances of ollama before running this command)
 ```
 pm2 start --name ollama "ollama serve"
 ```
@@ -62,5 +72,5 @@ ollama pull vicuna && ollama pull mistral && ollama pull neural-chat && ollama p
 ## Running the Validator
 
 ```bash
-pm2 start --name net32-vali --interpreter python3 ./neurons/validator.py -- --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --neuron.device cuda:0 --axon.port 70000
+pm2 start run.sh --name llm_detection_validators_autoupdate -- --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --axon.port 70000 --neuron.device cuda:0
 ```

@@ -59,19 +59,20 @@ We've outlined our project objectives and end goals in the [Vision & Roadmap](do
 
 ## Miners
 
-We made a solid baseline model - [open-source implementation](https://github.com/BurhanUlTayyab/GPTZero/tree/main) of GPTZero, which is based on [DetectGPT: Zero-Shot Machine-Generated Text Detection
-using Probability Curvature](https://arxiv.org/pdf/2301.11305v1.pdf) and counting [perplexity of fixed-length models](https://huggingface.co/docs/transformers/perplexity).
+We made a solid baseline solution based on counting [perplexity of fixed-length models](https://huggingface.co/docs/transformers/perplexity). 
+For counting PPL we use a fresh phi-2 model from microsoft, which has been released at the end of 2023. 
+We also trained a linear model on the phi-2 outputs, to make probabilities more representative. 
 
-On our local validation with baseline model we got overall accuracy about 85% and f1 score 77%, while
-the percantage of human-written text, which were recognized as ai-written was only 8%.
+On our local validation with baseline model got overall accuracy about 89%, you can find accuracy per data source below:
 
 | Data Source               | Accuracy |
 |---------------------------|-----------|
-| LLM (gpt-3.5-turbo )      | 0.880    |
-| LLM (gpt-4-turbo-preview) | 0.720    |
-| LLM (vicuna)              | 0.840    |
-| LLM (mistral)             | 0.880    |
-| Human-data                | 0.895    |
+| LLM (gemma:7b)            | 0.939    |
+| LLM (neural-chat)         | 0.856    |
+| LLM (zephyr:7b-beta)      | 0.964    |
+| LLM (vicuna)              | 0.981    |
+| LLM (mistral)             | 0.963    |
+| Human-data                | 0.841    |
 
 ## Validators
 
@@ -85,14 +86,24 @@ It includes heuristics to extract only natural language (as opposed to boilerpla
 to extensive deduplication.
 
 ### AI-generated texts
-For AI-generated text collection, we utilize the English section of the [hc3 dataset](https://huggingface.co/datasets/Hello-SimpleAI/HC3),
-which includes various prompts, human responses, and ChatGPT-generated answers.
-To prevent overfitting on this dataset, we exclude ChatGPT answers and 
-instead run Large Language Models on random prompts from hc3 each time we conduct validation data.
+For AI-generated text collection, we need to obtain prompts and then generate texts based on this prompts.
+We combined two approaches for collecting prompts: 
 
-We use the [Ollama GitHub repository](https://github.com/ollama) to run Large Language Models.
-Currently, we are using only Vicuna and Mistral models for text completion, but we are going
-to extend them in future to improve the robustness of our metrics.
+1) Open Dataset (30% of prompts). Some prompts are taken from the English section of the [hc3 dataset](https://huggingface.co/datasets/Hello-SimpleAI/HC3).
+
+2) Prompt generation (70% of prompts). For prompt generation we implemented the same approach that is used in [prompting subnet](https://github.com/opentensor/prompting/tree/main).
+Here we use different contexts (Wikipedia API, StackOverflow and mathgenerator), different tasks (Question answering, Summarization, Code debugging, Mathematics and more) and
+different agents to generate variable prompts on wide range of topics.
+
+
+When prompts are obtained, we use the [Ollama GitHub repository](https://github.com/ollama) to run Large Language Models and generate completions for these prompts.
+As LLMs we use five SOTA models: vicuna, mistral, gemma:7b, neural-chat and zephyr:7b-beta.
+
+### Data augmentation
+To prevent remembering C4 dataset, which contains human-written texts, we add some augmentation to both ai-generated and human-written texts. 
+First of all we select a random a sequence of consecutive setences from a given text. Then we add in a random place misspelling or removing a random adjective.
+
+This augmentations don't allow miners to precalculate hashes on C4 dataset and then use them to determine whether this present in C4 or not.
 
 ## Reward counting
 Based on [Detecting LLM-Generated Text in Computing Education](https://arxiv.org/pdf/2307.07411.pdf) 

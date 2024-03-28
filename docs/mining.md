@@ -47,7 +47,15 @@ docker compose up --detach
 
 ## Running the Miner
 
+
+
 > **Note:** Recently, the public RPC endpoint has been under high load, so it's strongly advised that you use your local Subtensor instance!
+
+
+Install PM2 and the jq package on your system.
+```bash
+sudo apt update && sudo apt install jq && sudo apt install npm && sudo npm install pm2 -g && pm2 update
+```
 
 To start your miner basic command is
 

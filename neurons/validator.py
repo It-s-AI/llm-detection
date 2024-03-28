@@ -87,6 +87,7 @@ class Validator(BaseValidatorNeuron):
             bt.logging.exception(e)
             return None
 
+
 # The main function parses the configuration and runs the validator.
 if __name__ == "__main__":
     with Validator() as validator:

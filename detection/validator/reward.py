@@ -34,7 +34,7 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
     Returns:
     - float: The reward value for the miner.
     """
-    preds = y_pred.astype(int)
+    preds = np.round(y_pred)
 
     # accuracy = accuracy_score(y_true, preds)
     cm = confusion_matrix(y_true, preds)
