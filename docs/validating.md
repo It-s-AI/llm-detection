@@ -58,7 +58,7 @@ Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-Run ollama service in background
+Run ollama service in background (make sure that you don't have any running instances of ollama before running this command)
 ```
 pm2 start --name ollama "ollama serve"
 ```
