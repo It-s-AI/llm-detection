@@ -50,19 +50,30 @@ async def forward(self):
     end_time = time.time()
     bt.logging.info(f"Time to generate challenges: {int(end_time - start_time)}")
 
-    responses: List[TextSynapse] = await self.dendrite(
-        axons=axons,
-        synapse=TextSynapse(texts=texts, predictions=[]),
-        deserialize=True,
-        timeout=self.config.neuron.timeout,
-    )
+    step = 35
+    # Use range() to generate indices from 0 to len(axons), stepping by 'step'
+    all_responses = []
+    for i in range(0, len(axons), step):
+        bt.logging.info(f"Sending challenges to the #{i} subset of miners with size {step}")
+        subset_axons = axons[i:i+step]
 
-    # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {responses}")
+        responses: List[TextSynapse] = await self.dendrite(
+            axons=subset_axons,
+            synapse=TextSynapse(texts=texts, predictions=[]),
+            deserialize=True,
+            timeout=self.config.neuron.timeout,
+        )
+
+        # Log the results for monitoring purposes.
+        bt.logging.info(f"Received responses: {len(responses)}")
+        all_responses.extend(responses)
+        bt.logging.info(f"Overall amount of responses: {len(all_responses)}")
 
     # Adjust the scores based on responses from miners.
-    rewards, metrics = get_rewards(self, labels=labels, responses=responses)
+    rewards, metrics = get_rewards(self, labels=labels, responses=all_responses)
+    bt.logging.info("Miner uids: {}".format(miner_uids))
     bt.logging.info("Rewards: {}".format(rewards))
+    bt.logging.info("Metrics: {}".format(metrics))
 
     rewards_tensor = torch.tensor(rewards).to(self.device)
     uids_tensor = torch.tensor(miner_uids).to(self.device)

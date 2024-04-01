@@ -371,7 +371,8 @@ class BaseValidatorNeuron(BaseNeuron):
     def new_wandb_run(self):
         """Creates a new wandb run to save information to."""
         # Create a unique run id for this run.
-        run_id = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        run_id = dt.datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+
         name = "validator-" + str(self.uid) + "-" + run_id
         self.wandb_run = wandb.init(
             name=name,
