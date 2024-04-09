@@ -49,7 +49,7 @@ class Miner(BaseMinerNeuron):
 
         if self.config.neuron.model_type == 'ppl':
             self.model = PPLModel(device=self.device)
-            self.model.load_pretrained(self.config.neurons.ppl_model_path)
+            self.model.load_pretrained(self.config.neuron.ppl_model_path)
         else:
             self.model = DebertaClassifier(foundation_model_path=self.config.neuron.deberta_foundation_model_path,
                                            model_path=self.config.neuron.deberta_model_path,
