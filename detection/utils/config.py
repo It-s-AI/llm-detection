@@ -162,6 +162,33 @@ def add_args(cls, parser):
             default=1_000,
         )
 
+        parser.add_argument(
+            "--neuron.deberta_foundation_model_path",
+            type=str,
+            help="Path to foundation model, which is using in deberta classifier",
+            default="models/deberta_foundational",
+        )
+
+        parser.add_argument(
+            "--neuron.deberta_model_path",
+            type=str,
+            help="Path to finetuned model, which is using in deberta classifier",
+            default="models/deberta_finetuned.pth",
+        )
+
+        parser.add_argument(
+            "--neuron.ppl_model_path",
+            type=str,
+            help="Path to ppl_model.pk, which is using in PPL classifier",
+            default="models/ppl_model.pk",
+        )
+
+        parser.add_argument(
+            "--neuron.model_type",
+            type=str,
+            help="Which model use, on of ['deberta', 'ppl']",
+            default="deberta",
+        )
 
 
 def config(cls):
