@@ -27,6 +27,14 @@ cd llm-detection
 python -m pip install -e .
 ```
 
+4. Download models for LLM classification
+```commandline
+pip3 install gdown
+gdown https://drive.google.com/uc?id=1cYDfiS3BItRlQRRwXGwdCJxqNGIgMHEH -O models/deberta_finetuned.pth
+gdown https://drive.google.com/uc?id=1O1VDf-MbbO93f1dM3ubrZ464ScGTTRd5 -O models/deberta-v3-large-hf-weights.zip
+unzip models/deberta-v3-large-hf-weights.zip -d models/deberta-v3-large-hf-weights
+```
+
 4. Make sure you've [created a Wallet](https://docs.bittensor.com/getting-started/wallets) and [registered a hotkey](https://docs.bittensor.com/subnets/register-and-participate).
 
 ```bash

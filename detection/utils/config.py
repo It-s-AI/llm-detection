@@ -166,7 +166,7 @@ def add_args(cls, parser):
             "--neuron.deberta_foundation_model_path",
             type=str,
             help="Path to foundation model, which is using in deberta classifier",
-            default="models/deberta_foundational",
+            default="models/deberta-v3-large-hf-weights",
         )
 
         parser.add_argument(
