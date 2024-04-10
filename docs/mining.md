@@ -30,7 +30,7 @@ python -m pip install -e .
 4. Download models for LLM classification
 ```commandline
 pip3 install gdown
-gdown https://drive.google.com/uc?id=1cYDfiS3BItRlQRRwXGwdCJxqNGIgMHEH -O models/deberta_finetuned.pth
+gdown https://drive.google.com/uc?id=1cYDfiS3BItRlQRRwXGwdCJxqNGIgMHEH -O models/deberta-large-ls03-ctx1024.pth
 gdown https://drive.google.com/uc?id=1O1VDf-MbbO93f1dM3ubrZ464ScGTTRd5 -O models/deberta-v3-large-hf-weights.zip
 unzip models/deberta-v3-large-hf-weights.zip -d models/deberta-v3-large-hf-weights
 ```

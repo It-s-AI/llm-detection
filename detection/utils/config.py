@@ -173,7 +173,7 @@ def add_args(cls, parser):
             "--neuron.deberta_model_path",
             type=str,
             help="Path to finetuned model, which is using in deberta classifier",
-            default="models/deberta_finetuned.pth",
+            default="models/deberta-large-ls03-ctx1024.pth",
         )
 
         parser.add_argument(
