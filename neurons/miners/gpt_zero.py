@@ -31,6 +31,12 @@ class PPLModel:
         features = [(100 - ppl) / 100]
         return self.logreg.predict_proba([features])[0][1]
 
+    def predict_batch(self, texts):
+        preds = []
+        for text in texts:
+            preds.append(self.__call__(text))
+        return preds
+
     def fit(self, X, y):
         features = []
         mask = []
