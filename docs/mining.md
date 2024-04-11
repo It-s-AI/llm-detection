@@ -30,8 +30,8 @@ python -m pip install -e .
 
 4. Download models for LLM classification
 ```commandline
-gdown https://drive.google.com/uc?id=1cYDfiS3BItRlQRRwXGwdCJxqNGIgMHEH -O models/deberta-large-ls03-ctx1024.pth
-gdown https://drive.google.com/uc?id=1O1VDf-MbbO93f1dM3ubrZ464ScGTTRd5 -O models/deberta-v3-large-hf-weights.zip
+wget https://huggingface.co/sergak0/sn32/resolve/main/deberta-large-ls03-ctx1024.pth -O models/deberta-large-ls03-ctx1024.pth
+wget https://huggingface.co/sergak0/sn32/resolve/main/deberta-v3-large-hf-weights.zip -O models/deberta-v3-large-hf-weights.zip
 apt install zip unzip
 unzip models/deberta-v3-large-hf-weights.zip -d models/deberta-v3-large-hf-weights
 ```
