@@ -16,6 +16,7 @@ Miners will need enough processing power to inference models. The device the mod
 1. Clone the repo
 
 ```bash
+apt update && apt upgrade -y
 git clone https://github.com/It-s-AI/llm-detection
 ```  
 
@@ -29,7 +30,6 @@ python -m pip install -e .
 
 4. Download models for LLM classification
 ```commandline
-pip3 install gdown
 gdown https://drive.google.com/uc?id=1cYDfiS3BItRlQRRwXGwdCJxqNGIgMHEH -O models/deberta-large-ls03-ctx1024.pth
 gdown https://drive.google.com/uc?id=1O1VDf-MbbO93f1dM3ubrZ464ScGTTRd5 -O models/deberta-v3-large-hf-weights.zip
 apt install zip unzip

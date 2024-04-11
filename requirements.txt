@@ -16,6 +16,7 @@ transformers==4.36.0
 nltk==3.8.1
 wandb==0.16.4
 hf_transfer
+gdown
 
 bs4
 pre-commit==3.3.2

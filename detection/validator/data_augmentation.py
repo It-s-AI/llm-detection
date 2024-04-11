@@ -68,11 +68,15 @@ class DataAugmentator:
     def __call__(self, text):
         text = self.subsample_sentences(text)['text']
 
-        if random.random() < 0.5:
+        p = random.random()
+        if p < 0.3:
             res = self.add_misspell(text)
             res['type'] = 'misspell'
-        else:
+        elif p < 0.6:
             res = self.remove_random_adjective(text)
             res['type'] = 'remove_adj'
+        else:
+            res = {'text': text, 'type': 'subsample_sentences', 'subtype': 'None'}
+
         return res
 
