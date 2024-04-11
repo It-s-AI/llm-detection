@@ -16,6 +16,7 @@ Miners will need enough processing power to inference models. The device the mod
 1. Clone the repo
 
 ```bash
+apt update && apt upgrade -y
 git clone https://github.com/It-s-AI/llm-detection
 ```  
 
@@ -25,6 +26,14 @@ git clone https://github.com/It-s-AI/llm-detection
 ```shell
 cd llm-detection
 python -m pip install -e .
+```
+
+4. Download models for LLM classification
+```commandline
+gdown https://drive.google.com/uc?id=1cYDfiS3BItRlQRRwXGwdCJxqNGIgMHEH -O models/deberta-large-ls03-ctx1024.pth
+gdown https://drive.google.com/uc?id=1O1VDf-MbbO93f1dM3ubrZ464ScGTTRd5 -O models/deberta-v3-large-hf-weights.zip
+apt install zip unzip
+unzip models/deberta-v3-large-hf-weights.zip -d models/deberta-v3-large-hf-weights
 ```
 
 4. Make sure you've [created a Wallet](https://docs.bittensor.com/getting-started/wallets) and [registered a hotkey](https://docs.bittensor.com/subnets/register-and-participate).

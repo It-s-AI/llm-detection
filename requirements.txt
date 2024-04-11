@@ -1,4 +1,4 @@
-bittensor==6.9.3
+bittensor==6.10.1
 datasets==2.18.0
 langchain_community==0.0.27
 loguru==0.7.0
@@ -16,6 +16,7 @@ transformers==4.36.0
 nltk==3.8.1
 wandb==0.16.4
 hf_transfer
+gdown
 
 bs4
 pre-commit==3.3.2

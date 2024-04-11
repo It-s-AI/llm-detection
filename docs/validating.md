@@ -12,6 +12,7 @@ Otherwise ollama service won't be restarting automatically and you'll have to re
 1. Clone the repo
 
 ```bash
+apt update && apt upgrade -y
 git clone https://github.com/It-s-AI/llm-detection
 ```  
 

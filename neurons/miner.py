@@ -29,6 +29,9 @@ from detection.base.miner import BaseMinerNeuron
 from miners.gpt_zero import PPLModel
 
 from transformers.utils import logging as hf_logging
+
+from neurons.miners.deberta_classifier import DebertaClassifier
+
 hf_logging.set_verbosity(40)
 
 
@@ -44,8 +47,14 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
 
-        self.model = PPLModel(device=self.device)
-        self.model.load_pretrained('neurons/miners/ppl_model.pk')
+        if self.config.neuron.model_type == 'ppl':
+            self.model = PPLModel(device=self.device)
+            self.model.load_pretrained(self.config.neuron.ppl_model_path)
+        else:
+            self.model = DebertaClassifier(foundation_model_path=self.config.neuron.deberta_foundation_model_path,
+                                           model_path=self.config.neuron.deberta_model_path,
+                                           device=self.device)
+
         self.load_state()
 
     async def forward(
