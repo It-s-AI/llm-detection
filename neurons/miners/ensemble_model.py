@@ -1,5 +1,5 @@
-from deberta_classifier import DebertaClassifier
-from gpt_zero import PPLModel
+from neurons.miners.deberta_classifier import DebertaClassifier
+from neurons.miners.gpt_zero import PPLModel
 
 
 class EnsembleModel:
