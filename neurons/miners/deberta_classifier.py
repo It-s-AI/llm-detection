@@ -33,7 +33,7 @@ def GeneratePredictions(model, tokenizer, test_dataset, device):
 
     all_predictions = []
     with torch.no_grad():
-        for batch in tqdm(data_loader):
+        for batch in data_loader:
             token_sequences = batch.input_ids.to(device)
             attention_masks = batch.attention_mask.to(device)
 
