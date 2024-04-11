@@ -186,7 +186,7 @@ def add_args(cls, parser):
         parser.add_argument(
             "--neuron.model_type",
             type=str,
-            help="Which model use, on of ['deberta', 'ppl']",
+            help="Which model use, on of ['deberta', 'ppl', 'ensemble']",
             default="deberta",
         )
 

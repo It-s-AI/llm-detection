@@ -31,6 +31,7 @@ from miners.gpt_zero import PPLModel
 from transformers.utils import logging as hf_logging
 
 from neurons.miners.deberta_classifier import DebertaClassifier
+from neurons.miners.ensemble_model import EnsembleModel
 
 hf_logging.set_verbosity(40)
 
@@ -50,10 +51,19 @@ class Miner(BaseMinerNeuron):
         if self.config.neuron.model_type == 'ppl':
             self.model = PPLModel(device=self.device)
             self.model.load_pretrained(self.config.neuron.ppl_model_path)
-        else:
+        elif self.config.neuron.model_type == 'deberta':
             self.model = DebertaClassifier(foundation_model_path=self.config.neuron.deberta_foundation_model_path,
                                            model_path=self.config.neuron.deberta_model_path,
                                            device=self.device)
+        elif self.config.neuron.model_type == 'ensemble':
+            ppl_model = PPLModel(device=self.device)
+            ppl_model.load_pretrained(self.config.neuron.ppl_model_path)
+            deberta_model = DebertaClassifier(foundation_model_path=self.config.neuron.deberta_foundation_model_path,
+                                              model_path=self.config.neuron.deberta_model_path,
+                                              device=self.device)
+            self.model = EnsembleModel(ppl_model, deberta_model)
+        else:
+            raise Exception("Unknown model_type: {}".format(self.config.neuron.model_type))
 
         self.load_state()
 
