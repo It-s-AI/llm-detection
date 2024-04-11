@@ -81,7 +81,7 @@ class Miner(BaseMinerNeuron):
         preds = []
         for text in input_data:
             try:
-                pred_prob = self.model(text)
+                pred_prob = self.model(text) > 0.5
             except Exception as e:
                 pred_prob = 0
                 bt.logging.error('Couldnt proceed text "{}..."'.format(input_data))
