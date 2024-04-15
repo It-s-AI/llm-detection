@@ -35,6 +35,7 @@ import datetime as dt
 import wandb
 import time
 
+import json
 
 class BaseValidatorNeuron(BaseNeuron):
     """
@@ -389,52 +390,53 @@ class BaseValidatorNeuron(BaseNeuron):
         )
 
         bt.logging.debug(f"Started a new wandb run: {name}")
-    
+        
     def log_step(
-        self,
-        uids,
-        metrics,
-        rewards
-    ):
-        # If we have already completed X steps then we will complete the current wandb run and make a new one.     
-        if (self.step and self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0):
-            step_log = {
-                "timestamp": time.time(),
-                "uids": uids,
-                "uid_metrics": {},
-            }
-            bt.logging.info(
-                f"Validator has completed {self.step} run steps. Creating a new wandb run."
-            )
-            self.wandb_run.finish()
-            self.new_wandb_run()            
-
-            for i, uid in enumerate(uids):
-                step_log["uid_metrics"][str(uid)] = {
-                    "uid": uid,
-                    "weight": self.scores[uid].item(),
-                    "reward": rewards[i]
+            self,
+            uids,
+            metrics,
+            rewards
+        ):
+            # If we have already completed X steps then we will complete the current wandb run and make a new one.     
+            if (self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0):
+                step_log = {
+                    "timestamp": time.time(),
+                    "uids": uids.tolist(),
+                    "uid_metrics": {},
                 }
-                step_log["uid_metrics"][str(uid)].update(metrics[i])
-
-            bt.logging.info(
-                f"step_log: {step_log}"
-            )            
-            graphed_data = {
-                "time": time.time(),
-                "block": self.metagraph.block.item(),
-                "uid_data": {
-                    str(uids[i]): rewards[i] for i in range(len(uids))
-                },
-                "weight_data": {str(uid): self.scores[uid].item() for uid in uids},
-            }    
-            bt.logging.info(
-                f"graphed_data: {graphed_data}"
-            )  
-            step_log.update(graphed_data)
+                bt.logging.info(
+                    f"Validator has completed {self.step} run steps. Creating a new wandb run."
+                )
+                self.wandb_run.finish()
+                self.new_wandb_run()            
+    
+                for i, uid in enumerate(uids):
+                    step_log["uid_metrics"][str(uid.item())] = {
+                        "uid": uid.item(),
+                        "weight": self.scores[uid].item(),
+                        "reward": rewards[i].item()
+                    }
+                    step_log["uid_metrics"][str(uid.item())].update(metrics[i])
+             
+                graphed_data = {
+                    "block": self.metagraph.block.item(),
+                    "uid_data": {
+                        str(uids[i].item()): rewards[i].item() for i in range(len(uids))
+                    },
+                    "weight_data": {str(uid.item()): self.scores[uid].item() for uid in uids},
+                }    
+    
+                bt.logging.info(
+                    f"step_log: {step_log}"
+                )  
+                bt.logging.info(
+                    f"graphed_data: {graphed_data}"
+                )              
+                original_format_json = json.dumps(step_log)
+                bt.logging.info("Logging to Wandb")
+                self.wandb_run.log(
+                    {**graphed_data, "original_format_json": original_format_json},
+                    step=self.step,
+                )
+                bt.logging.info("Logged")
             
-            bt.logging.trace("Logging to Wandb")
-            self.wandb_run.log(
-                step_log,
-                step=self.step,
-            )
