@@ -140,7 +140,7 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
         full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
-        if epoch % 5 == 0 or len(full_data) == n_samples:
+        if epoch % 1 == 0 or len(full_data) == n_samples:
             df = pd.DataFrame(full_data)
             try:
                 df.to_csv(output_path, index=False)
@@ -155,4 +155,4 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
 if __name__ == '__main__':
     main()
 
-# nohup python3 detection/validator/data_generator.py --ai_batch_size=50 --human_batch_size=50 > generator.log &
+# nohup python3 detection/validator/data_generator.py --ai_batch_size=150 --human_batch_size=150 > generator.log &
