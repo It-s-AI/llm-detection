@@ -104,7 +104,18 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
               OllamaModel(model_name='vicuna'),
               OllamaModel(model_name='gemma:7b'),
               OllamaModel(model_name='mistral'),
-              OllamaModel(model_name='zephyr:7b-beta'), ]
+              OllamaModel(model_name='zephyr:7b-beta'),
+
+              OllamaModel(model_name='llama3'),
+              OllamaModel(model_name='command-r'),
+              OllamaModel(model_name='wizardlm2'),
+              OllamaModel(model_name='openhermes'),
+              OllamaModel(model_name='mixtral'),
+              OllamaModel(model_name='starling-lm'),
+              OllamaModel(model_name='openchat'),
+              OllamaModel(model_name='dolphin-mistral'),
+              OllamaModel(model_name='nous-hermes2'),
+              OllamaModel(model_name='wizardcoder'), ]
     generator = DataGenerator(models, None)
 
     if input_path is not None:
