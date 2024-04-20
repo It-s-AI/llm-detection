@@ -32,6 +32,7 @@ class OllamaModel:
         # Centered around 1 because that's what's hardest for downstream classification models.
         frequency_penalty = np.random.uniform(low=0, high=0.5)
         top_k = int(np.random.choice([-1, 20, 40]))
+        top_k = top_k if top_k != -1 else None
         top_p = np.random.uniform(low=0.5, high=1)
 
         self.model = Ollama(model=self.model_name,

@@ -17,6 +17,7 @@ nltk==3.8.1
 wandb==0.16.4
 hf_transfer
 gdown
+zstandard==0.22.0
 
 bs4
 pre-commit==3.3.2
