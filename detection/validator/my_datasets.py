@@ -67,6 +67,7 @@ class PromptDataset(Iterator):
                 else:
                     while el['source'] != 'reddit_eli5':
                         el = next(self.hc3)
+                el['text'] = el['text'].replace("Explain like I'm five.", '').replace("Please explain like I'm five.", '')
             except Exception as e:
                 if type(e) == StopIteration:
                     bt.logging.info('Prompt dataset ended: reinitializing it')

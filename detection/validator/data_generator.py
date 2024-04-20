@@ -44,14 +44,16 @@ class DataGenerator:
         processed = 0
         for i in tqdm(range(len(self.models)), desc=f"Generating AI data"):
             cnt_samples = int(n_samples * self.model_probs[i]) if i != len(self.models) - 1 else n_samples - processed
+            self.models[i].init_model()
             model = self.models[i]
             model_name = self.model_names[i]
 
-            for j in tqdm(range(cnt_samples), desc=f"Generating with {model_name} model"):
+            for j in tqdm(range(cnt_samples), desc=f"Generating with {model_name} model and params {model.params}"):
                 while True:
                     el = next(self.prompt_dataset)
                     el['text'] = model(el['prompt'])
                     el['model_name'] = model_name
+                    el['model_params'] = model.params
 
                     augs = self.augmentator(el['text'])
                     el['text'] = augs['text']

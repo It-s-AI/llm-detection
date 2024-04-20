@@ -7,6 +7,7 @@ class ValDataRow(BaseModel):
     prompt: str | None = None
     data_source: str | None = None
     model_name: str | None = None
+    model_params: dict | None = None
 
     persona_profile: str | None = None
     persona_mood: str | None = None
