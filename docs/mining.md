@@ -69,7 +69,7 @@ sudo apt update && sudo apt install jq && sudo apt install npm && sudo npm insta
 To start your miner basic command is
 
 ```bash
-pm2 start --name net32-miner --interpreter python3 ./neurons/miner.py -- --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --neuron.device cuda:0 --axon.port 70000
+pm2 start --name net32-miner --interpreter python3 ./neurons/miner.py -- --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --neuron.device cuda:0 --axon.port 70000 
 ```
 
 ## Running the Miner on TESTNET
