@@ -12,21 +12,21 @@ from detection.validator.prompt_generator import PromptGenerator
 class HumanDataset(Iterator):
     def __init__(self):
         super().__init__()
-        self.c4 = self.init_dataset()
+        self.pile = self.init_dataset()
 
     def init_dataset(self):
         seed = random.randint(0, 1000)
-        c4 = iter(
-            load_dataset("allenai/c4", 'en',  streaming=True)['train'].shuffle(
+        pile = iter(
+            load_dataset("monology/pile-uncopyrighted", streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=1000
             )
         )
-        return c4
+        return pile
 
     def __next__(self) -> dict:
         while True:
             try:
-                el = next(self.c4)
+                el = next(self.pile)
             except Exception as e:
                 if type(e) == StopIteration:
                     bt.logging.info('Human dataset ended: reinitializing it')
@@ -34,10 +34,10 @@ class HumanDataset(Iterator):
                     bt.logging.error("Got exception during loading data from human dataset, reinitializing it")
                     bt.logging.exception(e)
 
-                self.c4 = self.init_dataset()
+                self.pile = self.init_dataset()
                 continue
 
-            res = {'text': el['text'], 'data_source': 'c4_en'}
+            res = {'text': el['text'], 'data_source': 'pile_human', 'topic': el['meta']['pile_set_name']}
             return res
 
 
@@ -50,7 +50,7 @@ class PilePromptDataset(Iterator):
     def init_dataset(self):
         seed = random.randint(0, 1000)
         dataset = iter(
-            load_dataset("monology/pile-uncopyrighted", name="train", streaming=True)['train'].shuffle(
+            load_dataset("monology/pile-uncopyrighted", streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=1000
             )
         )
@@ -114,7 +114,7 @@ class HC3PromptDataset(Iterator):
         while True:
             try:
                 el = next(self.hc3)
-                if random.random() < 0.5:
+                if random.random() < 0.7:
                     while el['source'] == 'reddit_eli5':
                         el = next(self.hc3)
                 else:
@@ -148,11 +148,11 @@ class PromptDataset(Iterator):
             # bt.logging.debug("Retrieving data from PromptDataset...")
             res = {}
             p = random.random()
-            if p < 0.3:
+            if p < 0.2:
                 bt.logging.debug("Getting prompt from hc3")
                 el = next(self.hc3_prompt_dataset)
                 res['data_source'] = 'hc3'
-            elif p < 0.6:
+            elif p < 0.5:
                 bt.logging.debug("Getting prompt from prompt_generator")
                 el = self.prompt_generator.get_challenge(None)
                 res['data_source'] = 'prompt_generator'
