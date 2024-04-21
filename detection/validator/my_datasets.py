@@ -88,7 +88,7 @@ class PilePromptDataset(Iterator):
 
             try:
                 el = next(self.pile)
-                document_text = el['text'][:self.max_prompt_len * 1.25]
+                document_text = el['text'][:int(self.max_prompt_len * 1.25)]
                 context_len = int(len(document_text) * np.random.uniform(0.25, 0.75))
                 prompt = self.generate_prompt(document_text[:context_len])[:self.max_prompt_len]
                 return {'prompt': prompt, 'topic': el['meta']['pile_set_name'], 'real_completion': el['text'][context_len:]}
