@@ -13,6 +13,7 @@ class HumanDataset(Iterator):
     def __init__(self):
         super().__init__()
         self.pile = self.init_dataset()
+        self.pile_prompt_dataset = PilePromptDataset(2048)
 
     def init_dataset(self):
         seed = random.randint(0, 1000)
@@ -23,7 +24,7 @@ class HumanDataset(Iterator):
         )
         return pile
 
-    def __next__(self) -> dict:
+    def get_next_pile(self):
         while True:
             try:
                 el = next(self.pile)
@@ -39,6 +40,10 @@ class HumanDataset(Iterator):
 
             res = {'text': el['text'], 'data_source': 'pile_human', 'topic': el['meta']['pile_set_name']}
             return res
+
+    def __next__(self) -> dict:
+        el = next(self.pile_prompt_dataset)
+        return {'text': el['real_completion'], 'data_source': 'pile_human', 'topic': el['topic']}
 
 
 class PilePromptDataset(Iterator):
@@ -78,12 +83,15 @@ class PilePromptDataset(Iterator):
 
     def __next__(self):
         while True:
+            # if np.random.random() > 0.001:
+            #     continue
+
             try:
                 el = next(self.pile)
-                document_text = el['text']
-                context_len = int(min(len(document_text), self.max_prompt_len * 1.25) * np.random.uniform(0.25, 0.75))
+                document_text = el['text'][:self.max_prompt_len * 1.25]
+                context_len = int(len(document_text) * np.random.uniform(0.25, 0.75))
                 prompt = self.generate_prompt(document_text[:context_len])[:self.max_prompt_len]
-                return {'prompt': prompt, 'topic': el['meta']['pile_set_name'], 'real_completion': document_text[context_len:]}
+                return {'prompt': prompt, 'topic': el['meta']['pile_set_name'], 'real_completion': el['text'][context_len:]}
             except Exception as e:
                 if type(e) == StopIteration:
                     bt.logging.info('PilePromptDataset ended: reinitializing it')
@@ -136,7 +144,7 @@ class HC3PromptDataset(Iterator):
 
 
 class PromptDataset(Iterator):
-    def __init__(self, max_prompt_len=1024):
+    def __init__(self, max_prompt_len=2048):
         super().__init__()
         self.hc3_prompt_dataset = HC3PromptDataset(max_prompt_len)
         self.pile_prompt_dataset = PilePromptDataset(max_prompt_len)

@@ -9,7 +9,7 @@ from detection.validator.text_postprocessing import TextCleaner
 
 
 class OllamaModel:
-    def __init__(self, model_name='llama2', num_predict=1300):
+    def __init__(self, model_name='llama2', num_predict=1000):
         """
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
