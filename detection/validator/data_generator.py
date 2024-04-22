@@ -48,7 +48,8 @@ class DataGenerator:
             model = self.models[i]
             model_name = self.model_names[i]
 
-            for j in tqdm(range(cnt_samples), desc=f"Generating with {model_name} model and params {model.params}"):
+            bt.logging.info(f"Generating with {model_name} model and params {model.params}")
+            for j in tqdm(range(cnt_samples)):
                 while True:
                     el = next(self.prompt_dataset)
                     el['text'] = model(el['prompt'], text_completion_mode=True)
