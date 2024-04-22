@@ -51,7 +51,7 @@ class DataGenerator:
             for j in tqdm(range(cnt_samples), desc=f"Generating with {model_name} model and params {model.params}"):
                 while True:
                     el = next(self.prompt_dataset)
-                    el['text'] = model(el['prompt'])
+                    el['text'] = model(el['prompt'], text_completion_mode=True)
                     el['model_name'] = model_name
                     el['model_params'] = model.params
 
