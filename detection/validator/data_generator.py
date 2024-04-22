@@ -120,6 +120,13 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
                    OllamaModel(model_name='llama3:text'),
                    OllamaModel(model_name='mixtral:text'),
                    OllamaModel(model_name='gemma:text'),
+
+                   OllamaModel(model_name='command-r'),
+                   OllamaModel(model_name='neural-chat'),
+                   OllamaModel(model_name='zephyr:7b-beta'),
+                   OllamaModel(model_name='openhermes'),
+                   OllamaModel(model_name='wizardcoder'),
+                   OllamaModel(model_name='starling-lm'),
                    ]
 
     generator = DataGenerator(text_models, None)

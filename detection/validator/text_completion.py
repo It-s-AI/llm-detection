@@ -45,10 +45,20 @@ class OllamaModel:
                             top_k=top_k)
         self.params = {'top_k': top_k, 'top_p': top_p, 'temperature': sampling_temperature, 'repeat_penalty': frequency_penalty}
 
-    def __call__(self, prompt: str) -> str | None:
+    def __call__(self, prompt: str, text_completion_mode=False) -> str | None:
         while True:
             try:
-                text = self.model.invoke(prompt)
+                if text_completion_mode:
+                    if ':text' not in self.model_name:
+                        system_message = "You're a text completion model, just complete text that user sended you" #. Return text without any supportive - we write add your result right after the user text
+                        text = self.model.invoke([{'role': 'system', 'content': system_message},
+                                                  {'role': 'user', 'content': prompt}])
+                    else:
+                        text = self.model.invoke(prompt)
+                else:
+                    assert ':text' not in self.model_name
+                    text = self.model.invoke(prompt)
+
                 return self.text_cleaner.clean_text(text)
             except Exception as e:
                 bt.logging.info("Couldn't get response from Ollama, probably it's restarting now: {}".format(e))
