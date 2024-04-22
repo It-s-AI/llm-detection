@@ -100,23 +100,29 @@ class DataGenerator:
 @click.option("--ai_batch_size", default=100)
 @click.option("--human_batch_size", default=0)
 def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
-    models = [OllamaModel(model_name='neural-chat'),
-              OllamaModel(model_name='vicuna'),
-              OllamaModel(model_name='gemma:7b'),
-              OllamaModel(model_name='mistral'),
-              OllamaModel(model_name='zephyr:7b-beta'),
+    # models = [OllamaModel(model_name='neural-chat'),
+    #           OllamaModel(model_name='vicuna'),
+    #           OllamaModel(model_name='gemma:7b'),
+    #           OllamaModel(model_name='mistral'),
+    #           OllamaModel(model_name='zephyr:7b-beta'),
+    #
+    #           OllamaModel(model_name='llama3'),
+    #           # OllamaModel(model_name='command-r'),
+    #           OllamaModel(model_name='wizardlm2'),
+    #           OllamaModel(model_name='openhermes'),
+    #           # OllamaModel(model_name='mixtral'),
+    #           OllamaModel(model_name='starling-lm'),
+    #           OllamaModel(model_name='openchat'),
+    #           # OllamaModel(model_name='nous-hermes2'),
+    #           OllamaModel(model_name='wizardcoder'), ]
 
-              OllamaModel(model_name='llama3'),
-              OllamaModel(model_name='command-r'),
-              OllamaModel(model_name='wizardlm2'),
-              OllamaModel(model_name='openhermes'),
-              OllamaModel(model_name='mixtral'),
-              OllamaModel(model_name='starling-lm'),
-              OllamaModel(model_name='openchat'),
-              OllamaModel(model_name='dolphin-mistral'),
-              OllamaModel(model_name='nous-hermes2'),
-              OllamaModel(model_name='wizardcoder'), ]
-    generator = DataGenerator(models, None)
+    text_models = [OllamaModel(model_name='mistral:text'),
+                   OllamaModel(model_name='llama3:text'),
+                   OllamaModel(model_name='mixtral:text'),
+                   OllamaModel(model_name='gemma:text'),
+                   ]
+
+    generator = DataGenerator(text_models, None)
 
     if input_path is not None:
         # path_to_prompts = 'prompts.csv'

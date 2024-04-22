@@ -90,7 +90,8 @@ class PilePromptDataset(Iterator):
                 el = next(self.pile)
                 document_text = el['text'][:int(self.max_prompt_len * 1.25)]
                 context_len = int(len(document_text) * np.random.uniform(0.25, 0.75))
-                prompt = self.generate_prompt(document_text[:context_len])[:self.max_prompt_len]
+                # prompt = self.generate_prompt(document_text[:context_len])[:self.max_prompt_len]
+                prompt = document_text[:context_len]
                 return {'prompt': prompt, 'topic': el['meta']['pile_set_name'], 'real_completion': el['text'][context_len:]}
             except Exception as e:
                 if type(e) == StopIteration:
@@ -156,11 +157,11 @@ class PromptDataset(Iterator):
             # bt.logging.debug("Retrieving data from PromptDataset...")
             res = {}
             p = random.random()
-            if p < 0.2:
+            if p < 0: #TODO: fix it
                 bt.logging.debug("Getting prompt from hc3")
                 el = next(self.hc3_prompt_dataset)
                 res['data_source'] = 'hc3'
-            elif p < 0.5:
+            elif p < 0:
                 bt.logging.debug("Getting prompt from prompt_generator")
                 el = self.prompt_generator.get_challenge(None)
                 res['data_source'] = 'prompt_generator'
