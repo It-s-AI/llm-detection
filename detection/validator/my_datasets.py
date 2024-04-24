@@ -1,5 +1,7 @@
 import logging
 import random
+import time
+
 import bittensor as bt
 import numpy as np
 from datasets import load_dataset
@@ -12,34 +14,7 @@ from detection.validator.prompt_generator import PromptGenerator
 class HumanDataset(Iterator):
     def __init__(self):
         super().__init__()
-        self.pile = self.init_dataset()
         self.pile_prompt_dataset = PilePromptDataset(2048)
-
-    def init_dataset(self):
-        seed = random.randint(0, 1000)
-        pile = iter(
-            load_dataset("monology/pile-uncopyrighted", streaming=True)['train'].shuffle(
-                seed=seed, buffer_size=1000
-            )
-        )
-        return pile
-
-    def get_next_pile(self):
-        while True:
-            try:
-                el = next(self.pile)
-            except Exception as e:
-                if type(e) == StopIteration:
-                    bt.logging.info('Human dataset ended: reinitializing it')
-                else:
-                    bt.logging.error("Got exception during loading data from human dataset, reinitializing it")
-                    bt.logging.exception(e)
-
-                self.pile = self.init_dataset()
-                continue
-
-            res = {'text': el['text'], 'data_source': 'pile_human', 'topic': el['meta']['pile_set_name']}
-            return res
 
     def __next__(self) -> dict:
         el = next(self.pile_prompt_dataset)
@@ -53,13 +28,18 @@ class PilePromptDataset(Iterator):
         self.max_prompt_len = max_prompt_len
 
     def init_dataset(self):
-        seed = random.randint(0, 1000)
-        dataset = iter(
-            load_dataset("monology/pile-uncopyrighted", streaming=True)['train'].shuffle(
-                seed=seed, buffer_size=1000
+        try:
+            seed = random.randint(0, 1000)
+            dataset = iter(
+                load_dataset("monology/pile-uncopyrighted", streaming=True)['train'].shuffle(
+                    seed=seed, buffer_size=10000
+                )
             )
-        )
-        return dataset
+            return dataset
+        except Exception as e:
+            logging.error("Got exception during Pile dataset initializing: {}, retrying...".format(e))
+            time.sleep(60)
+            return self.init_dataset()
 
     def generate_prompt(self, context):
         payload_cuttoff = int(len(context) * np.random.uniform(0.1, 0.9))
@@ -83,9 +63,6 @@ class PilePromptDataset(Iterator):
 
     def __next__(self):
         while True:
-            # if np.random.random() > 0.001:
-            #     continue
-
             try:
                 el = next(self.pile)
                 document_text = el['text'][:int(self.max_prompt_len * 1.25)]
@@ -97,7 +74,7 @@ class PilePromptDataset(Iterator):
                 if type(e) == StopIteration:
                     bt.logging.info('PilePromptDataset ended: reinitializing it')
                 else:
-                    bt.logging.error("Got exception during loading data from PilePromptDataset, reinitializing it")
+                    bt.logging.error("Got exception during loading data from PilePromptDataset, reinitializing it: {}".format(e))
                     bt.logging.exception(e)
 
                 self.pile = self.init_dataset()
@@ -111,13 +88,18 @@ class HC3PromptDataset(Iterator):
         self.max_prompt_len = max_prompt_len
 
     def init_dataset(self):
-        seed = random.randint(0, 1000)
-        hc3 = iter(
-            load_dataset("Hello-SimpleAI/HC3", name="all", streaming=True)['train'].shuffle(
-                seed=seed, buffer_size=1000
+        try:
+            seed = random.randint(0, 1000)
+            hc3 = iter(
+                load_dataset("Hello-SimpleAI/HC3", name="all", streaming=True)['train'].shuffle(
+                    seed=seed, buffer_size=10000
+                )
             )
-        )
-        return hc3
+            return hc3
+        except Exception as e:
+            logging.error("Got exception during hc3 dataset initializing: {}, retrying...".format(e))
+            time.sleep(60)
+            return self.init_dataset()
 
     def __next__(self):
         while True:
@@ -133,7 +115,7 @@ class HC3PromptDataset(Iterator):
                 if type(e) == StopIteration:
                     bt.logging.info('Prompt dataset ended: reinitializing it')
                 else:
-                    bt.logging.error("Got exception during loading data from prompt dataset, reinitializing it")
+                    bt.logging.error("Got exception during loading data from PilePromptDataset, reinitializing it: {}".format(e))
                     bt.logging.exception(e)
 
                 self.hc3 = self.init_dataset()
