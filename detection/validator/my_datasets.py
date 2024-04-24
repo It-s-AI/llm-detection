@@ -127,7 +127,7 @@ class HC3PromptDataset(Iterator):
 
 
 class PromptDataset(Iterator):
-    def __init__(self, max_prompt_len=2048):
+    def __init__(self, max_prompt_len=1500):
         super().__init__()
         self.hc3_prompt_dataset = HC3PromptDataset(max_prompt_len)
         self.pile_prompt_dataset = PilePromptDataset(max_prompt_len)
@@ -139,7 +139,7 @@ class PromptDataset(Iterator):
             # bt.logging.debug("Retrieving data from PromptDataset...")
             res = {}
             p = random.random()
-            if p < 0: #TODO: fix it
+            if p < 0:
                 bt.logging.debug("Getting prompt from hc3")
                 el = next(self.hc3_prompt_dataset)
                 res['data_source'] = 'hc3'
