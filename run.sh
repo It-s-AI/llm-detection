@@ -7,6 +7,7 @@ proc_name="llm_detection_validators_main_process"
 args=()
 version_location="./detection/__init__.py"
 version="__version__"
+delay=0 # Default delay value in hours
 
 old_args=$@
 
@@ -18,20 +19,20 @@ then
 fi
 
 # Checks if $1 is smaller than $2
-# If $1 is smaller than or equal to $2, then true. 
+# If $1 is smaller than or equal to $2, then true.
 # else false.
 version_less_than_or_equal() {
     [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
 }
 
 # Checks if $1 is smaller than $2
-# If $1 is smaller than $2, then true. 
+# If $1 is smaller than $2, then true.
 # else false.
 version_less_than() {
     [ "$1" = "$2" ] && return 1 || version_less_than_or_equal $1 $2
 }
 
-# Returns the difference between 
+# Returns the difference between
 # two versions as a numerical value.
 get_version_difference() {
     local tag1="$1"
@@ -80,7 +81,7 @@ read_version_value() {
 check_package_installed() {
     local package_name="$1"
     os_name=$(uname -s)
-    
+
     if [[ "$os_name" == "Linux" ]]; then
         # Use dpkg-query to check if the package is installed
         if dpkg-query -W -f='${Status}' "$package_name" 2>/dev/null | grep -q "installed"; then
@@ -145,7 +146,6 @@ strip_quotes() {
 
     echo "$stripped"
 }
-
 # Loop through all command line arguments
 while [[ $# -gt 0 ]]; do
   arg="$1"
@@ -154,26 +154,35 @@ while [[ $# -gt 0 ]]; do
   if [[ "$arg" == -* ]]; then
     # Check if the argument has a value
     if [[ $# -gt 1 && "$2" != -* ]]; then
-          if [[ "$arg" == "--script" ]]; then
-            script="$2";
-            shift 2
-        else
-            # Add '=' sign between flag and value
-            args+=("'$arg'");
-            args+=("'$2'");
-            shift 2
-        fi
+      case "$arg" in
+        --script)
+          script="$2"
+          shift 2
+          ;;
+        --delay) # Handle delay argument
+          delay=$(($2 * 3600))
+          shift 2
+          ;;
+        *)
+          # Add '=' sign between flag and value
+          args+=("'$arg'")
+          args+=("'$2'")
+          shift 2
+          ;;
+      esac
     else
       # Add '=True' for flags with no value
-      args+=("'$arg'");
+      args+=("'$arg'")
       shift
     fi
   else
     # Argument is not a flag, add it as it is
-    args+=("'$arg '");
+    args+=("'$arg '")
     shift
   fi
 done
+
+echo "Received delay input: $delay seconds."
 
 # Check if script argument was provided
 if [[ -z "$script" ]]; then
@@ -184,6 +193,8 @@ fi
 branch=$(git branch --show-current)            # get current branch.
 echo watching branch: $branch
 echo pm2 process name: $proc_name
+
+
 
 # Get the current version locally.
 current_version=$(read_version_value)
@@ -240,6 +251,8 @@ if [ "$?" -eq 1 ]; then
                 if git pull origin $branch; then
                     # latest_version is newer than current_version, should download and reinstall.
                     echo "New version published. Updating the local copy."
+
+                    sleep $delay # Apply the delay
 
                     # Install latest changes just in case.
                     pip install -e .
