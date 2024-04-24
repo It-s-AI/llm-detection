@@ -248,11 +248,11 @@ if [ "$?" -eq 1 ]; then
                 echo "current version $current_version"
                 # Pull latest changes
                 # Failed git pull will return a non-zero output
+                sleep $delay # Apply the delay
+                
                 if git pull origin $branch; then
                     # latest_version is newer than current_version, should download and reinstall.
                     echo "New version published. Updating the local copy."
-
-                    sleep $delay # Apply the delay
 
                     # Install latest changes just in case.
                     pip install -e .
