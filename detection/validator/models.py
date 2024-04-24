@@ -14,6 +14,5 @@ class ValDataRow(BaseModel):
     person_ton: str | None = None
     task: str | None = None
 
-    augmentation_type: str | None = None
-    augmentation_subtype: str | None = None
+    augmentations: list[str] = []
 

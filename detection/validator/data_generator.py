@@ -56,10 +56,9 @@ class DataGenerator:
                     el['model_name'] = model_name
                     el['model_params'] = model.params
 
-                    augs = self.augmentator(el['text'])
-                    el['text'] = augs['text']
-                    for k, v in augs.items():
-                        el['augmentation_{}'.format(k)] = v
+                    text, augs = self.augmentator(el['text'])
+                    el['text'] = text
+                    el['augmentations'] = augs
 
                     if len(el['text']) > self.min_text_length:
                         break
@@ -77,10 +76,9 @@ class DataGenerator:
             while True:
                 el = next(self.human_dataset)
 
-                augs = self.augmentator(el['text'])
-                el['text'] = augs['text']
-                for k, v in augs.items():
-                    el['augmentation_{}'.format(k)] = v
+                text, augs = self.augmentator(el['text'])
+                el['text'] = text
+                el['augmentations'] = augs
 
                 if len(el['text']) > self.min_text_length:
                     break

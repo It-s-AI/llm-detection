@@ -10,14 +10,14 @@ import ollama
 
 
 class OllamaModel:
-    def __init__(self, model_name='llama2', num_predict=1000):
+    def __init__(self, model_name, num_predict=1000):
         """
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
         """
         bt.logging.info(f'Initializing OllamaModel {model_name}')
-        if num_predict > 1500:
-            raise Exception("You're trying to set num_predict to more than 1500, it can lead to context overloading and Ollama hanging")
+        if num_predict > 1000:
+            raise Exception("You're trying to set num_predict to more than 1000, it can lead to context overloading and Ollama hanging")
 
         pulled_models = [el['name'] for el in ollama.list()['models']]
         if model_name not in pulled_models:
