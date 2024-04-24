@@ -64,11 +64,6 @@ Run ollama service in background (make sure that you don't have any running inst
 pm2 start --name ollama "ollama serve"
 ```
 
-Then download models
-```
-ollama pull vicuna && ollama pull mistral && ollama pull neural-chat && ollama pull gemma:7b && ollama pull zephyr:7b-beta
-```
-
 
 ## Running the Validator
 
