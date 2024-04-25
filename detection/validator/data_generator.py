@@ -118,15 +118,19 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
     text_models = [OllamaModel(model_name='mistral:text'),
                    OllamaModel(model_name='llama3:text'),
                    OllamaModel(model_name='mixtral:text'),
-                   OllamaModel(model_name='gemma:text'),
 
+                   OllamaModel(model_name='gemma:7b'),
                    OllamaModel(model_name='command-r'),
                    OllamaModel(model_name='neural-chat'),
                    OllamaModel(model_name='zephyr:7b-beta'),
                    OllamaModel(model_name='openhermes'),
                    OllamaModel(model_name='wizardcoder'),
-                   OllamaModel(model_name='starling-lm'),
-                   ]
+                   OllamaModel(model_name='starling-lm:7b-beta'),
+                   OllamaModel(model_name='yi:34b'),
+                   OllamaModel(model_name='openchat:7b'),
+                   OllamaModel(model_name='dolphin-mistral'),
+                   OllamaModel(model_name='solar'),
+                   OllamaModel(model_name='llama2:13b'),]
 
     generator = DataGenerator(text_models, None)
 
