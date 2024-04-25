@@ -74,7 +74,7 @@ class Validator(BaseValidatorNeuron):
 
     async def build_queries(self) -> tuple[List[str], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
-        data = self.generator.generate_data(n_human_samples=75, n_ai_samples=75)
+        data = self.generator.generate_data(n_human_samples=150, n_ai_samples=150)
         texts = [el.text for el in data]
         labels = np.array([int(el.label) for el in data])
         return texts, labels
