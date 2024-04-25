@@ -138,7 +138,7 @@ class DataAugmentator:
         ind = random.randint(0, len(sentences) - cnt)
         res = sentences[ind:ind + cnt]
 
-        if random.random() > 0.5 and len(sentences):
+        if random.random() > 0.5:
             sent_ind = random.randint(0, len(res[0]) - 1)
             res[0] = res[0][sent_ind:]
 
