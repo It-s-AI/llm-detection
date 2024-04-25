@@ -42,7 +42,7 @@ class OllamaModel:
         top_p = np.random.uniform(low=0.5, high=1)
 
         self.model = Ollama(model=self.model_name,
-                            timeout=100,
+                            timeout=200,
                             num_thread=1,
                             num_predict=self.num_predict,
                             temperature=sampling_temperature,

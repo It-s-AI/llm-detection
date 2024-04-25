@@ -171,4 +171,4 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
 if __name__ == '__main__':
     main()
 
-# nohup python3 detection/validator/data_generator.py --ai_batch_size=150 --human_batch_size=150 > generator.log &
+# nohup python3 detection/validator/data_generator.py --ai_batch_size=150 --human_batch_size=150 --output_path "generated_data.csv" > generator.log &
