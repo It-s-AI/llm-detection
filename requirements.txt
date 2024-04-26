@@ -22,6 +22,7 @@ ollama==0.1.8
 pyspellchecker==0.8.1
 symspellpy==6.7.7
 typo==0.1.7
+scalecodec==1.2.7
 
 bs4
 pre-commit==3.3.2
