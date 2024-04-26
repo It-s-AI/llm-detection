@@ -1,6 +1,6 @@
 # The MIT License (MIT)
- # Copyright © 2024 It's AI 
- 
+# Copyright © 2024 It's AI
+
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -24,7 +24,6 @@ from typing import List
 import bittensor as bt
 import torch
 import numpy as np
-
 
 import detection
 from detection.validator import forward
@@ -51,11 +50,22 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
 
-        models = [OllamaModel(model_name='neural-chat'),
-                  OllamaModel(model_name='vicuna'),
+        models = [OllamaModel(model_name='mistral:text'),
+                  OllamaModel(model_name='llama3:text'),
+                  OllamaModel(model_name='mixtral:text'),
+
                   OllamaModel(model_name='gemma:7b'),
-                  OllamaModel(model_name='mistral'),
-                  OllamaModel(model_name='zephyr:7b-beta'),]
+                  OllamaModel(model_name='command-r'),
+                  OllamaModel(model_name='neural-chat'),
+                  OllamaModel(model_name='zephyr:7b-beta'),
+                  OllamaModel(model_name='openhermes'),
+                  OllamaModel(model_name='wizardcoder'),
+                  OllamaModel(model_name='starling-lm:7b-beta'),
+                  OllamaModel(model_name='yi:34b'),
+                  OllamaModel(model_name='openchat:7b'),
+                  OllamaModel(model_name='dolphin-mistral'),
+                  OllamaModel(model_name='solar'),
+                  OllamaModel(model_name='llama2:13b'),]
 
         bt.logging.info(f"Models loaded{models}")
 
@@ -64,7 +74,7 @@ class Validator(BaseValidatorNeuron):
 
     async def build_queries(self) -> tuple[List[str], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
-        data = self.generator.generate_data(n_human_samples=25, n_ai_samples=25)        
+        data = self.generator.generate_data(n_human_samples=150, n_ai_samples=150)
         texts = [el.text for el in data]
         labels = np.array([int(el.label) for el in data])
         return texts, labels
@@ -78,7 +88,7 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-        
+
         try:
             res = await forward(self)
             return res

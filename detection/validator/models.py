@@ -7,12 +7,12 @@ class ValDataRow(BaseModel):
     prompt: str | None = None
     data_source: str | None = None
     model_name: str | None = None
+    model_params: dict | None = None
 
     persona_profile: str | None = None
     persona_mood: str | None = None
     person_ton: str | None = None
     task: str | None = None
 
-    augmentation_type: str | None = None
-    augmentation_subtype: str | None = None
+    augmentations: list[str] = []
 
