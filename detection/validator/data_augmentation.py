@@ -19,7 +19,7 @@ import typo
 
 FIXED_ORDER_DATA_AUGMENTATION_STEPS = [
     {'name': 'SubsampleSentences', 'p': 1},
-    {'name' : 'BuggySpellCheck', 'p': 0.2},
+    # {'name' : 'BuggySpellCheck', 'p': 0.2},
 ]
 
 CHAR_CHANGES = [
@@ -84,7 +84,8 @@ class DataAugmentator:
         # Correct the misspelled words
         corrected_text = text
         for word in misspelled:
-            correction = self.__GetCorrectedWord(word)
+            # correction = self.__GetCorrectedWord(word)
+            correction = self.slow_spell_checker.correction(word)
             if correction:
                 # Doing replace-alls like this is an intentional bug. Sometimes single letters get detected
                 # as words and replaced throughout the document, thereby resulting in garbled text.
