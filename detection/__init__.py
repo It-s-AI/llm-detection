@@ -31,4 +31,4 @@ from . import validator
 
 WANDB_PROJECT = "subnet32"
 WANDB_ENTITY = "itsai-dev"
-MAX_RUN_STEPS_PER_WANDB_RUN = 4
+MAX_RUN_STEPS_PER_WANDB_RUN = 8
