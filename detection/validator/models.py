@@ -13,6 +13,7 @@ class ValDataRow(BaseModel):
     persona_mood: str | None = None
     person_ton: str | None = None
     task: str | None = None
+    topic: str | None = None
 
     augmentations: list[str] = []
 
