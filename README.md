@@ -66,32 +66,25 @@ Overall accuracy on our validation is about 93%.
 
 For validating we use two types of data, which is balanced in proportion 1:1.
 
-### Human-written texts
-To gather human-written validation data we use [C4 dataset](https://huggingface.co/datasets/c4).
 
-C4 dataset is a collection of about 750GB of English-language text sourced from the public Common Crawl web scrape. 
-It includes heuristics to extract only natural language (as opposed to boilerplate and other gibberish) in addition
-to extensive deduplication.
+### Human-written texts
+To gather human-written validation data we use the Pile dataset.
+
+The Pile is a 825 GiB diverse, open source language modelling data set that consists of 22 smaller, high-quality datasets combined together. It includes web-crawled data, financial, med, law, arxiv, github and also about 15 different topics.
 
 ### AI-generated texts
-For AI-generated text collection, we need to obtain prompts and then generate texts based on this prompts.
-We combined two approaches for collecting prompts: 
+For AI-generated text collection, we need to obtain prompts and then generate texts based on these prompts. While for human texts we take samples from Pile dataset we have to generate ai-samples from the same data-source, so that the only difference between them was human/ai written.
 
-1) Open Dataset (30% of prompts). Some prompts are taken from the English section of the [hc3 dataset](https://huggingface.co/datasets/Hello-SimpleAI/HC3).
+So, as prompts we take a random sample and then use part of it as text begging and ask LLMs to generate a completion for it.
 
-2) Prompt generation (70% of prompts). For prompt generation we implemented the same approach that is used in [prompting subnet](https://github.com/opentensor/prompting/tree/main).
-Here we use different contexts (Wikipedia API, StackOverflow and mathgenerator), different tasks (Question answering, Summarization, Code debugging, Mathematics and more) and
-different agents to generate variable prompts on wide range of topics.
+We use the Ollama GitHub repository to run Large Language Models and generate completions for these prompts. As LLMs we use 15 SOTA models, including llama3, starling-lm:7b-beta, mixtral, command r, mistral, gemma:7b, neural-chat, zephyr:7b-beta and others.
 
+We also randomly select generation parameters for LLM during validation to make the dataset more diverse.
 
-When prompts are obtained, we use the [Ollama GitHub repository](https://github.com/ollama) to run Large Language Models and generate completions for these prompts.
-As LLMs we use five SOTA models: vicuna, mistral, gemma:7b, neural-chat and zephyr:7b-beta.
+### Data augmentation to prevent cheating
+To prevent remembering Pile dataset and make it stablier to overfitting we add some augmentation to both ai-generated and human-written texts. First of all we select a random sequence of consecutive sentences from a given text. Then we add in a random place (or two) misspelling (about 10 different char-based augs) or remove a random adjective.
 
-### Data augmentation
-To prevent remembering C4 dataset, which contains human-written texts, we add some augmentation to both ai-generated and human-written texts. 
-First of all we select a random a sequence of consecutive setences from a given text. Then we add in a random place misspelling or removing a random adjective.
-
-This augmentations don't allow miners to precalculate hashes on C4 dataset and then use them to determine whether this present in C4 or not.
+These augmentations don't allow miners to precalculate hashes on Pile dataset and then use them to determine whether this text is present in the human set of data or not.
 
 ## Reward counting
 Based on [Detecting LLM-Generated Text in Computing Education](https://arxiv.org/pdf/2307.07411.pdf) 
