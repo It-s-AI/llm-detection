@@ -26,11 +26,11 @@ import detection
 
 # import base miner class which takes care of most of the boilerplate
 from detection.base.miner import BaseMinerNeuron
-from miners.gpt_zero import PPLModel
+from miners.ppl_model import PPLModel
 
 from transformers.utils import logging as hf_logging
 
-from neurons.miners.deberta_classifier import DebertaClassifier
+from miners.deberta_classifier import DebertaClassifier
 
 hf_logging.set_verbosity(40)
 
