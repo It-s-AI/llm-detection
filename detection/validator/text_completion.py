@@ -19,7 +19,7 @@ class OllamaModel:
         if num_predict > 1000:
             raise Exception("You're trying to set num_predict to more than 1000, it can lead to context overloading and Ollama hanging")
 
-        pulled_models = [el['name'] for el in ollama.list()['models']]
+        pulled_models = [el['name'] for el in ollama.list()['models']] if ollama.list() is not None else []
         if model_name not in pulled_models and model_name + ':latest' not in pulled_models:
             bt.logging.info("Model {} cannot be found locally - downloading it...".format(model_name))
             ollama.pull(model_name)
