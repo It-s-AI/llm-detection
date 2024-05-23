@@ -73,7 +73,7 @@ async def forward(self):
     bt.logging.info(f"Time to generate challenges: {int(end_time - start_time)}")
 
     cnt_challenges_for_check = random.randint(1, min(10, len(texts)))
-    check_ids = np.random.choice(np.arange(len(texts)), size=cnt_challenges_for_check, replace=False)
+    check_ids = np.random.choice(np.arange(len(texts)).astype(int), size=cnt_challenges_for_check, replace=False)
     check_responses = await get_all_responses(self, axons, texts[check_ids], self.config.neuron.timeout)
     all_responses = await get_all_responses(self, axons, texts, self.config.neuron.timeout)
 
