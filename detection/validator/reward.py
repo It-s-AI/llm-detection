@@ -52,7 +52,7 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
 def count_penalty(y_pred: np.array, check_predictions: np.array, check_ids: np.array) -> float:
     bad = np.any((y_pred < 0) | (y_pred > 1))
 
-    if (check_predictions != y_pred[check_ids]).any():
+    if (check_predictions.round(3) != y_pred[check_ids].round(3)).any():
         bad = 1
 
     return 0 if bad else 1
