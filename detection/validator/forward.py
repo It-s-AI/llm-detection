@@ -74,8 +74,8 @@ async def forward(self):
 
     cnt_challenges_for_check = random.randint(1, min(10, len(texts)))
     check_ids = np.random.choice(np.arange(len(texts)), size=cnt_challenges_for_check, replace=False)
-    check_responses = await get_all_responses(self, axons, texts[check_ids], self.config.neuron.timeout_10)
-    all_responses = await get_all_responses(self, axons, texts, self.config.neuron.timeout_300)
+    check_responses = await get_all_responses(self, axons, texts[check_ids], self.config.neuron.timeout)
+    all_responses = await get_all_responses(self, axons, texts, self.config.neuron.timeout)
 
     rewards, metrics = get_rewards(self, labels=labels, responses=all_responses, check_responses=check_responses, check_ids=check_ids)
     bt.logging.info("Miner uids: {}".format(miner_uids))
