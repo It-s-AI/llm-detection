@@ -121,7 +121,7 @@ def add_args(cls, parser):
             type=int,
             help="Timeout",
             default=20,
-        )        
+        )
 
         parser.add_argument(
             "--neuron.disable_set_weights",

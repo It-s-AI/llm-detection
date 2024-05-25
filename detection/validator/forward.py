@@ -1,6 +1,7 @@
 # The MIT License (MIT)
- # Copyright © 2024 It's AI 
- 
+ # Copyright © 2024 It's AI
+import random
+
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -16,6 +17,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import bittensor as bt
+import numpy as np
 
 from detection.protocol import TextSynapse
 from detection.validator.reward import get_rewards
@@ -24,6 +26,26 @@ from detection.utils.uids import get_random_uids
 import time
 from typing import List
 import torch
+
+
+async def get_all_responses(self, axons, texts, timeout, step=35):
+    all_responses = []
+    for i in range(0, len(axons), step):
+        bt.logging.info(f"Sending challenges to the #{i} subset of miners with size {step}")
+        subset_axons = axons[i:i + step]
+
+        responses: List[TextSynapse] = await self.dendrite(
+            axons=subset_axons,
+            synapse=TextSynapse(texts=texts, predictions=[]),
+            deserialize=True,
+            timeout=timeout,
+        )
+
+        # Log the results for monitoring purposes.
+        bt.logging.info(f"Received responses: {len(responses)}")
+        all_responses.extend(responses)
+        bt.logging.info(f"Overall amount of responses: {len(all_responses)}")
+    return all_responses
 
 
 async def forward(self):
@@ -50,27 +72,13 @@ async def forward(self):
     end_time = time.time()
     bt.logging.info(f"Time to generate challenges: {int(end_time - start_time)}")
 
-    step = 35
-    # Use range() to generate indices from 0 to len(axons), stepping by 'step'
-    all_responses = []
-    for i in range(0, len(axons), step):
-        bt.logging.info(f"Sending challenges to the #{i} subset of miners with size {step}")
-        subset_axons = axons[i:i+step]
+    cnt_challenges_for_check = random.randint(1, min(10, len(texts)))
+    check_ids = np.random.choice(np.arange(len(texts)).astype(int), size=cnt_challenges_for_check, replace=False)
 
-        responses: List[TextSynapse] = await self.dendrite(
-            axons=subset_axons,
-            synapse=TextSynapse(texts=texts, predictions=[]),
-            deserialize=True,
-            timeout=self.config.neuron.timeout,
-        )
+    check_responses = await get_all_responses(self, axons, [texts[idx] for idx in check_ids], self.config.neuron.timeout)
+    all_responses = await get_all_responses(self, axons, texts, self.config.neuron.timeout)
 
-        # Log the results for monitoring purposes.
-        bt.logging.info(f"Received responses: {len(responses)}")
-        all_responses.extend(responses)
-        bt.logging.info(f"Overall amount of responses: {len(all_responses)}")
-
-    # Adjust the scores based on responses from miners.
-    rewards, metrics = get_rewards(self, labels=labels, responses=all_responses)
+    rewards, metrics = get_rewards(self, labels=labels, responses=all_responses, check_responses=check_responses, check_ids=check_ids)
     bt.logging.info("Miner uids: {}".format(miner_uids))
     bt.logging.info("Rewards: {}".format(rewards))
     bt.logging.info("Metrics: {}".format(metrics))
