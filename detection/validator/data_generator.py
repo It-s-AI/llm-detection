@@ -159,8 +159,9 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
         if epoch % 1 == 0 or len(full_data) == n_samples:
             df = pd.DataFrame(full_data)
             try:
-                df.to_csv(output_path, index=False)
-                bt.logging.info("Saved {} samples into {}".format(len(full_data), output_path))
+                cur_path = output_path[:-4] + '_{}'.format(len(full_data) // 10000 * 10000) + '.csv'
+                df.to_csv(cur_path, index=False)
+                bt.logging.info("Saved {} samples into {}".format(len(full_data), cur_path))
             except:
                 bt.logging.error("Coudnt save data into file")
 
@@ -171,4 +172,4 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
 if __name__ == '__main__':
     main()
 
-# nohup python3 detection/validator/data_generator.py --ai_batch_size=150 --human_batch_size=150 --output_path "generated_data.csv" > generator.log &
+# nohup python3 detection/validator/data_generator.py --ai_batch_size=150 --human_batch_size=150 --output_path "data/generated_data.csv" > generator.log &
