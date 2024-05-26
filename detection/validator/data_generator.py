@@ -159,9 +159,10 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
         if epoch % 1 == 0 or len(full_data) == n_samples:
             df = pd.DataFrame(full_data)
             try:
-                cur_path = output_path[:-4] + '_{}'.format(len(full_data) // 10000 * 10000) + '.csv'
-                df.to_csv(cur_path, index=False)
-                bt.logging.info("Saved {} samples into {}".format(len(full_data), cur_path))
+                start_ind = len(full_data) // 10000 * 10000
+                cur_path = output_path[:-4] + '_{}'.format(start_ind) + '.csv'
+                df[start_ind:].to_csv(cur_path, index=False)
+                bt.logging.info("Saved {} samples into {}".format(len(df[start_ind:]), cur_path))
             except:
                 bt.logging.error("Coudnt save data into file")
 
