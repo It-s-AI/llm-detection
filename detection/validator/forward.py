@@ -20,6 +20,8 @@ import bittensor as bt
 import numpy as np
 
 from detection.protocol import TextSynapse
+from detection.validator.data_augmentation import DataAugmentator
+from detection.validator.models import ValDataRow
 from detection.validator.reward import get_rewards
 from detection.utils.uids import get_random_uids
 
@@ -28,24 +30,42 @@ from typing import List
 import torch
 
 
-async def get_all_responses(self, axons, texts, timeout, step=35):
+async def get_all_responses(self, axons, texts: List[ValDataRow], check_ids, timeout, step=35, min_text_length=250):
     all_responses = []
+    check_responses = []
+    augmentator = DataAugmentator()
     for i in range(0, len(axons), step):
         bt.logging.info(f"Sending challenges to the #{i} subset of miners with size {step}")
         subset_axons = axons[i:i + step]
 
+        auged_texts = []
+        for el in texts:
+            text_auged, augs = self.augmentator(el.text)
+            if len(text_auged) >= min_text_length:
+                auged_texts.append(text_auged)
+            else:
+                auged_texts.append(el.text_auged)
+
         responses: List[TextSynapse] = await self.dendrite(
             axons=subset_axons,
-            synapse=TextSynapse(texts=texts, predictions=[]),
+            synapse=TextSynapse(texts=[auged_texts[idx] for idx in check_ids], predictions=[]),
             deserialize=True,
             timeout=timeout,
         )
+        check_responses.extend(responses)
+
+        responses: List[TextSynapse] = await self.dendrite(
+            axons=subset_axons,
+            synapse=TextSynapse(texts=auged_texts, predictions=[]),
+            deserialize=True,
+            timeout=timeout,
+        )
+        all_responses.extend(responses)
 
         # Log the results for monitoring purposes.
         bt.logging.info(f"Received responses: {len(responses)}")
-        all_responses.extend(responses)
         bt.logging.info(f"Overall amount of responses: {len(all_responses)}")
-    return all_responses
+    return all_responses, check_responses
 
 
 async def forward(self):
@@ -75,8 +95,7 @@ async def forward(self):
     cnt_challenges_for_check = random.randint(1, min(10, len(texts)))
     check_ids = np.random.choice(np.arange(len(texts)).astype(int), size=cnt_challenges_for_check, replace=False)
 
-    check_responses = await get_all_responses(self, axons, [texts[idx] for idx in check_ids], self.config.neuron.timeout)
-    all_responses = await get_all_responses(self, axons, texts, self.config.neuron.timeout)
+    all_responses, check_responses = await get_all_responses(self, axons, texts, check_ids, self.config.neuron.timeout)
 
     rewards, metrics = get_rewards(self, labels=labels, responses=all_responses, check_responses=check_responses, check_ids=check_ids)
     bt.logging.info("Miner uids: {}".format(miner_uids))
