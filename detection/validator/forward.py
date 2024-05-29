@@ -40,7 +40,7 @@ async def get_all_responses(self, axons, texts: List[ValDataRow], check_ids, tim
 
         auged_texts = []
         for el in texts:
-            text_auged, augs = self.augmentator(el.text)
+            text_auged, augs = augmentator(el.text)
             if len(text_auged) >= min_text_length:
                 auged_texts.append(text_auged)
             else:
