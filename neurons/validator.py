@@ -30,6 +30,7 @@ from detection.validator import forward
 from detection.base.validator import BaseValidatorNeuron
 
 from detection.validator.data_generator import DataGenerator
+from detection.validator.models import ValDataRow
 from detection.validator.text_completion import OllamaModel
 
 
@@ -72,10 +73,10 @@ class Validator(BaseValidatorNeuron):
         self.generator = DataGenerator(models, None)
         bt.logging.info(f"Generator initialized {self.generator}")
 
-    async def build_queries(self) -> tuple[List[str], np.array]:
+    async def build_queries(self) -> tuple[List[ValDataRow], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
         data = self.generator.generate_data(n_human_samples=150, n_ai_samples=150)
-        texts = [el.text for el in data]
+        texts = [el for el in data]
         labels = np.array([int(el.label) for el in data])
         return texts, labels
 

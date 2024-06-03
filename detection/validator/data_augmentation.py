@@ -56,8 +56,6 @@ class DataAugmentator:
 
         self.slow_spell_checker = SpellChecker()
         self.sym_spell = SymSpell()
-        # self.fast_spell_checker = jamspell.TSpellCorrector()
-        # assert self.fast_spell_checker.LoadLangModel('data/en.bin')
 
     def __GetCorrectedWord(self, word):
         # candidates = self.fast_spell_checker.GetCandidates([word], 0)
@@ -68,27 +66,17 @@ class DataAugmentator:
 
         return np.random.choice(list(candidates)[:5])
 
-    # Based on https://www.kaggle.com/competitions/llm-detect-ai-generated-text/discussion/456142
-    # but uses better regex that appears to handle ' the same way as the competition organizers & limits the number
-    # of replacements to avoid ever taking a horrendously long time to run (pyspellchecker is slow).
-    # Intentionally buggy to imitate how the competition organizers appear to have done their preprocessing.
     def __BuggyCorrectTypos(self, text):
-        # Tokenize the text into words
         words = re.findall(r"\b[\w|']+\b", text)
 
-        # Find misspelled words. Truncated for runtime reasons (not the bug).
         misspelled = self.slow_spell_checker.unknown(words)
         corrected_typo_count = min(10, len(misspelled))
         misspelled = np.random.choice(list(misspelled), corrected_typo_count, replace=10)
 
-        # Correct the misspelled words
         corrected_text = text
         for word in misspelled:
-            # correction = self.__GetCorrectedWord(word)
             correction = self.slow_spell_checker.correction(word)
             if correction:
-                # Doing replace-alls like this is an intentional bug. Sometimes single letters get detected
-                # as words and replaced throughout the document, thereby resulting in garbled text.
                 corrected_text = corrected_text.replace(word, correction)
 
         return corrected_text
@@ -101,7 +89,6 @@ class DataAugmentator:
         random_index = np.random.choice(capital_indices)
 
         modified_text = text[:random_index] + text[random_index].lower() + text[random_index + 1:]
-
         return modified_text
 
     def __CapitalizeRandomLetter(self, text):
@@ -110,9 +97,7 @@ class DataAugmentator:
             return text
 
         random_index = np.random.choice(lower_indices)
-
         modified_text = text[:random_index] + text[random_index].upper() + text[random_index + 1:]
-
         return modified_text
 
     def __RemoveRandomAdjective(self, text):
