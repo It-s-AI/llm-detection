@@ -53,7 +53,6 @@ def count_penalty(y_pred: np.array, check_predictions: np.array, check_ids: np.a
     bad = np.any((y_pred < 0) | (y_pred > 1))
 
     if (check_predictions.round(2) != y_pred[check_ids].round(2)).any():
-        bt.logging.info("Predictions differ: {}\n{}".format(check_predictions.round(2), y_pred[check_ids].round(2)))
         bad = 1
 
     return 0 if bad else 1
