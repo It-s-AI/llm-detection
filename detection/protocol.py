@@ -18,6 +18,8 @@ import pydantic
 from typing import List, Optional
 import bittensor as bt
 
+from detection import __version__
+
 
 class TextSynapse(bt.Synapse):
     """
@@ -43,6 +45,8 @@ class TextSynapse(bt.Synapse):
         title="Predictions",
         description="List of predicted probabilities. This attribute is mutable and can be updated.",
     ) 
+
+    version: str = __version__
 
     def deserialize(self) -> float:
         """

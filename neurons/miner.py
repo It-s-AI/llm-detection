@@ -24,6 +24,8 @@ import random
 # Bittensor Miner Template:
 import detection
 
+from detection.utils.weight_version import is_version_in_range
+
 # import base miner class which takes care of most of the boilerplate
 from detection.base.miner import BaseMinerNeuron
 from miners.ppl_model import PPLModel
@@ -74,6 +76,12 @@ class Miner(BaseMinerNeuron):
         the miner's intended operation. This method demonstrates a basic transformation of input data.
         """
         start_time = time.time()
+
+        # Check if the validators version is correct
+        version_check = is_version_in_range(synapse.version, self.version, self.least_acceptable_version)
+
+        if not version_check:
+            return synapse
 
         input_data = synapse.texts
         bt.logging.info(f"Amount of texts recieved: {len(input_data)}")
