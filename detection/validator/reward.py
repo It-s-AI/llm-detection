@@ -95,8 +95,6 @@ def get_rewards(
         try:
             if not predictions_list[uid] or len(predictions_list[uid]) != len(labels) or \
                     not check_predictions_list[uid] or len(check_predictions_list[uid]) != len(check_ids):
-                # if not version_predictions_list[uid] and check_predictions_list[uid]:
-                #     bt.logging.info(f"VERSION BLOCKED for #{uid} miner: got {version_predictions_list[uid]}")
                 rewards.append(0)
                 metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 1})
                 continue
