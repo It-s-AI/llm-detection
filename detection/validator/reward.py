@@ -49,10 +49,18 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
     return reward, res
 
 
-def count_penalty(y_pred: np.array, check_predictions: np.array, check_ids: np.array) -> float:
+def count_penalty(
+    y_pred: np.array,
+    check_predictions: np.array,
+    check_ids: np.array,
+    version_predictions_array: List
+    ) -> float:
     bad = np.any((y_pred < 0) | (y_pred > 1))
 
     if (check_predictions.round(2) != y_pred[check_ids].round(2)).any():
+        bad = 1
+
+    if version_predictions_array:
         bad = 1
 
     return 0 if bad else 1
@@ -63,6 +71,7 @@ def get_rewards(
     labels: np.array,
     responses: List[TextSynapse],
     check_responses: List[TextSynapse],
+    version_responses: List[TextSynapse],
     check_ids: np.array
 ) -> torch.FloatTensor:
     """
@@ -78,6 +87,7 @@ def get_rewards(
     # Get all the reward results by iteratively calling your reward() function.
     predictions_list = [synapse.predictions for synapse in responses]
     check_predictions_list = [synapse.predictions for synapse in check_responses]
+    version_predictions_list = [synapse.predictions for synapse in version_responses]
 
     rewards = []
     metrics = []
@@ -85,6 +95,8 @@ def get_rewards(
         try:
             if not predictions_list[uid] or len(predictions_list[uid]) != len(labels) or \
                     not check_predictions_list[uid] or len(check_predictions_list[uid]) != len(check_ids):
+                # if not version_predictions_list[uid] and check_predictions_list[uid]:
+                #     bt.logging.info(f"VERSION BLOCKED for #{uid} miner: got {version_predictions_list[uid]}")
                 rewards.append(0)
                 metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 1})
                 continue
@@ -93,7 +105,9 @@ def get_rewards(
             check_predictions_array = np.array(check_predictions_list[uid])
 
             miner_reward, metric = reward(predictions_array, labels)
-            penalty = count_penalty(predictions_array, check_predictions_array, check_ids)
+            penalty = count_penalty(
+                predictions_array, check_predictions_array, check_ids, version_predictions_list[uid])
+
             miner_reward *= penalty
             rewards.append(miner_reward)
             metric['penalty'] = penalty
