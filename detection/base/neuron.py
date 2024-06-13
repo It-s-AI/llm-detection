@@ -16,6 +16,8 @@
 
 import copy
 import time
+import requests
+import re
 
 import bittensor as bt
 
@@ -25,6 +27,7 @@ from abc import ABC, abstractmethod
 from detection.utils.config import check_config, add_args, config
 from detection.utils.misc import ttl_get_block
 from detection import __spec_version__ as spec_version
+from detection import version_url
 
 
 class BaseNeuron(ABC):
@@ -97,6 +100,11 @@ class BaseNeuron(ABC):
         # Check if the miner is registered on the Bittensor network before proceeding further.
         self.check_registered()
 
+        # Parse versions for weight_version check
+        self.parse_versions()
+        print("VERSIONS")
+        print(self.version, self.least_acceptable_version)
+
         # Each miner gets a unique identity (UID) in the network for differentiation.
         self.uid = self.metagraph.hotkeys.index(
             self.wallet.hotkey.ss58_address
@@ -121,11 +129,17 @@ class BaseNeuron(ABC):
         """
         # Ensure miner or validator hotkey is still registered on the network.
         self.check_registered()
+        
 
         try:
             if self.should_sync_metagraph():
                 self.last_update = self.block
                 self.resync_metagraph()
+                # Parse versions for weight_check
+                self.parse_versions()
+                print("VERSIONS")
+                print(self.version, self.least_acceptable_version)
+
 
             if self.should_set_weights():
                 self.set_weights()
@@ -184,3 +198,27 @@ class BaseNeuron(ABC):
 
     def load_state(self):
         pass
+
+    def parse_versions(self):
+        self.version = "10.0.0"
+        self.least_acceptable_version = "0.0.0"
+
+        bt.logging.info(f"Parsing versions...")
+        response = requests.get(version_url)
+        bt.logging.info(f"Response: {response.status_code}")
+        if response.status_code == 200:
+            content = response.text
+
+            version_pattern = r"__version__\s*=\s*['\"]([^'\"]+)['\"]"
+            least_acceptable_version_pattern = r"__least_acceptable_version__\s*=\s*['\"]([^'\"]+)['\"]"
+
+            try:
+                version = re.search(version_pattern, content).group(1)
+                least_acceptable_version = re.search(least_acceptable_version_pattern, content).group(1)
+            except AttributeError as e:
+                bt.logging.error(f"While parsing versions got error: {e}")
+                return
+
+            self.version = version
+            self.least_acceptable_version = least_acceptable_version
+        return

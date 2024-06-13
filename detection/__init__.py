@@ -23,6 +23,7 @@ __spec_version__ = (
     + (10 * int(version_split[1]))
     + (1 * int(version_split[2]))
 )
+version_url = "https://raw.githubusercontent.com/it-s-ai/llm-detection/main/detection/__init__.py"
 
 # Import all submodules.
 from . import protocol

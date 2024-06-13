@@ -8,6 +8,9 @@ setup_runpod.sh
 wandb/
 wandb/*
 
+models/
+models/*
+
 nohup.out
 
 # Byte-compiled / optimized / DLL files
