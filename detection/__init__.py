@@ -17,6 +17,7 @@
 
 # Define the version of the template module.
 __version__ = "2.5.0"
+__least_acceptable_version__ = "2.4.0"
 version_split = __version__.split(".")
 __spec_version__ = (
     (1000 * int(version_split[0]))

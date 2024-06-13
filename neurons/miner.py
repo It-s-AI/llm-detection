@@ -80,6 +80,10 @@ class Miner(BaseMinerNeuron):
         # Check if the validators version is correct
         version_check = is_version_in_range(synapse.version, self.version, self.least_acceptable_version)
 
+        print(synapse.dendrite.hotkey)
+        print(synapse.version, self.version, self.least_acceptable_version)
+        print(version_check)
+        
         if not version_check:
             return synapse
 
