@@ -102,8 +102,6 @@ class BaseNeuron(ABC):
 
         # Parse versions for weight_version check
         self.parse_versions()
-        print("VERSIONS")
-        print(self.version, self.least_acceptable_version)
 
         # Each miner gets a unique identity (UID) in the network for differentiation.
         self.uid = self.metagraph.hotkeys.index(
@@ -137,9 +135,6 @@ class BaseNeuron(ABC):
                 self.resync_metagraph()
                 # Parse versions for weight_check
                 self.parse_versions()
-                print("VERSIONS")
-                print(self.version, self.least_acceptable_version)
-
 
             if self.should_set_weights():
                 self.set_weights()

@@ -77,14 +77,10 @@ class Miner(BaseMinerNeuron):
         """
         start_time = time.time()
 
+        # Check if the validators version is correct
         version_check = is_version_in_range(synapse.version, self.version, self.least_acceptable_version)
 
-        print(synapse.dendrite.hotkey)
-        print("VERSION CHECK", version_check)
-        print((synapse.version, self.version, self.least_acceptable_version))
-
         if not version_check:
-            print("HASNT PASSED")
             return synapse
 
         input_data = synapse.texts
