@@ -18,7 +18,7 @@ import re
 import typo
 
 FIXED_ORDER_DATA_AUGMENTATION_STEPS = [
-    {'name': 'SubsampleSentences', 'p': 1},
+    # {'name': 'SubsampleSentences', 'p': 1},
     # {'name' : 'BuggySpellCheck', 'p': 0.2},
 ]
 
@@ -101,7 +101,7 @@ class DataAugmentator:
         return modified_text
 
     def __RemoveRandomAdjective(self, text):
-        tokens = text.split(' ')
+        tokens = text.split()
         tagged_tokens = pos_tag(tokens)
 
         # Identify all adjectives (JJ, JJR, JJS)
@@ -111,8 +111,9 @@ class DataAugmentator:
             return ' '.join(tokens)
 
         adjective_to_remove = random.choice(adjectives)
+        idx = [i for i, el in enumerate(tokens) if el == adjective_to_remove]
         tokens.remove(adjective_to_remove)
-        return ' '.join(tokens)
+        return ' '.join(tokens), idx
 
     def __SubsampleSentences(self, text, min_sentence=4, max_sentence=10):
         sentences = sent_tokenize(text)
@@ -159,9 +160,9 @@ class DataAugmentator:
             elif augmentation_step['name'] == 'CapitalizeRandomLetter':
                 text = self.__CapitalizeRandomLetter(text)
             elif augmentation_step['name'] == "RemoveRandomAdjective":
-                text = self.__RemoveRandomAdjective(text)
-            elif augmentation_step['name'] == 'SubsampleSentences':
-                text = self.__SubsampleSentences(text)
+                text, idx = self.__RemoveRandomAdjective(text)
+            # elif augmentation_step['name'] == 'SubsampleSentences':
+            #     text = self.__SubsampleSentences(text)
             elif 'typo_' in augmentation_step['name']:
                 error_type_name = augmentation_step['name'][5:]
                 try:

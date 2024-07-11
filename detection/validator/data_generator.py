@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from detection.validator.models import ValDataRow
 from detection.validator.my_datasets import HumanDataset, PromptDataset
+from detection.validator.segmentation_processer import SegmentationProcesser
 from detection.validator.text_completion import OllamaModel
 from detection.validator.data_augmentation import DataAugmentator
 
@@ -22,6 +23,7 @@ class DataGenerator:
         self.models = models
         self.model_names = [el.model_name for el in models]
         self.augmentator = DataAugmentator()
+        self.segmentation_processer = SegmentationProcesser()
 
         if model_probs is None:
             self.model_probs = [1 / len(self.models) for i in range(len(self.models))]
@@ -58,10 +60,18 @@ class DataGenerator:
 
                     good = False
                     for _ in range(10):
-                        text_auged, augs = self.augmentator(el['text'])
-                        if len(text_auged) >= self.min_text_length:
+                        text, cnt_first_human = self.segmentation_processer.merge_prompt_text(el['prompt'], el['text'])
+                        text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
+                        text_auged, augs = self.augmentator(text)
+
+                        n_auged = len(self.segmentation_processer.split_to_words(text_auged))
+                        new_cnt_first_human = int(n_auged * (1 - sum(labels) / len(labels)))
+                        labels_auged = [0] * new_cnt_first_human + [1] * (n_auged - new_cnt_first_human)
+
+                        if self.min_text_length <= len(text_auged):
                             el['text_auged'] = text_auged
                             el['augmentations'] = augs
+                            el['segmentation_labels'] = labels_auged
                             good = True
                             break
 
@@ -83,10 +93,17 @@ class DataGenerator:
 
                 good = False
                 for _ in range(10):
-                    text_auged, augs = self.augmentator(el['text'])
-                    if len(text_auged) >= self.min_text_length:
+                    text, cnt_first_human = el['text'], len(self.segmentation_processer.split_to_words(el['text']))
+                    text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
+                    text_auged, augs = self.augmentator(text)
+
+                    n_auged = len(self.segmentation_processer.split_to_words(text_auged))
+                    labels_auged = [0] * n_auged
+
+                    if self.min_text_length <= len(text_auged):
                         el['text_auged'] = text_auged
                         el['augmentations'] = augs
+                        el['segmentation_labels'] = labels_auged
                         good = True
                         break
 
