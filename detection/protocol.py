@@ -46,7 +46,7 @@ class TextSynapse(bt.Synapse):
         description="List of predicted probabilities. This attribute is mutable and can be updated.",
     ) 
 
-    version: str = __version__
+    version: str = ""
 
     def deserialize(self) -> float:
         """
