@@ -62,16 +62,13 @@ class DataGenerator:
                     for _ in range(10):
                         text, cnt_first_human = self.segmentation_processer.merge_prompt_text(el['prompt'], el['text'])
                         text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
-                        text_auged, augs = self.augmentator(text)
-
-                        n_auged = len(self.segmentation_processer.split_to_words(text_auged))
-                        new_cnt_first_human = int(n_auged * (1 - sum(labels) / len(labels)))
-                        labels_auged = [0] * new_cnt_first_human + [1] * (n_auged - new_cnt_first_human)
+                        text_auged, augs, labels_auged = self.augmentator(text, labels)
 
                         if self.min_text_length <= len(text_auged):
                             el['text_auged'] = text_auged
                             el['augmentations'] = augs
-                            el['segmentation_labels'] = labels_auged
+                            el['segmentation_labels'] = labels
+                            el['auged_segmentation_labels'] = labels_auged
                             good = True
                             break
 
@@ -95,15 +92,13 @@ class DataGenerator:
                 for _ in range(10):
                     text, cnt_first_human = el['text'], len(self.segmentation_processer.split_to_words(el['text']))
                     text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
-                    text_auged, augs = self.augmentator(text)
-
-                    n_auged = len(self.segmentation_processer.split_to_words(text_auged))
-                    labels_auged = [0] * n_auged
+                    text_auged, augs, labels_auged = self.augmentator(text, labels)
 
                     if self.min_text_length <= len(text_auged):
-                        el['text_auged'] = text_auged
+                        el['text_auged'] = text
                         el['augmentations'] = augs
-                        el['segmentation_labels'] = labels_auged
+                        el['segmentation_labels'] = labels
+                        el['auged_segmentation_labels'] = labels_auged
                         good = True
                         break
 

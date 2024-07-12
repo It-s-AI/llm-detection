@@ -40,11 +40,9 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
     cm = confusion_matrix(y_true, preds)
     tn, fp, fn, tp = cm.ravel()
     f1 = f1_score(y_true, preds)
-    ap_score = average_precision_score(y_true, y_pred)
 
     res = {'fp_score': 1 - fp / len(y_pred),
-            'f1_score': f1,
-            'ap_score': ap_score}
+           'f1_score': f1}
     reward = sum([v for v in res.values()]) / len(res)
     return reward, res
 
@@ -68,7 +66,7 @@ def count_penalty(
     
 def get_rewards(
     self,
-    labels: np.array,
+    labels: list[list[list[bool]]],
     responses: List[TextSynapse],
     check_responses: List[TextSynapse],
     version_responses: List[TextSynapse],
@@ -85,16 +83,25 @@ def get_rewards(
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
     # Get all the reward results by iteratively calling your reward() function.
-    predictions_list = [synapse.predictions for synapse in responses]
-    check_predictions_list = [synapse.predictions for synapse in check_responses]
+    predictions_list = [np.concatenate(synapse.predictions) for synapse in responses]
+    check_predictions_list = [np.concatenate(synapse.predictions) for synapse in check_responses]
     version_predictions_list = [synapse.predictions for synapse in version_responses]
+
+    flatten_check_ids = []
+    for uid_labels in labels:
+        cur_mask = np.concatenate([len(text_labels) * [i in check_ids] for i, text_labels in enumerate(uid_labels)])
+        cur_ids, _ = np.where(cur_mask)
+        flatten_check_ids.append(cur_ids)
+
+    labels = [np.concatenate(el) for el in labels]
+
 
     rewards = []
     metrics = []
     for uid in range(len(predictions_list)):
         try:
-            if not predictions_list[uid] or len(predictions_list[uid]) != len(labels) or \
-                    not check_predictions_list[uid] or len(check_predictions_list[uid]) != len(check_ids):
+            if not predictions_list[uid] or len(predictions_list[uid]) != len(labels[uid]) or \
+                    not check_predictions_list[uid] or len(check_predictions_list[uid]) != len(flatten_check_ids[uid]):
                 rewards.append(0)
                 metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 1})
                 continue
@@ -102,9 +109,8 @@ def get_rewards(
             predictions_array = np.array(predictions_list[uid])
             check_predictions_array = np.array(check_predictions_list[uid])
 
-            miner_reward, metric = reward(predictions_array, labels)
-            penalty = count_penalty(
-                predictions_array, check_predictions_array, check_ids, version_predictions_list[uid])
+            miner_reward, metric = reward(predictions_array, labels[uid])
+            penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[uid], version_predictions_list[uid])
 
             miner_reward *= penalty
             rewards.append(miner_reward)
