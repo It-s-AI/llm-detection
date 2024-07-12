@@ -32,7 +32,7 @@ class PilePromptDataset(Iterator):
             seed = random.randint(0, 1000)
             dataset = iter(
                 load_dataset("monology/pile-uncopyrighted", streaming=True)['train'].shuffle(
-                    seed=seed, buffer_size=10000
+                    seed=seed, buffer_size=100000
                 )
             )
             return dataset
@@ -41,30 +41,13 @@ class PilePromptDataset(Iterator):
             time.sleep(60)
             return self.init_dataset()
 
-    def generate_prompt(self, context):
-        payload_cuttoff = int(len(context) * np.random.uniform(0.1, 0.9))
-        prompt_payload = context[:payload_cuttoff]
-
-        user_request = np.random.choice([
-            f'Complete the following document.\n\n"{prompt_payload}"',
-            f'Finish writing the following document.\n\n"{prompt_payload}"',
-            f'Help me finish writing the following.\n\n"{prompt_payload}"',
-            f'Help me complete this: "{prompt_payload}"',
-            f'Finish writing the following (be careful not to stop prematurely): "{prompt_payload}"',
-        ])
-
-        leading_words = np.random.choice([
-            context[payload_cuttoff:],
-            f"Here's a plausible continuation for the document: {context[payload_cuttoff:]}",
-            f"Sure! Here's the rest of the document: \"{context[payload_cuttoff:]}"
-        ])
-
-        return f"A chat.\nUSER: {user_request}\nASSISTANT: {leading_words}"
-
     def __next__(self):
         while True:
             try:
                 el = next(self.pile)
+                if random.random() > 0.01:
+                    continue
+
                 document_text = el['text'][:int(self.max_prompt_len * 1.25)]
                 context_len = int(len(document_text) * np.random.uniform(0.25, 0.75))
                 # prompt = self.generate_prompt(document_text[:context_len])[:self.max_prompt_len]
