@@ -90,7 +90,7 @@ class DataGenerator:
 
                 good = False
                 for _ in range(10):
-                    text, cnt_first_human = el['text'], len(self.segmentation_processer.split_to_words(el['text']))
+                    text, cnt_first_human = el['text'], len(el['text'].split())
                     text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
                     text_auged, augs, labels_auged = self.augmentator(text, labels)
 
