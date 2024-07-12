@@ -88,12 +88,12 @@ class Miner(BaseMinerNeuron):
 
         try:
             preds = self.model.predict_batch(input_data)
-            preds = [el > 0.5 for el in preds]
         except Exception as e:
             bt.logging.error('Couldnt proceed text "{}..."'.format(input_data))
             bt.logging.error(e)
             preds = [0] * len(input_data)
 
+        preds = [pred * len(text.split()) for pred, text in zip(preds, input_data)]
         bt.logging.info(f"Made predictions in {int(time.time() - start_time)}s")
 
         synapse.predictions = preds
