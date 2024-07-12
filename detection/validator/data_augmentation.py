@@ -111,9 +111,8 @@ class DataAugmentator:
             return ' '.join(tokens)
 
         adjective_to_remove = random.choice(adjectives)
-        idx = [i for i, el in enumerate(tokens) if el == adjective_to_remove]
         tokens.remove(adjective_to_remove)
-        return ' '.join(tokens), idx
+        return ' '.join(tokens)
 
     def __SubsampleSentences(self, text, min_sentence=4, max_sentence=10):
         sentences = sent_tokenize(text)
@@ -160,7 +159,7 @@ class DataAugmentator:
             elif augmentation_step['name'] == 'CapitalizeRandomLetter':
                 text = self.__CapitalizeRandomLetter(text)
             elif augmentation_step['name'] == "RemoveRandomAdjective":
-                text, idx = self.__RemoveRandomAdjective(text)
+                text = self.__RemoveRandomAdjective(text)
             # elif augmentation_step['name'] == 'SubsampleSentences':
             #     text = self.__SubsampleSentences(text)
             elif 'typo_' in augmentation_step['name']:
