@@ -93,7 +93,7 @@ class Miner(BaseMinerNeuron):
             bt.logging.error(e)
             preds = [0] * len(input_data)
 
-        preds = [pred * len(text.split()) for pred, text in zip(preds, input_data)]
+        preds = [[pred] * len(text.split()) for pred, text in zip(preds, input_data)]
         bt.logging.info(f"Made predictions in {int(time.time() - start_time)}s")
 
         synapse.predictions = preds

@@ -40,7 +40,7 @@ class TextSynapse(bt.Synapse):
         allow_mutation=False,
     )
 
-    predictions: List[list[float]] = pydantic.Field(
+    predictions: List[List[float]] = pydantic.Field(
         ...,
         title="Predictions",
         description="List of predicted probabilities. This attribute is mutable and can be updated.",
