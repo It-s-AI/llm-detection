@@ -33,7 +33,7 @@ from typing import List
 import torch
 
 
-async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, timeout, step=35, min_text_length=250):
+async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, timeout, step=25, min_text_length=250):
     all_responses = []
     version_responses = []
     check_responses = []

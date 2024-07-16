@@ -151,5 +151,5 @@ if __name__ == '__main__':
     print(next(dataset))
 
     dataset = PromptDataset()
-    for i in range(15):
+    for i in range(2):
         print(next(dataset))

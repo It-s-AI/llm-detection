@@ -1,6 +1,7 @@
 # The MIT License (MIT)
- # Copyright © 2024 It's AI 
- 
+ # Copyright © 2024 It's AI
+import traceback
+
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -22,7 +23,6 @@ import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, average_precision_score
 
 from detection.protocol import TextSynapse
-
 import time
 
 
@@ -83,8 +83,8 @@ def get_rewards(
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
     # Get all the reward results by iteratively calling your reward() function.
-    predictions_list = [np.concatenate(synapse.predictions) for synapse in responses]
-    check_predictions_list = [np.concatenate(synapse.predictions) for synapse in check_responses]
+    predictions_list = [np.concatenate(synapse.predictions) if len(synapse.predictions) else [] for synapse in responses]
+    check_predictions_list = [np.concatenate(synapse.predictions) if len(synapse.predictions) else [] for synapse in check_responses]
     version_predictions_list = [synapse.predictions for synapse in version_responses]
 
     flatten_check_ids = []
@@ -100,8 +100,7 @@ def get_rewards(
     metrics = []
     for uid in range(len(predictions_list)):
         try:
-            if not predictions_list[uid] or len(predictions_list[uid]) != len(labels[uid]) or \
-                    not check_predictions_list[uid] or len(check_predictions_list[uid]) != len(flatten_check_ids[uid]):
+            if len(predictions_list[uid]) != len(labels[uid]) or len(check_predictions_list[uid]) != len(flatten_check_ids[uid]):
                 rewards.append(0)
                 metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 1})
                 continue
@@ -117,8 +116,8 @@ def get_rewards(
             metric['penalty'] = penalty
             metrics.append(metric)
         except Exception as e:
-            bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels))
-            bt.logging.exception(e)
+            bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels[uid]))
+            bt.logging.info(traceback.format_exc())
             rewards.append(0)
             metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 1})
 
