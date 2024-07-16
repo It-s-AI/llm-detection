@@ -40,9 +40,12 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
     cm = confusion_matrix(y_true, preds)
     tn, fp, fn, tp = cm.ravel()
     f1 = f1_score(y_true, preds)
+    ap_score = average_precision_score(y_true, y_pred)
 
     res = {'fp_score': 1 - fp / len(y_pred),
-           'f1_score': f1}
+           'f1_score': f1,
+           'ap_score': ap_score}
+
     reward = sum([v for v in res.values()]) / len(res)
     return reward, res
 
@@ -90,7 +93,7 @@ def get_rewards(
     flatten_check_ids = []
     for uid_labels in labels:
         cur_mask = np.concatenate([len(text_labels) * [i in check_ids] for i, text_labels in enumerate(uid_labels)])
-        cur_ids, _ = np.where(cur_mask)
+        cur_ids = np.where(cur_mask)[0]
         flatten_check_ids.append(cur_ids)
 
     labels = [np.concatenate(el) for el in labels]
@@ -107,6 +110,8 @@ def get_rewards(
 
             predictions_array = np.array(predictions_list[uid])
             check_predictions_array = np.array(check_predictions_list[uid])
+
+            bt.logging.info(f"{predictions_array.shape}, {labels[uid].shape}, {check_predictions_array.shape}, {flatten_check_ids[uid].shape}")
 
             miner_reward, metric = reward(predictions_array, labels[uid])
             penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[uid], version_predictions_list[uid])

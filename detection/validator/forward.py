@@ -47,6 +47,8 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
         auged_labels = []
         for el in queries:
             new_text, augs, new_labels = augmentator(el.text, el.segmentation_labels)
+            print('New labels {}: {} ... {}, cnt_zeros = {}, cnt_ones = {}'.format(len(new_labels), new_labels[:5], new_labels[-5:], len(new_labels) - sum(new_labels), sum(new_labels)))
+
             if len(new_text) >= min_text_length:
                 auged_texts.append(new_text)
                 auged_labels.append(new_labels)
@@ -54,7 +56,7 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
                 auged_texts.append(el.text_auged)
                 auged_labels.append(el.auged_segmentation_labels)
 
-        final_labels += auged_labels
+        final_labels += [auged_labels] * len(subset_axons)
 
         responses: List[TextSynapse] = await self.dendrite(
             axons=subset_axons,

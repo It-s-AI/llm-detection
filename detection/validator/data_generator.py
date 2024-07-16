@@ -118,25 +118,9 @@ class DataGenerator:
 @click.option("--input_path", default=None)
 @click.option("--output_path", default='generated_data.csv')
 @click.option("--n_samples", default=None)
-@click.option("--ai_batch_size", default=100)
-@click.option("--human_batch_size", default=0)
-def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
-    # models = [OllamaModel(model_name='neural-chat'),
-    #           OllamaModel(model_name='vicuna'),
-    #           OllamaModel(model_name='gemma:7b'),
-    #           OllamaModel(model_name='mistral'),
-    #           OllamaModel(model_name='zephyr:7b-beta'),
-    #
-    #           OllamaModel(model_name='llama3'),
-    #           # OllamaModel(model_name='command-r'),
-    #           OllamaModel(model_name='wizardlm2'),
-    #           OllamaModel(model_name='openhermes'),
-    #           # OllamaModel(model_name='mixtral'),
-    #           OllamaModel(model_name='starling-lm'),
-    #           OllamaModel(model_name='openchat'),
-    #           # OllamaModel(model_name='nous-hermes2'),
-    #           OllamaModel(model_name='wizardcoder'), ]
-
+@click.option("--n_ai_samples", default=100)
+@click.option("--n_human_samples", default=0)
+def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
     text_models = [OllamaModel(model_name='mistral:text'),
                    OllamaModel(model_name='llama3:text'),
                    OllamaModel(model_name='mixtral:text'),
@@ -162,23 +146,19 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
         generator.prompt_dataset = iter(data.to_dict('records'))
         n_samples = len(data)
 
-    if n_samples is not None:
-        assert human_batch_size == 0, "You cant set n_samples and human_batch_size at the same time"
-
     epoch = 0
     full_data = []
     while True:
         start_time = time.time()
-        if len(full_data) == n_samples:
+        if len(full_data) >= n_samples:
             bt.logging.info("Successfully generated {} samples, finishing".format(n_samples))
             break
 
-        cur_ai_batch_size = ai_batch_size if n_samples is None else min(ai_batch_size, n_samples - len(full_data))
-        data = generator.generate_data(n_ai_samples=cur_ai_batch_size, n_human_samples=human_batch_size)
+        data = generator.generate_data(n_ai_samples=n_ai_samples, n_human_samples=n_human_samples)
         full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
-        if epoch % 1 == 0 or len(full_data) == n_samples:
+        if epoch % 1 == 0 or len(full_data) >= n_samples:
             df = pd.DataFrame(full_data)
             try:
                 start_ind = len(full_data) // 10000 * 10000
@@ -195,4 +175,4 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
 if __name__ == '__main__':
     main()
 
-# nohup python3 detection/validator/data_generator.py --ai_batch_size=150 --human_batch_size=150 --output_path "data/generated_data.csv" > generator.log &
+# nohup python3 detection/validator/data_generator.py --n_ai_samples=75 --n_human_samples=25 --output_path "data/generated_data.csv" > generator.log &
