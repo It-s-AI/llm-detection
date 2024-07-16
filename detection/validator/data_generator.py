@@ -150,7 +150,7 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
     full_data = []
     while True:
         start_time = time.time()
-        if len(full_data) >= n_samples:
+        if n_samples is not None and len(full_data) >= n_samples:
             bt.logging.info("Successfully generated {} samples, finishing".format(n_samples))
             break
 
@@ -158,7 +158,7 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
         full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
-        if epoch % 1 == 0 or len(full_data) >= n_samples:
+        if epoch % 1 == 0 or (n_samples is not None and len(full_data) >= n_samples):
             df = pd.DataFrame(full_data)
             try:
                 start_ind = len(full_data) // 10000 * 10000
