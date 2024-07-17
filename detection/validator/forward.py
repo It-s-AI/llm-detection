@@ -129,6 +129,7 @@ async def forward(self):
 
     cnt_challenges_for_check = random.randint(1, min(10, len(texts)))
     check_ids = np.random.choice(np.arange(len(texts)).astype(int), size=cnt_challenges_for_check, replace=False)
+    check_ids = np.array(sorted(check_ids))
 
     all_responses, check_responses, version_responses, final_labels = await get_all_responses(
         self, axons, texts, check_ids, self.config.neuron.timeout)
