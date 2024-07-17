@@ -1,5 +1,7 @@
+import logging
 import random
 import time
+import traceback
 
 import bittensor as bt
 import click
@@ -62,7 +64,12 @@ class DataGenerator:
                     for _ in range(10):
                         text, cnt_first_human = self.segmentation_processer.merge_prompt_text(el['prompt'], el['text'])
                         text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
-                        text_auged, augs, labels_auged = self.augmentator(text, labels)
+                        try:
+                            text_auged, augs, labels_auged = self.augmentator(text, labels)
+                        except:
+                            logging.error("Got error during augmentations for text: {} \n and labels: {}".format(text, labels))
+                            logging.info(traceback.format_exc())
+                            continue
 
                         if self.min_text_length <= len(text_auged):
                             el['text_auged'] = text_auged
