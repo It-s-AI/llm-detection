@@ -125,25 +125,30 @@ class DataGenerator:
 @click.option("--input_path", default=None)
 @click.option("--output_path", default='generated_data.csv')
 @click.option("--n_samples", default=None)
-@click.option("--n_ai_samples", default=100)
-@click.option("--n_human_samples", default=0)
+@click.option("--n_ai_samples", default=75)
+@click.option("--n_human_samples", default=25)
 def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
-    text_models = [OllamaModel(model_name='mistral:text'),
-                   OllamaModel(model_name='llama3:text'),
-                   OllamaModel(model_name='mixtral:text'),
+    text_models = [OllamaModel(model_name='llama3:text'),
+                   OllamaModel(model_name='llama2:13b'),
+                   OllamaModel(model_name='codellama:13b'),
 
-                   OllamaModel(model_name='gemma:7b'),
+                   OllamaModel(model_name='qwen2:7b-instruct-q4_0'),
+                   OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+
                    OllamaModel(model_name='command-r'),
-                   OllamaModel(model_name='neural-chat'),
+                   OllamaModel(model_name='command-r'),
+
+                   OllamaModel(model_name='gemma2:9b-instruct-q4_0'),
+                   OllamaModel(model_name='gemma2:27b-text-q4_0'),
+
+                   OllamaModel(model_name='deepseek-coder-v2:16b-lite-instruct-q4_0'),
+                   OllamaModel(model_name='yi:34b'),
+                   OllamaModel(model_name='phi3:14b-instruct'),
+
                    OllamaModel(model_name='zephyr:7b-beta'),
                    OllamaModel(model_name='openhermes'),
-                   OllamaModel(model_name='wizardcoder'),
-                   OllamaModel(model_name='starling-lm:7b-beta'),
-                   OllamaModel(model_name='yi:34b'),
-                   OllamaModel(model_name='openchat:7b'),
-                   OllamaModel(model_name='dolphin-mistral'),
-                   OllamaModel(model_name='solar'),
-                   OllamaModel(model_name='llama2:13b'),]
+                   OllamaModel(model_name='mistral:text'),
+                   ]
 
     generator = DataGenerator(text_models, None)
 

@@ -10,7 +10,7 @@ import ollama
 
 
 class OllamaModel:
-    def __init__(self, model_name, num_predict=1000):
+    def __init__(self, model_name, num_predict=900):
         """
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
@@ -62,7 +62,7 @@ class OllamaModel:
                     else:
                         text = self.model.invoke(prompt)
                 else:
-                    assert ':text' not in self.model_name
+                    assert 'text' not in self.model_name
                     text = self.model.invoke(prompt)
 
                 return self.text_cleaner.clean_text(text)

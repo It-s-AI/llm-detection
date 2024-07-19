@@ -21,7 +21,7 @@ class SegmentationProcesser:
 
         return now['text'], now['cnt_first_human']
 
-    def subsample_words(self, text, cnt_first_human, min_cnt=50, max_cnt=350):
+    def subsample_words(self, text, cnt_first_human, min_cnt=40, max_cnt=350):
         words = text.split()
         labels = [0] * cnt_first_human + [1] * (len(words) - cnt_first_human)
         if len(words) <= min_cnt:

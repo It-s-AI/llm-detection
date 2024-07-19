@@ -120,7 +120,7 @@ def add_args(cls, parser):
             "--neuron.timeout",
             type=int,
             help="Timeout",
-            default=10,
+            default=20,
         )
 
         parser.add_argument(
