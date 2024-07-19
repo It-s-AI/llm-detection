@@ -55,7 +55,7 @@ class OllamaModel:
         while True:
             try:
                 if text_completion_mode:
-                    if ':text' not in self.model_name:
+                    if 'text' not in self.model_name:
                         system_message = "You're a text completion model, just complete text that user sended you" #. Return text without any supportive - we write add your result right after the user text
                         text = self.model.invoke([{'role': 'system', 'content': system_message},
                                                   {'role': 'user', 'content': prompt}])
