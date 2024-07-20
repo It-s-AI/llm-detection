@@ -56,16 +56,20 @@ class DataGenerator:
             for j in range(cnt_samples):
                 while True:
                     el = next(self.prompt_dataset)
-                    el['text'] = model(el['prompt'], text_completion_mode=True)
+                    el['completion'] = model(el['prompt'], text_completion_mode=True)
                     el['model_name'] = model_name
                     el['model_params'] = model.params
 
                     good = False
                     for _ in range(10):
-                        text, cnt_first_human = self.segmentation_processer.merge_prompt_text(el['prompt'], el['text'])
+                        text, cnt_first_human = self.segmentation_processer.merge_prompt_text(el['prompt'], el['completion'])
+                        el['text'] = text
+
                         text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
+
                         try:
                             text_auged, augs, labels_auged = self.augmentator(text, labels)
+                            assert len(text_auged.split()) == len(labels_auged)
                         except:
                             logging.error("Got error during augmentations for text: {} \n and labels: {}".format(text, labels))
                             logging.info(traceback.format_exc())
@@ -102,7 +106,7 @@ class DataGenerator:
                     text_auged, augs, labels_auged = self.augmentator(text, labels)
 
                     if self.min_text_length <= len(text_auged):
-                        el['text_auged'] = text
+                        el['text_auged'] = text_auged
                         el['augmentations'] = augs
                         el['segmentation_labels'] = labels
                         el['auged_segmentation_labels'] = labels_auged
