@@ -52,25 +52,24 @@ class Validator(BaseValidatorNeuron):
         self.load_state()
 
         models = [OllamaModel(model_name='llama3:text'),
-                   OllamaModel(model_name='llama2:13b'),
-                   OllamaModel(model_name='codellama:13b'),
+                  OllamaModel(model_name='llama2:13b'),
+                  OllamaModel(model_name='codellama:13b'),
 
-                   OllamaModel(model_name='qwen2:7b-instruct-q4_0'),
-                   OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+                  OllamaModel(model_name='qwen2:7b-text-q4_0'),
+                  OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+                  OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
 
-                   OllamaModel(model_name='command-r'),
-                   OllamaModel(model_name='command-r'),
+                  OllamaModel(model_name='command-r'),
+                  OllamaModel(model_name='command-r'),
 
-                   OllamaModel(model_name='gemma2:9b-instruct-q4_0'),
-                   OllamaModel(model_name='gemma2:27b-text-q4_0'),
+                  OllamaModel(model_name='gemma2:9b-instruct-q4_0'),
+                  OllamaModel(model_name='gemma2:27b-text-q4_0'),
 
-                   OllamaModel(model_name='deepseek-coder-v2:16b-lite-instruct-q4_0'),
-                   OllamaModel(model_name='yi:34b'),
-                   OllamaModel(model_name='phi3:14b-instruct'),
-
-                   OllamaModel(model_name='zephyr:7b-beta'),
-                   OllamaModel(model_name='openhermes'),
-                   OllamaModel(model_name='mistral:text'),]
+                  OllamaModel(model_name='openchat:7b'),
+                  OllamaModel(model_name='yi:34b'),
+                  OllamaModel(model_name='zephyr:7b-beta'),
+                  OllamaModel(model_name='openhermes'),
+                  OllamaModel(model_name='mistral:text'), ]
 
         bt.logging.info(f"Models loaded{models}")
 
