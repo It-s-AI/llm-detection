@@ -66,6 +66,8 @@ class DataGenerator:
                         el['text'] = text
 
                         text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
+                        if len(labels) == 0:
+                            continue
 
                         try:
                             text_auged, augs, labels_auged = self.augmentator(text, labels)
@@ -103,6 +105,9 @@ class DataGenerator:
                 for _ in range(10):
                     text, cnt_first_human = el['text'], len(el['text'].split())
                     text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
+                    if len(labels) == 0:
+                        continue
+
                     text_auged, augs, labels_auged = self.augmentator(text, labels)
 
                     if self.min_text_length <= len(text_auged):
