@@ -19,6 +19,7 @@
 import time
 import os
 import random
+import traceback
 from typing import List
 
 import bittensor as bt
@@ -98,7 +99,7 @@ class Validator(BaseValidatorNeuron):
             return res
         except Exception as e:
             bt.logging.error("Got error in forward function")
-            bt.logging.exception(e)
+            bt.logging.info(traceback.format_exc())
             return None
 
 
