@@ -50,7 +50,7 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
         auged_texts = []
         auged_labels = []
         for el in queries:
-            text, labels = segmentation_processer.subsample_words(el.text, sum([el == 0 for el in el.segmentation_labels]))
+            text, labels = segmentation_processer.subsample_words(el.text, sum([i == 0 for i in el.segmentation_labels]))
             new_text, augs, new_labels = augmentator(text, labels)
             print('New labels {}: {} ... {}, cnt_zeros = {}, cnt_ones = {}'.format(len(new_labels), new_labels[:5], new_labels[-5:], len(new_labels) - sum(new_labels), sum(new_labels)))
 
