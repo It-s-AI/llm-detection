@@ -32,6 +32,8 @@ import time
 from typing import List
 import torch
 
+from detection.validator.segmentation_processer import SegmentationProcesser
+
 
 async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, timeout, step=25, min_text_length=250):
     all_responses = []
@@ -39,6 +41,8 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
     check_responses = []
     final_labels = []
     augmentator = DataAugmentator()
+    segmentation_processer = SegmentationProcesser()
+
     for i in range(0, len(axons), step):
         bt.logging.info(f"Sending challenges to the #{i} subset of miners with size {step}")
         subset_axons = axons[i:i + step]
@@ -46,7 +50,8 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
         auged_texts = []
         auged_labels = []
         for el in queries:
-            new_text, augs, new_labels = augmentator(el.text, el.segmentation_labels)
+            text, labels = segmentation_processer.subsample_words(el.text, sum([el == 0 for el in el.segmentation_labels]))
+            new_text, augs, new_labels = augmentator(text, labels)
             print('New labels {}: {} ... {}, cnt_zeros = {}, cnt_ones = {}'.format(len(new_labels), new_labels[:5], new_labels[-5:], len(new_labels) - sum(new_labels), sum(new_labels)))
 
             if len(new_text) >= min_text_length:

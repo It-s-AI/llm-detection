@@ -64,6 +64,7 @@ class DataGenerator:
                     for _ in range(10):
                         text, cnt_first_human = self.segmentation_processer.merge_prompt_text(el['prompt'], el['completion'])
                         el['text'] = text
+                        el['segmentation_labels'] = [0] * cnt_first_human + [1] * (text.split() - cnt_first_human)
 
                         text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
                         if len(labels) == 0:
@@ -80,7 +81,6 @@ class DataGenerator:
                         if self.min_text_length <= len(text_auged):
                             el['text_auged'] = text_auged
                             el['augmentations'] = augs
-                            el['segmentation_labels'] = labels
                             el['auged_segmentation_labels'] = labels_auged
                             good = True
                             break
@@ -104,6 +104,8 @@ class DataGenerator:
                 good = False
                 for _ in range(10):
                     text, cnt_first_human = el['text'], len(el['text'].split())
+                    el['segmentation_labels'] = cnt_first_human * [0]
+
                     text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
                     if len(labels) == 0:
                         continue
@@ -113,7 +115,6 @@ class DataGenerator:
                     if self.min_text_length <= len(text_auged):
                         el['text_auged'] = text_auged
                         el['augmentations'] = augs
-                        el['segmentation_labels'] = labels
                         el['auged_segmentation_labels'] = labels_auged
                         good = True
                         break
