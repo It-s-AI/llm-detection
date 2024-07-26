@@ -64,7 +64,7 @@ class DataGenerator:
                     for _ in range(10):
                         text, cnt_first_human = self.segmentation_processer.merge_prompt_text(el['prompt'], el['completion'])
                         el['text'] = text
-                        el['segmentation_labels'] = [0] * cnt_first_human + [1] * (text.split() - cnt_first_human)
+                        el['segmentation_labels'] = [0] * cnt_first_human + [1] * (len(text.split()) - cnt_first_human)
 
                         text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
                         if len(labels) == 0:
