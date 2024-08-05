@@ -10,7 +10,7 @@ import ollama
 
 
 class OllamaModel:
-    def __init__(self, model_name, num_predict=1000):
+    def __init__(self, model_name, num_predict=900):
         """
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
@@ -55,14 +55,14 @@ class OllamaModel:
         while True:
             try:
                 if text_completion_mode:
-                    if ':text' not in self.model_name:
+                    if 'text' not in self.model_name:
                         system_message = "You're a text completion model, just complete text that user sended you" #. Return text without any supportive - we write add your result right after the user text
                         text = self.model.invoke([{'role': 'system', 'content': system_message},
                                                   {'role': 'user', 'content': prompt}])
                     else:
                         text = self.model.invoke(prompt)
                 else:
-                    assert ':text' not in self.model_name
+                    assert 'text' not in self.model_name
                     text = self.model.invoke(prompt)
 
                 return self.text_cleaner.clean_text(text)

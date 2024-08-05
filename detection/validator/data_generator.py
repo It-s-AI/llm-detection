@@ -1,5 +1,7 @@
+import logging
 import random
 import time
+import traceback
 
 import bittensor as bt
 import click
@@ -8,6 +10,7 @@ from tqdm import tqdm
 
 from detection.validator.models import ValDataRow
 from detection.validator.my_datasets import HumanDataset, PromptDataset
+from detection.validator.segmentation_processer import SegmentationProcesser
 from detection.validator.text_completion import OllamaModel
 from detection.validator.data_augmentation import DataAugmentator
 
@@ -22,6 +25,7 @@ class DataGenerator:
         self.models = models
         self.model_names = [el.model_name for el in models]
         self.augmentator = DataAugmentator()
+        self.segmentation_processer = SegmentationProcesser()
 
         if model_probs is None:
             self.model_probs = [1 / len(self.models) for i in range(len(self.models))]
@@ -52,16 +56,32 @@ class DataGenerator:
             for j in range(cnt_samples):
                 while True:
                     el = next(self.prompt_dataset)
-                    el['text'] = model(el['prompt'], text_completion_mode=True)
+                    el['completion'] = model(el['prompt'], text_completion_mode=True)
                     el['model_name'] = model_name
                     el['model_params'] = model.params
 
                     good = False
                     for _ in range(10):
-                        text_auged, augs = self.augmentator(el['text'])
-                        if len(text_auged) >= self.min_text_length:
+                        text, cnt_first_human = self.segmentation_processer.merge_prompt_text(el['prompt'], el['completion'])
+                        el['text'] = text
+                        el['segmentation_labels'] = [0] * cnt_first_human + [1] * (len(text.split()) - cnt_first_human)
+
+                        text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
+                        if len(labels) == 0:
+                            continue
+
+                        try:
+                            text_auged, augs, labels_auged = self.augmentator(text, labels)
+                            assert len(text_auged.split()) == len(labels_auged)
+                        except:
+                            logging.error("Got error during augmentations for text: {} \n and labels: {}".format(text, labels))
+                            logging.info(traceback.format_exc())
+                            continue
+
+                        if self.min_text_length <= len(text_auged):
                             el['text_auged'] = text_auged
                             el['augmentations'] = augs
+                            el['auged_segmentation_labels'] = labels_auged
                             good = True
                             break
 
@@ -83,10 +103,19 @@ class DataGenerator:
 
                 good = False
                 for _ in range(10):
-                    text_auged, augs = self.augmentator(el['text'])
-                    if len(text_auged) >= self.min_text_length:
+                    text, cnt_first_human = el['text'], len(el['text'].split())
+                    el['segmentation_labels'] = cnt_first_human * [0]
+
+                    text, labels = self.segmentation_processer.subsample_words(text, cnt_first_human)
+                    if len(labels) == 0:
+                        continue
+
+                    text_auged, augs, labels_auged = self.augmentator(text, labels)
+
+                    if self.min_text_length <= len(text_auged):
                         el['text_auged'] = text_auged
                         el['augmentations'] = augs
+                        el['auged_segmentation_labels'] = labels_auged
                         good = True
                         break
 
@@ -106,41 +135,28 @@ class DataGenerator:
 @click.option("--input_path", default=None)
 @click.option("--output_path", default='generated_data.csv')
 @click.option("--n_samples", default=None)
-@click.option("--ai_batch_size", default=100)
-@click.option("--human_batch_size", default=0)
-def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
-    # models = [OllamaModel(model_name='neural-chat'),
-    #           OllamaModel(model_name='vicuna'),
-    #           OllamaModel(model_name='gemma:7b'),
-    #           OllamaModel(model_name='mistral'),
-    #           OllamaModel(model_name='zephyr:7b-beta'),
-    #
-    #           OllamaModel(model_name='llama3'),
-    #           # OllamaModel(model_name='command-r'),
-    #           OllamaModel(model_name='wizardlm2'),
-    #           OllamaModel(model_name='openhermes'),
-    #           # OllamaModel(model_name='mixtral'),
-    #           OllamaModel(model_name='starling-lm'),
-    #           OllamaModel(model_name='openchat'),
-    #           # OllamaModel(model_name='nous-hermes2'),
-    #           OllamaModel(model_name='wizardcoder'), ]
+@click.option("--n_ai_samples", default=75)
+@click.option("--n_human_samples", default=25)
+def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
+    text_models = [OllamaModel(model_name='llama3:text'),
+                   OllamaModel(model_name='llama2:13b'),
+                   OllamaModel(model_name='codellama:13b'),
 
-    text_models = [OllamaModel(model_name='mistral:text'),
-                   OllamaModel(model_name='llama3:text'),
-                   OllamaModel(model_name='mixtral:text'),
+                   OllamaModel(model_name='qwen2:7b-text-q4_0'),
+                   OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+                   OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
 
-                   OllamaModel(model_name='gemma:7b'),
                    OllamaModel(model_name='command-r'),
-                   OllamaModel(model_name='neural-chat'),
+                   OllamaModel(model_name='command-r'),
+
+                   OllamaModel(model_name='gemma2:9b-instruct-q4_0'),
+                   OllamaModel(model_name='gemma2:27b-text-q4_0'),
+
+                   OllamaModel(model_name='openchat:7b'),
+                   OllamaModel(model_name='yi:34b'),
                    OllamaModel(model_name='zephyr:7b-beta'),
                    OllamaModel(model_name='openhermes'),
-                   OllamaModel(model_name='wizardcoder'),
-                   OllamaModel(model_name='starling-lm:7b-beta'),
-                   OllamaModel(model_name='yi:34b'),
-                   OllamaModel(model_name='openchat:7b'),
-                   OllamaModel(model_name='dolphin-mistral'),
-                   OllamaModel(model_name='solar'),
-                   OllamaModel(model_name='llama2:13b'),]
+                   OllamaModel(model_name='mistral:text'),]
 
     generator = DataGenerator(text_models, None)
 
@@ -150,23 +166,19 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
         generator.prompt_dataset = iter(data.to_dict('records'))
         n_samples = len(data)
 
-    if n_samples is not None:
-        assert human_batch_size == 0, "You cant set n_samples and human_batch_size at the same time"
-
     epoch = 0
     full_data = []
     while True:
         start_time = time.time()
-        if len(full_data) == n_samples:
+        if n_samples is not None and len(full_data) >= n_samples:
             bt.logging.info("Successfully generated {} samples, finishing".format(n_samples))
             break
 
-        cur_ai_batch_size = ai_batch_size if n_samples is None else min(ai_batch_size, n_samples - len(full_data))
-        data = generator.generate_data(n_ai_samples=cur_ai_batch_size, n_human_samples=human_batch_size)
+        data = generator.generate_data(n_ai_samples=n_ai_samples, n_human_samples=n_human_samples)
         full_data += [el.dict() for el in data]
         bt.logging.info('Generated epoch {} in {} seconds'.format(epoch, round(time.time() - start_time, 3)))
 
-        if epoch % 1 == 0 or len(full_data) == n_samples:
+        if epoch % 1 == 0 or (n_samples is not None and len(full_data) >= n_samples):
             df = pd.DataFrame(full_data)
             try:
                 start_ind = len(full_data) // 10000 * 10000
@@ -183,4 +195,4 @@ def main(input_path, output_path, n_samples, ai_batch_size, human_batch_size):
 if __name__ == '__main__':
     main()
 
-# nohup python3 detection/validator/data_generator.py --ai_batch_size=150 --human_batch_size=150 --output_path "data/generated_data.csv" > generator.log &
+# nohup python3 detection/validator/data_generator.py --n_ai_samples=75 --n_human_samples=25 --output_path "data/generated_data.csv" > generator.log &

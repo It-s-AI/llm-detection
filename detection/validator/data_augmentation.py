@@ -18,7 +18,7 @@ import re
 import typo
 
 FIXED_ORDER_DATA_AUGMENTATION_STEPS = [
-    {'name': 'SubsampleSentences', 'p': 1},
+    # {'name': 'SubsampleSentences', 'p': 1},
     # {'name' : 'BuggySpellCheck', 'p': 0.2},
 ]
 
@@ -101,7 +101,7 @@ class DataAugmentator:
         return modified_text
 
     def __RemoveRandomAdjective(self, text):
-        tokens = text.split(' ')
+        tokens = text.split()
         tagged_tokens = pos_tag(tokens)
 
         # Identify all adjectives (JJ, JJR, JJS)
@@ -134,7 +134,7 @@ class DataAugmentator:
 
         return ' '.join(res)
 
-    def __call__(self, text):
+    def __call__(self, text, labels):
         text = text.strip()
 
         random_augs = self.rand_order_data_augmentation_steps.copy()
@@ -160,8 +160,8 @@ class DataAugmentator:
                 text = self.__CapitalizeRandomLetter(text)
             elif augmentation_step['name'] == "RemoveRandomAdjective":
                 text = self.__RemoveRandomAdjective(text)
-            elif augmentation_step['name'] == 'SubsampleSentences':
-                text = self.__SubsampleSentences(text)
+            # elif augmentation_step['name'] == 'SubsampleSentences':
+            #     text = self.__SubsampleSentences(text)
             elif 'typo_' in augmentation_step['name']:
                 error_type_name = augmentation_step['name'][5:]
                 try:
@@ -172,4 +172,7 @@ class DataAugmentator:
             else:
                 raise Exception("Unexpected augmentation name: {}".format(augmentation_step['name']))
 
-        return text, applied_augs
+        n_auged = len(text.split())
+        new_cnt_first_human = int(n_auged * (1 - sum(labels) / len(labels)))
+        labels_auged = [0] * new_cnt_first_human + [1] * (n_auged - new_cnt_first_human)
+        return text, applied_augs, labels_auged

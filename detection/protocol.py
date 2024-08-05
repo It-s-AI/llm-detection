@@ -40,13 +40,13 @@ class TextSynapse(bt.Synapse):
         allow_mutation=False,
     )
 
-    predictions: List[float] = pydantic.Field(
+    predictions: List[List[float]] = pydantic.Field(
         ...,
         title="Predictions",
         description="List of predicted probabilities. This attribute is mutable and can be updated.",
     ) 
 
-    version: str = __version__
+    version: str = ""
 
     def deserialize(self) -> float:
         """

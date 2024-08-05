@@ -64,6 +64,12 @@ Run ollama service in background (make sure that you don't have any running inst
 pm2 start --name ollama "ollama serve"
 ```
 
+If you want to update your pulled models run this:
+```
+ollama list | tail -n +2 | awk '{print $1}' | while read -r model; do
+  ollama pull $model
+done
+```
 
 ## Running the Validator
 

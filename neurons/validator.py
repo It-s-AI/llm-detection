@@ -19,6 +19,7 @@
 import time
 import os
 import random
+import traceback
 from typing import List
 
 import bittensor as bt
@@ -51,22 +52,25 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
 
-        models = [OllamaModel(model_name='mistral:text'),
-                  OllamaModel(model_name='llama3:text'),
-                  OllamaModel(model_name='mixtral:text'),
+        models = [OllamaModel(model_name='llama3:text'),
+                  OllamaModel(model_name='llama2:13b'),
+                  OllamaModel(model_name='codellama:13b'),
 
-                  OllamaModel(model_name='gemma:7b'),
+                  OllamaModel(model_name='qwen2:7b-text-q4_0'),
+                  OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+                  OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+
                   OllamaModel(model_name='command-r'),
-                  OllamaModel(model_name='neural-chat'),
+                  OllamaModel(model_name='command-r'),
+
+                  OllamaModel(model_name='gemma2:9b-instruct-q4_0'),
+                  OllamaModel(model_name='gemma2:27b-text-q4_0'),
+
+                  OllamaModel(model_name='openchat:7b'),
+                  OllamaModel(model_name='yi:34b'),
                   OllamaModel(model_name='zephyr:7b-beta'),
                   OllamaModel(model_name='openhermes'),
-                  OllamaModel(model_name='wizardcoder'),
-                  OllamaModel(model_name='starling-lm:7b-beta'),
-                  OllamaModel(model_name='yi:34b'),
-                  OllamaModel(model_name='openchat:7b'),
-                  OllamaModel(model_name='dolphin-mistral'),
-                  OllamaModel(model_name='solar'),
-                  OllamaModel(model_name='llama2:13b'),]
+                  OllamaModel(model_name='mistral:text'), ]
 
         bt.logging.info(f"Models loaded{models}")
 
@@ -75,9 +79,9 @@ class Validator(BaseValidatorNeuron):
 
     async def build_queries(self) -> tuple[List[ValDataRow], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
-        data = self.generator.generate_data(n_human_samples=150, n_ai_samples=150)
+        data = self.generator.generate_data(n_human_samples=25, n_ai_samples=75)
         texts = [el for el in data]
-        labels = np.array([int(el.label) for el in data])
+        labels = [el.segmentation_labels for el in data]
         return texts, labels
 
     async def forward(self):
@@ -95,7 +99,7 @@ class Validator(BaseValidatorNeuron):
             return res
         except Exception as e:
             bt.logging.error("Got error in forward function")
-            bt.logging.exception(e)
+            bt.logging.info(traceback.format_exc())
             return None
 
 
