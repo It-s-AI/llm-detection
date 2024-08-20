@@ -52,7 +52,7 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
         for el in queries:
             text, labels = segmentation_processer.subsample_words(el.text, sum([ell == 0 for ell in el.segmentation_labels]))
             new_text, augs, new_labels = augmentator(text, labels)
-            print('New labels {}: {} ... {}, cnt_zeros = {}, cnt_ones = {}'.format(len(new_labels), new_labels[:5], new_labels[-5:], len(new_labels) - sum(new_labels), sum(new_labels)))
+            # print('New labels {}: {} ... {}, cnt_zeros = {}, cnt_ones = {}'.format(len(new_labels), new_labels[:5], new_labels[-5:], len(new_labels) - sum(new_labels), sum(new_labels)))
 
             if len(new_text) >= min_text_length:
                 auged_texts.append(new_text)
@@ -152,7 +152,7 @@ async def forward(self):
     rewards_tensor = torch.tensor(rewards).to(self.device)
 
     m = torch.nn.Softmax()
-    rewards_tensor = m(rewards_tensor * 4)
+    rewards_tensor = m(rewards_tensor * 20)
 
     bt.logging.info("Normalized rewards: {}".format(rewards_tensor))
 
