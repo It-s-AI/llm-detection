@@ -152,7 +152,7 @@ async def forward(self):
     rewards_tensor = torch.tensor(rewards).to(self.device)
 
     m = torch.nn.Softmax()
-    rewards_tensor = m(rewards_tensor * 4)
+    rewards_tensor = m(rewards_tensor * 20)
 
     bt.logging.info("Normalized rewards: {}".format(rewards_tensor))
 
