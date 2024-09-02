@@ -48,6 +48,9 @@ class BaseValidatorNeuron(BaseNeuron):
         # Save a copy of the hotkeys to local memory.
         self.hotkeys = copy.deepcopy(self.metagraph.hotkeys)
 
+        # Init KeyPair to sign messages to wandb
+        self.keypair = self.wallet.hotkey
+
         # Dendrite lets us send messages to other nodes (axons) in the network.
         self.dendrite = bt.dendrite(wallet=self.wallet)
         bt.logging.info(f"Dendrite: {self.dendrite}")
@@ -435,9 +438,15 @@ class BaseValidatorNeuron(BaseNeuron):
                     f"graphed_data: {graphed_data}"
                 )              
                 original_format_json = json.dumps(step_log)
+
+                signed_msg = f'0x{self.keypair.sign(original_format_json).hex()}'
                 bt.logging.info("Logging to Wandb")
                 self.wandb_run.log(
-                    {**graphed_data, "original_format_json": original_format_json},
+                    {
+                        **graphed_data, 
+                        "original_format_json": original_format_json,
+                        "signed_msg": signed_msg
+                    },
                     step=self.step,
                 )
                 bt.logging.info("Logged")
