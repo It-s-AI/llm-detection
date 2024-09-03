@@ -48,7 +48,7 @@ class TextDataset(Iterator):
                 return {'prompt': prompt, 'real_completion': el[self.text_field][context_len:]}
             except Exception as e:
                 if type(e) == StopIteration:
-                    bt.logging.info('PilePromptDataset ended: reinitializing it')
+                    bt.logging.info(f'{self.__class__} ended: reinitializing it')
                 else:
                     bt.logging.error("Got exception during loading data from PilePromptDataset, reinitializing it: {}".format(e))
                     bt.logging.exception(e)
