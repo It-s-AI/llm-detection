@@ -13,9 +13,10 @@ from collections.abc import Iterator
 class TextDataset(Iterator):
     def __init__(self, max_prompt_len, text_field):
         super().__init__()
-        self.pile = self.init_dataset()
+        self.dataset = self.init_dataset()
         self.max_prompt_len = max_prompt_len
         self.text_field = text_field
+        self.name = 'RedPajamaDataset' if text_field == 'raw_content' else 'PileDataset'
 
     @abstractmethod
     def get_iter(self):
@@ -31,14 +32,14 @@ class TextDataset(Iterator):
             dataset = self.get_iter()
             return dataset
         except Exception as e:
-            logging.error("Got exception during Pile dataset initializing: {}, retrying...".format(e))
+            logging.error("Got exception during {} dataset initializing: {}, retrying...".format(self.name, e))
             time.sleep(60)
             return self.init_dataset()
 
     def __next__(self):
         while True:
             try:
-                el = next(self.pile)
+                el = next(self.dataset)
                 if not self.filter_rules_pass(el):
                     continue
 
@@ -48,12 +49,12 @@ class TextDataset(Iterator):
                 return {'prompt': prompt, 'real_completion': el[self.text_field][context_len:]}
             except Exception as e:
                 if type(e) == StopIteration:
-                    bt.logging.info(f'{self.__class__} ended: reinitializing it')
+                    bt.logging.info(f'{self.name} with ended: reinitializing it')
                 else:
-                    bt.logging.error("Got exception during loading data from PilePromptDataset, reinitializing it: {}".format(e))
+                    bt.logging.error("Got exception during loading data from {}, reinitializing it: {}".format(self.name, e))
                     bt.logging.exception(e)
 
-                self.pile = self.init_dataset()
+                self.dataset = self.init_dataset()
                 continue
 
 
@@ -84,7 +85,7 @@ class RedPajamaDataset(TextDataset):
                 languages=["en"],
                 name="default",
                 streaming=True,
-            ).shuffle(seed=seed, buffer_size=100000)
+            )['train'].shuffle(seed=seed, buffer_size=100000)
         )
         return dataset
 
