@@ -8,9 +8,6 @@ import bittensor as bt
 import numpy as np
 from datasets import load_dataset
 from collections.abc import Iterator
-from pylatexenc.latex2text import LatexNodes2Text
-
-from detection.validator.prompt_generator import PromptGenerator
 
 
 class TextDataset(Iterator):
@@ -48,7 +45,7 @@ class TextDataset(Iterator):
                 document_text = el[self.text_field][:int(self.max_prompt_len * 1.25)]
                 context_len = int(len(document_text) * np.random.uniform(0.25, 0.75))
                 prompt = document_text[:context_len]
-                return {'prompt': prompt, 'topic': el['meta']['pile_set_name'], 'real_completion': el[self.text_field][context_len:]}
+                return {'prompt': prompt, 'real_completion': el[self.text_field][context_len:]}
             except Exception as e:
                 if type(e) == StopIteration:
                     bt.logging.info('PilePromptDataset ended: reinitializing it')
@@ -119,13 +116,22 @@ class RedPajamaDataset(TextDataset):
 
 
 class HumanDataset(Iterator):
-    def __init__(self):
+    def __init__(self, max_prompt_len=1500):
         super().__init__()
-        self.pile_prompt_dataset = PileDataset(1500)
+        self.pile_dataset = PileDataset(max_prompt_len)
+        self.red_pajama_dataset = RedPajamaDataset(max_prompt_len)
 
     def __next__(self) -> dict:
-        el = next(self.pile_prompt_dataset)
-        return {'text': el['real_completion'], 'data_source': 'pile_human', 'topic': el['topic']}
+        res = {}
+        if random.random() > 0.5:
+            el = next(self.pile_dataset)
+            res['data_source'] = 'pile'
+        else:
+            el = next(self.red_pajama_dataset)
+            res['data_source'] = 'red_pajama'
+
+        res['text'] = el['real_completion']
+        return res
 
 
 class PromptDataset(Iterator):
@@ -133,23 +139,22 @@ class PromptDataset(Iterator):
         super().__init__()
         self.pile_dataset = PileDataset(max_prompt_len)
         self.red_pajama_dataset = RedPajamaDataset(max_prompt_len)
-        self.prompt_generator = PromptGenerator()
         self.max_prompt_len = max_prompt_len
 
     def __next__(self) -> dict:
         while True:
             res = {}
-
-            el = next(self.pile_dataset)
-            res['data_source'] = 'pile'
+            if random.random() > 0.5:
+                el = next(self.pile_dataset)
+                res['data_source'] = 'pile'
+            else:
+                el = next(self.red_pajama_dataset)
+                res['data_source'] = 'red_pajama'
 
             if len(el['prompt']) > self.max_prompt_len:
                 bt.logging.info("Prompt has len {}, truncating it to {} chars".format(len(el['prompt']), self.max_prompt_len))
 
             res['prompt'] = el["prompt"][:self.max_prompt_len]
-            res['topic'] = el['task'] if res['data_source'] == 'prompt_generator' else el['topic']
-
-            # Check if the text is not empty or does not consist only of newline characters
             if res['prompt'].strip():
                 return res
 
