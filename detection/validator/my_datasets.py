@@ -84,6 +84,7 @@ class RedPajamaDataset(TextDataset):
                 snapshots=["2023-14"],
                 languages=["en"],
                 name="default",
+                partition='head_middle',
                 streaming=True,
             )['train'].shuffle(seed=seed, buffer_size=100000)
         )
