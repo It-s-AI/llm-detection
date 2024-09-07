@@ -171,6 +171,8 @@ class CCDataset:
                         # Read all lines from the file and shuffle them
                         with gzip.open(file, 'rt') as f:
                             bucket_data[current_bucket] = [json.loads(line) for line in f]
+                            logger.info('Loaded {} documents from {}'.format(len(bucket_data[current_bucket]), file))
+
                         random.shuffle(bucket_data[current_bucket])
 
                     # If we still don't have data for this bucket, move to the next one
