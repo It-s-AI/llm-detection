@@ -27,7 +27,7 @@ def get_2023_dumps() -> List[str]:
     dumps_2023 = []
     for dump in all_dumps:
         dump = dump['id']
-        if not dump.startwith('CC-MAIN-'):
+        if not dump.startswith('CC-MAIN-'):
             continue
 
         dump = dump[len('CC-MAIN-') + 1:]
