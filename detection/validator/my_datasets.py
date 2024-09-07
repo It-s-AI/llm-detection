@@ -18,7 +18,7 @@ class TextDataset(Iterator):
         super().__init__()
         self.max_prompt_len = max_prompt_len
         self.text_field = text_field
-        self.name = 'RedPajamaDataset' if text_field == 'raw_content' else 'PileDataset'
+        self.name = 'CommonCrawlDataset' if text_field == 'raw_content' else 'PileDataset'
         self.dataset = self.init_dataset()
 
     @abstractmethod
