@@ -31,7 +31,7 @@ def get_2023_dumps() -> List[str]:
             continue
 
         dump = dump[len('CC-MAIN-'):]
-        if int(dump[:4]) <= 2022:
+        if 2013 <= int(dump[:4]) <= 2022:
             dumps_2023.append(dump)
     return dumps_2023
 
