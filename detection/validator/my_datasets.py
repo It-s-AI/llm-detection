@@ -117,7 +117,7 @@ class HumanDataset(Iterator):
             res['data_source'] = 'pile'
         else:
             el = next(self.red_pajama_dataset)
-            res['data_source'] = 'red_pajama'
+            res['data_source'] = 'common_crawl'
 
         res['text'] = el['real_completion']
         return res
