@@ -99,7 +99,7 @@ class CommonCrawlDataset(TextDataset):
         return dataset
 
     def filter_rules_pass(self, sample):
-        if random.random() > 0.01:
+        if random.random() > 0.1:
             return False
         return True
 
