@@ -24,7 +24,7 @@ def get_2023_dumps() -> List[str]:
     response.raise_for_status()
     all_dumps = response.json()
 
-    dumps_2023 = [dump['id'] for dump in all_dumps if dump['id'].startswith('CC-MAIN-2023')]
+    dumps_2023 = [dump['id'].remove('CC-MAIN-', '') for dump in all_dumps if int(dump['id'][-4:]) <= 2022]
     return dumps_2023
 
 
