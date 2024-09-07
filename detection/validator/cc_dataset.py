@@ -30,7 +30,7 @@ def get_2023_dumps() -> List[str]:
         if not dump.startswith('CC-MAIN-'):
             continue
 
-        dump = dump[len('CC-MAIN-') + 1:]
+        dump = dump[len('CC-MAIN-'):]
         if int(dump[:4]) <= 2022:
             dumps_2023.append(dump)
     return dumps_2023
