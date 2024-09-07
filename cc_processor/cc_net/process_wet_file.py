@@ -69,14 +69,22 @@ def parse_doc(headers: List[str], doc: List[str]) -> Optional[dict]:
     if not headers or not doc:
         return None
 
+    headers_map = {}
+
+    for header in headers[1:]:
+        if not header:
+            continue
+        key, value = header.split(": ", 1)
+        headers_map[key] = value
+
     try:
-        warc_type = headers[1].split()[1]
+        warc_type = headers_map["WARC-Type"]
         if warc_type != "conversion":
             return None
-        url = headers[2].split()[1]
-        date = headers[3].split()[1]
-        digest = headers[6].split()[1]
-        length = int(headers[8].split()[1])
+        url = headers_map["WARC-Target-URI"]
+        date = headers_map["WARC-Date"]
+        digest = headers_map["WARC-Block-Digest"]
+        length = int(headers_map["Content-Length"])
     except Exception as e:
         logger.warning("Can't parse header:", e, headers, doc)
         return None

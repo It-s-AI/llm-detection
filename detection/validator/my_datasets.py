@@ -84,6 +84,7 @@ class CommonCrawlDataset(TextDataset):
     def get_iter(self):
         seed = random.randint(0, 1_000_000)
         random.seed(seed)
+        print('Using seed {}'.format(seed))
         dataset = CCDataset(
             dumps=self.dumps_2023,
             num_segments=10,
