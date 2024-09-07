@@ -71,6 +71,15 @@ ollama list | tail -n +2 | awk '{print $1}' | while read -r model; do
 done
 ```
 
+Install cc_processer
+```bash
+sudo apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev -y
+cd cc_processor 
+make install
+make install
+make dl_all_lm
+```
+
 ## Running the Validator
 
 ```bash
