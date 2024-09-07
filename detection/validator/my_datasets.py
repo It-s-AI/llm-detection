@@ -66,7 +66,7 @@ class PileDataset(TextDataset):
         super().__init__(max_prompt_len, 'text')
 
     def get_iter(self):
-        seed = random.randint(0, 1000)
+        seed = int(time.time())
         dataset = iter(
             load_dataset("monology/pile-uncopyrighted", streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=100000
@@ -84,7 +84,7 @@ class CommonCrawlDataset(TextDataset):
     def get_iter(self):
         seed = int(time.time())
         random.seed(seed)
-        print('Using seed {}'.format(seed))
+        logging.info('Using seed {}'.format(seed))
         dataset = CCDataset(
             dumps=self.dumps_2023,
             num_segments=10,
@@ -92,7 +92,7 @@ class CommonCrawlDataset(TextDataset):
             lm_dir=Path("cc_processor/data/lm_sp/"),
             lang_whitelist=['en'],
             lang_threshold=0.5,
-            min_len=250,
+            min_len=300,
             cache_dir=None,
             tmp_dir=Path("cc_processor/tmp_segments"),
         )
