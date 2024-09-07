@@ -77,7 +77,7 @@ sudo apt-get install build-essential libboost-system-dev libboost-thread-dev lib
 cd cc_processor 
 make install
 make install
-make dl_all_lm
+make lang=en dl_lm
 ```
 
 ## Running the Validator

@@ -16,10 +16,10 @@ from detection.validator.cc_dataset import CCDataset, get_2023_dumps
 class TextDataset(Iterator):
     def __init__(self, max_prompt_len, text_field):
         super().__init__()
-        self.dataset = self.init_dataset()
         self.max_prompt_len = max_prompt_len
         self.text_field = text_field
         self.name = 'RedPajamaDataset' if text_field == 'raw_content' else 'PileDataset'
+        self.dataset = self.init_dataset()
 
     @abstractmethod
     def get_iter(self):
@@ -85,13 +85,13 @@ class CommonCrawlDataset(TextDataset):
         dataset = CCDataset(
             dumps=self.dumps_2023,
             num_segments=10,
-            lang_model=Path("bin/lid.bin"),
-            lm_dir=Path("data/lm_sp/"),
+            lang_model=Path("cc_processor/bin/lid.bin"),
+            lm_dir=Path("cc_processor/data/lm_sp/"),
             lang_whitelist=['en'],
             lang_threshold=0.5,
             min_len=250,
             cache_dir=None,
-            tmp_dir=Path("tmp_segments"),
+            tmp_dir=Path("cc_processor/tmp_segments"),
         )
         return dataset
 
