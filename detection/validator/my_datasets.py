@@ -3,11 +3,14 @@ import logging
 import random
 import time
 from abc import abstractmethod
+from pathlib import Path
 
 import bittensor as bt
 import numpy as np
 from datasets import load_dataset
 from collections.abc import Iterator
+
+from detection.validator.cc_dataset import CCDataset, get_2023_dumps
 
 
 class TextDataset(Iterator):
@@ -72,48 +75,29 @@ class PileDataset(TextDataset):
         return dataset
 
 
-class RedPajamaDataset(TextDataset):
+class CommonCrawlDataset(TextDataset):
     def __init__(self, max_prompt_len):
         super().__init__(max_prompt_len, 'raw_content')
+        self.dumps_2023 = get_2023_dumps()
+        logging.info(f"Found {len(self.dumps_2023)} dumps from 2023: {self.dumps_2023}")
 
     def get_iter(self):
-        seed = random.randint(0, 1000)
-        dataset = iter(
-            load_dataset(
-                "togethercomputer/RedPajama-Data-V2",
-                snapshots=["2023-14"],
-                languages=["en"],
-                name="default",
-                partition='head_middle',
-                streaming=True,
-            )['train'].shuffle(seed=seed, buffer_size=100000)
+        dataset = CCDataset(
+            dumps=self.dumps_2023,
+            num_segments=10,
+            lang_model=Path("bin/lid.bin"),
+            lm_dir=Path("data/lm_sp/"),
+            lang_whitelist=['en'],
+            lang_threshold=0.5,
+            min_len=250,
+            cache_dir=None,
+            tmp_dir=Path("tmp_segments"),
         )
         return dataset
 
     def filter_rules_pass(self, sample):
-        if random.random() > 0.01 or not self.c4_rules_pass(sample):
+        if random.random() > 0.01:
             return False
-        return True
-
-    def c4_rules_pass(self, sample) -> bool:
-        """ function returns True if the sample complies with the filtering rules used in C4 """
-        signals = json.loads(sample["quality_signals"])
-
-        # rule 1: at least 3 sentences
-        num_sentences = signals["rps_doc_num_sentences"][0][2]
-        if num_sentences < 3:
-            return False
-
-        # rule 2: page may not contain bad words
-        n_bad_words = signals["rps_doc_ldnoobw_words"][0][2]
-        if n_bad_words > 0:
-            return False
-
-        # rule 3: page may not contain placeholder "lorem ipsum" text
-        lorem_ipsum = signals["rps_doc_lorem_ipsum"][0][2]
-        if lorem_ipsum > 0:
-            return False
-
         return True
 
 
@@ -121,7 +105,7 @@ class HumanDataset(Iterator):
     def __init__(self, max_prompt_len=1500):
         super().__init__()
         self.pile_dataset = PileDataset(max_prompt_len)
-        self.red_pajama_dataset = RedPajamaDataset(max_prompt_len)
+        self.red_pajama_dataset = CommonCrawlDataset(max_prompt_len)
 
     def __next__(self) -> dict:
         res = {}
@@ -140,7 +124,7 @@ class PromptDataset(Iterator):
     def __init__(self, max_prompt_len=1500):
         super().__init__()
         self.pile_dataset = PileDataset(max_prompt_len)
-        self.red_pajama_dataset = RedPajamaDataset(max_prompt_len)
+        self.red_pajama_dataset = CommonCrawlDataset(max_prompt_len)
         self.max_prompt_len = max_prompt_len
 
     def __next__(self) -> dict:

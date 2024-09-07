@@ -128,23 +128,25 @@ async def forward(self):
     axons = [self.metagraph.axons[uid] for uid in miner_uids]
 
     start_time = time.time()
-    texts, labels = await self.build_queries()
+    queries, labels = await self.build_queries()
+    out_of_domain_ids = np.where([el.data_source == 'red_pajama' for el in queries])[0]
     end_time = time.time()
     bt.logging.info(f"Time to generate challenges: {int(end_time - start_time)}")
 
-    cnt_challenges_for_check = random.randint(1, min(10, len(texts)))
-    check_ids = np.random.choice(np.arange(len(texts)).astype(int), size=cnt_challenges_for_check, replace=False)
+    cnt_challenges_for_check = random.randint(1, min(10, len(queries)))
+    check_ids = np.random.choice(np.arange(len(queries)).astype(int), size=cnt_challenges_for_check, replace=False)
     check_ids = np.array(sorted(check_ids))
 
     all_responses, check_responses, version_responses, final_labels = await get_all_responses(
-        self, axons, texts, check_ids, self.config.neuron.timeout)
+        self, axons, queries, check_ids, self.config.neuron.timeout)
 
     rewards, metrics = get_rewards(self,
                                    labels=final_labels,
                                    responses=all_responses,
                                    check_responses=check_responses,
                                    version_responses=version_responses,
-                                   check_ids=check_ids)
+                                   check_ids=check_ids,
+                                   out_of_domain_ids=out_of_domain_ids)
     bt.logging.info("Miner uids: {}".format(miner_uids))
     bt.logging.info("Rewards: {}".format(rewards))
     bt.logging.info("Metrics: {}".format(metrics))

@@ -73,7 +73,8 @@ def get_rewards(
     responses: List[TextSynapse],
     check_responses: List[TextSynapse],
     version_responses: List[TextSynapse],
-    check_ids: np.array
+    check_ids: np.array,
+    out_of_domain_ids: np.array
 ) -> torch.FloatTensor:
     """
     Returns a tensor of rewards for the given query and responses.
@@ -96,8 +97,12 @@ def get_rewards(
         cur_ids = np.where(cur_mask)[0]
         flatten_check_ids.append(cur_ids)
 
-    labels = [np.concatenate(el) for el in labels]
+    flatten_out_of_domain_masks = []
+    for uid_labels in labels:
+        cur_mask = np.concatenate([len(text_labels) * [i in out_of_domain_ids] for i, text_labels in enumerate(uid_labels)])
+        flatten_out_of_domain_masks.append(cur_mask)
 
+    labels = [np.concatenate(el) for el in labels]
 
     rewards = []
     metrics = []
@@ -113,12 +118,18 @@ def get_rewards(
 
             bt.logging.info(f"{predictions_array.shape}, {labels[uid].shape}, {check_predictions_array.shape}, {flatten_check_ids[uid].shape}")
 
-            miner_reward, metric = reward(predictions_array, labels[uid])
+            mask = flatten_out_of_domain_masks[uid]
+            out_of_domain_miner_reward, out_of_domain_metric = reward(predictions_array[mask], labels[uid][mask])
+
+            miner_reward, metric = reward(predictions_array[~mask], labels[uid][~mask])
             penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[uid], version_predictions_list[uid])
+            if out_of_domain_metric['f1_score'] < self.config.neuron.out_of_domain_min_f1_score:
+                penalty = 0
 
             miner_reward *= penalty
             rewards.append(miner_reward)
             metric['penalty'] = penalty
+            metric['out_of_domain_f1_score'] = out_of_domain_metric['f1_score']
             metrics.append(metric)
         except Exception as e:
             bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels[uid]))
