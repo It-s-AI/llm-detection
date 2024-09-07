@@ -62,6 +62,7 @@ class CCDataset:
         self.current_segment_iter = None
         self.tmp_dir = tmp_dir
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
+        self.allowed_buckets = ['head', 'middle']
 
     def _select_random_segments(self) -> List[str]:
         all_segments = []
