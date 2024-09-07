@@ -154,36 +154,24 @@ class CCDataset:
                 bucket_data = {bucket: [] for bucket in self.allowed_buckets}
                 current_bucket_index = 0
 
-                while True:
+                while any(bucket_files.values()) or any(bucket_data.values()):
                     current_bucket = self.allowed_buckets[current_bucket_index]
 
-                    # If the current bucket is empty, try to refill it
                     if not bucket_data[current_bucket]:
                         if not bucket_files[current_bucket]:
-                            # If no more files for this bucket, move to the next bucket
                             current_bucket_index = (current_bucket_index + 1) % len(self.allowed_buckets)
                             continue
 
-                        # Get a random file for the current bucket
                         file = random.choice(bucket_files[current_bucket])
                         bucket_files[current_bucket].remove(file)
 
-                        # Read all lines from the file and shuffle them
                         with gzip.open(file, 'rt') as f:
                             bucket_data[current_bucket] = [json.loads(line) for line in f]
-                            logger.info('Loaded {} documents from {}'.format(len(bucket_data[current_bucket]), file))
-
                         random.shuffle(bucket_data[current_bucket])
 
-                    # If we still don't have data for this bucket, move to the next one
-                    if not bucket_data[current_bucket]:
-                        current_bucket_index = (current_bucket_index + 1) % len(self.allowed_buckets)
-                        continue
+                    if bucket_data[current_bucket]:
+                        yield bucket_data[current_bucket].pop()
 
-                    # Yield a sample from the current bucket
-                    yield bucket_data[current_bucket].pop()
-
-                    # Move to the next bucket
                     current_bucket_index = (current_bucket_index + 1) % len(self.allowed_buckets)
 
             return alternating_bucket_iterator()
