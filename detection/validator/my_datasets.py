@@ -77,9 +77,9 @@ class PileDataset(TextDataset):
 
 class CommonCrawlDataset(TextDataset):
     def __init__(self, max_prompt_len):
-        super().__init__(max_prompt_len, 'raw_content')
         self.dumps_2023 = get_2023_dumps()
         logging.info(f"Found {len(self.dumps_2023)} dumps from 2023: {self.dumps_2023}")
+        super().__init__(max_prompt_len, 'raw_content')
 
     def get_iter(self):
         dataset = CCDataset(
