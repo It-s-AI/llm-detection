@@ -84,9 +84,9 @@ class CommonCrawlDataset(TextDataset):
         self.dumps_2023 = get_2023_dumps()
         logging.info(f"Found {len(self.dumps_2023)} dumps from 2023: {self.dumps_2023}")
         super().__init__(max_prompt_len, 'raw_content')
-        self.classifier = DebertaClassifier(foundation_model_path="models/deberta-v3-large-hf-weights",
-                                            model_path="models/deberta-cc-classifier",
-                                            device="cuda")
+        # self.classifier = DebertaClassifier(foundation_model_path="models/deberta-v3-large-hf-weights",
+        #                                     model_path="models/deberta-cc-classifier",
+        #                                     device="cuda")
 
     def get_iter(self):
         seed = int(time.time())
@@ -106,7 +106,7 @@ class CommonCrawlDataset(TextDataset):
         return dataset
 
     def filter_rules_pass(self, prompt, completion):
-        if self.classifier(completion) > 0.9:
+        if random.random() > 0.1:
             return False
         return True
 
