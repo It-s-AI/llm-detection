@@ -11,6 +11,7 @@ from datasets import load_dataset
 from collections.abc import Iterator
 
 from detection.validator.cc_dataset import CCDataset, get_2023_dumps
+from neurons.miners.deberta_classifier import DebertaClassifier
 
 
 class TextDataset(Iterator):
@@ -25,7 +26,7 @@ class TextDataset(Iterator):
     def get_iter(self):
         ...
 
-    def filter_rules_pass(self, sample):
+    def filter_rules_pass(self, prompt, completion):
         if random.random() > 0.01:
             return False
         return True
@@ -43,13 +44,16 @@ class TextDataset(Iterator):
         while True:
             try:
                 el = next(self.dataset)
-                if not self.filter_rules_pass(el):
-                    continue
 
                 document_text = el[self.text_field][:int(self.max_prompt_len * 1.25)]
                 context_len = int(len(document_text) * np.random.uniform(0.25, 0.75))
                 prompt = document_text[:context_len]
-                return {'prompt': prompt, 'real_completion': el[self.text_field][context_len:]}
+                completion = el[self.text_field][context_len:]
+
+                if not self.filter_rules_pass(prompt, completion):
+                    continue
+
+                return {'prompt': prompt, 'real_completion': completion}
             except Exception as e:
                 if type(e) == StopIteration:
                     bt.logging.info(f'{self.name} with ended: reinitializing it')
@@ -80,6 +84,9 @@ class CommonCrawlDataset(TextDataset):
         self.dumps_2023 = get_2023_dumps()
         logging.info(f"Found {len(self.dumps_2023)} dumps from 2023: {self.dumps_2023}")
         super().__init__(max_prompt_len, 'raw_content')
+        self.classifier = DebertaClassifier(foundation_model_path="models/deberta-v3-large-hf-weights",
+                                            model_path="models/deberta-cc-classifier",
+                                            device="cuda")
 
     def get_iter(self):
         seed = int(time.time())
@@ -98,8 +105,8 @@ class CommonCrawlDataset(TextDataset):
         )
         return dataset
 
-    def filter_rules_pass(self, sample):
-        if random.random() > 0.1:
+    def filter_rules_pass(self, prompt, completion):
+        if self.classifier(completion) > 0.9:
             return False
         return True
 
