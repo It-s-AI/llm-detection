@@ -138,7 +138,7 @@ class PromptDataset(Iterator):
                 res['data_source'] = 'pile'
             else:
                 el = next(self.red_pajama_dataset)
-                res['data_source'] = 'red_pajama'
+                res['data_source'] = 'common_crawl'
 
             if len(el['prompt']) > self.max_prompt_len:
                 bt.logging.info("Prompt has len {}, truncating it to {} chars".format(len(el['prompt']), self.max_prompt_len))
