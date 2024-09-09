@@ -105,8 +105,9 @@ check_variable_value_on_github() {
     local repo="$1"
     local file_path="$2"
     local variable_name="$3"
+    local branch="$4"
 
-    local url="https://api.github.com/repos/$repo/contents/$file_path"
+    local url="https://api.github.com/repos/$repo/contents/$file_path?ref=$branch"
     local response=$(curl -s "$url")
 
     # Check if the response contains an error message
@@ -240,13 +241,12 @@ if [ "$?" -eq 1 ]; then
         if [ -d "./.git" ]; then
 
             # check value on github remotely
-            latest_version=$(check_variable_value_on_github "It-s-AI/llm-detection" "detection/__init__.py" "__version__ ")
+            latest_version=$(check_variable_value_on_github "It-s-AI/llm-detection" "detection/__init__.py" "__version__ " "$branch")
 
-
-            echo "latest version $latest_version"
-            echo "current version $current_version"
             # If the file has been updated
             if version_less_than $current_version $latest_version; then
+                echo "latest version $latest_version"
+                echo "current version $current_version"
                 # Pull latest changes
                 # Failed git pull will return a non-zero output
                 sleep $delay # Apply the delay
