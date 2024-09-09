@@ -25,8 +25,6 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, average_
 from detection.protocol import TextSynapse
 import time
 
-from neurons.validator import Validator
-
 
 def reward(y_pred: np.array, y_true: np.array) -> float:
     """
@@ -70,7 +68,7 @@ def count_penalty(
 
 
 def get_rewards(
-        self: Validator,
+        self,
         labels: list[list[list[bool]]],
         responses: List[TextSynapse],
         check_responses: List[TextSynapse],
