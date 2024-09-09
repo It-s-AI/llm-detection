@@ -242,10 +242,11 @@ if [ "$?" -eq 1 ]; then
             # check value on github remotely
             latest_version=$(check_variable_value_on_github "It-s-AI/llm-detection" "detection/__init__.py" "__version__ ")
 
+
+            echo "latest version $latest_version"
+            echo "current version $current_version"
             # If the file has been updated
             if version_less_than $current_version $latest_version; then
-                echo "latest version $latest_version"
-                echo "current version $current_version"
                 # Pull latest changes
                 # Failed git pull will return a non-zero output
                 sleep $delay # Apply the delay
