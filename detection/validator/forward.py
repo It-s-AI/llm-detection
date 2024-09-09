@@ -129,7 +129,7 @@ async def forward(self):
 
     start_time = time.time()
     queries, labels = await self.build_queries()
-    out_of_domain_ids = np.where([el.data_source == 'red_pajama' for el in queries])[0]
+    out_of_domain_ids = np.where([el.data_source == 'common_crawl' for el in queries])[0]
     end_time = time.time()
     bt.logging.info(f"Time to generate challenges: {int(end_time - start_time)}")
 
@@ -146,7 +146,8 @@ async def forward(self):
                                    check_responses=check_responses,
                                    version_responses=version_responses,
                                    check_ids=check_ids,
-                                   out_of_domain_ids=out_of_domain_ids)
+                                   out_of_domain_ids=out_of_domain_ids,
+                                   update_out_of_domain=True)
     bt.logging.info("Miner uids: {}".format(miner_uids))
     bt.logging.info("Rewards: {}".format(rewards))
     bt.logging.info("Metrics: {}".format(metrics))

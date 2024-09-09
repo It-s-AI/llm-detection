@@ -158,7 +158,7 @@ def add_args(cls, parser):
             "--neuron.out_of_domain_min_f1_score",
             type=float,
             help="The minimum f1 score that miners must have on out of domain validation",
-            default=0.85,
+            default=0.9,
         )
 
     else:

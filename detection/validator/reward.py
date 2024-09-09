@@ -1,5 +1,5 @@
 # The MIT License (MIT)
- # Copyright © 2024 It's AI
+# Copyright © 2024 It's AI
 import traceback
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -24,6 +24,8 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, average_
 
 from detection.protocol import TextSynapse
 import time
+
+from neurons.validator import Validator
 
 
 def reward(y_pred: np.array, y_true: np.array) -> float:
@@ -51,11 +53,11 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
 
 
 def count_penalty(
-    y_pred: np.array,
-    check_predictions: np.array,
-    check_ids: np.array,
-    version_predictions_array: List
-    ) -> float:
+        y_pred: np.array,
+        check_predictions: np.array,
+        check_ids: np.array,
+        version_predictions_array: List
+) -> float:
     bad = np.any((y_pred < 0) | (y_pred > 1))
 
     if (check_predictions.round(2) != y_pred[check_ids].round(2)).any():
@@ -66,15 +68,16 @@ def count_penalty(
 
     return 0 if bad else 1
 
-    
+
 def get_rewards(
-    self,
-    labels: list[list[list[bool]]],
-    responses: List[TextSynapse],
-    check_responses: List[TextSynapse],
-    version_responses: List[TextSynapse],
-    check_ids: np.array,
-    out_of_domain_ids: np.array
+        self: Validator,
+        labels: list[list[list[bool]]],
+        responses: List[TextSynapse],
+        check_responses: List[TextSynapse],
+        version_responses: List[TextSynapse],
+        check_ids: np.array,
+        out_of_domain_ids: np.array,
+        update_out_of_domain: bool = False
 ) -> torch.FloatTensor:
     """
     Returns a tensor of rewards for the given query and responses.
@@ -123,13 +126,17 @@ def get_rewards(
 
             miner_reward, metric = reward(predictions_array[~mask], labels[uid][~mask])
             penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[uid], version_predictions_list[uid])
-            if out_of_domain_metric['f1_score'] < self.config.neuron.out_of_domain_min_f1_score:
+
+            self.out_of_domain_f1_scores[uid] = self.out_of_domain_f1_scores[uid] * (1 - self.out_of_domain_alpha) + \
+                                                out_of_domain_metric['f1_score'] * self.out_of_domain_alpha
+            if self.out_of_domain_f1_scores[uid] < self.config.neuron.out_of_domain_min_f1_score:
                 penalty = 0
 
             miner_reward *= penalty
             rewards.append(miner_reward)
             metric['penalty'] = penalty
             metric['out_of_domain_f1_score'] = out_of_domain_metric['f1_score']
+            metric['weighted_out_of_domain_f1_score'] = self.out_of_domain_f1_scores[uid]
             metrics.append(metric)
         except Exception as e:
             bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels[uid]))
