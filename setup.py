@@ -26,6 +26,7 @@ from pkg_resources import parse_requirements
 
 import subprocess
 
+
 def run_command(command):
     try:
         subprocess.run(command, check=True, shell=True)
@@ -73,11 +74,12 @@ with codecs.open(
 commands = [
     "apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev -y",
     "apt-get install zip unzip -y",
-    "cd cc_processor && make install",
-    "cd cc_processor && make install",
-    "cd cc_processor && make lang=en dl_lm",
+    "cd cc_net && make install",
+    "cd cc_net && make install",
+    "cd cc_net && make lang=en dl_lm",
 ]
 
+print('Setting up cc_net')
 for cmd in commands:
     run_command(cmd)
 

@@ -95,13 +95,13 @@ class CommonCrawlDataset(TextDataset):
         dataset = CCDataset(
             dumps=self.dumps_2023,
             num_segments=10,
-            lang_model=Path("cc_processor/bin/lid.bin"),
-            lm_dir=Path("cc_processor/data/lm_sp/"),
+            lang_model=Path("cc_net/bin/lid.bin"),
+            lm_dir=Path("cc_net/data/lm_sp/"),
             lang_whitelist=['en'],
             lang_threshold=0.5,
             min_len=300,
             cache_dir=None,
-            tmp_dir=Path("cc_processor/tmp_segments"),
+            tmp_dir=Path("cc_net/tmp_segments"),
         )
         return dataset
 

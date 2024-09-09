@@ -74,7 +74,7 @@ done
 Install cc_processer
 ```bash
 sudo apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev -y
-cd cc_processor 
+cd cc_net 
 make install
 make install
 make lang=en dl_lm
