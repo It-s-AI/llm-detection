@@ -78,6 +78,7 @@ cd cc_processor
 make install
 make install
 make lang=en dl_lm
+cd ..
 ```
 
 ## Running the Validator
