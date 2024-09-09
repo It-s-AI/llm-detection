@@ -91,6 +91,7 @@ class Validator(BaseValidatorNeuron):
         self.out_of_domain_alpha = 0.2
 
         commands = [
+            "apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev -y",
             "cd cc_processor && make install",
             "cd cc_processor && make install",
             "cd cc_processor && make lang=en dl_lm",
