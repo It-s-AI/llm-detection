@@ -106,7 +106,6 @@ check_variable_value_on_github() {
     local file_path="$2"
     local variable_name="$3"
 
-    echo "Branch $branch"
     local url="https://api.github.com/repos/$repo/contents/$file_path"
     local response=$(curl -s "$url")
 

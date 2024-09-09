@@ -183,7 +183,7 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
             try:
                 start_ind = len(full_data) // 10000 * 10000
                 cur_path = output_path[:-4] + '_{}'.format(start_ind) + '.csv'
-                df[start_ind:].to_csv(cur_path, index=False, error_bad_lines=False)
+                df[start_ind:].to_csv(cur_path, index=False, on_bad_lines=False)
                 bt.logging.info("Saved {} samples into {}".format(len(df[start_ind:]), cur_path))
             except:
                 bt.logging.error("Coudnt save data into file: {}".format(traceback.format_exc()))
