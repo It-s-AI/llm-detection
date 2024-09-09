@@ -24,6 +24,16 @@ from io import open
 from setuptools import setup, find_packages
 from pkg_resources import parse_requirements
 
+import subprocess
+
+def run_command(command):
+    try:
+        subprocess.run(command, check=True, shell=True)
+        print(f"Successfully executed: {command}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing command: {command}")
+        print(f"Error details: {e}")
+
 
 def read_requirements(path):
     with open(path, "r") as f:
@@ -59,6 +69,17 @@ with codecs.open(
         r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
     )
     version_string = version_match.group(1)
+
+commands = [
+    "apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev -y",
+    "apt-get install zip unzip -y",
+    "cd cc_processor && make install",
+    "cd cc_processor && make install",
+    "cd cc_processor && make lang=en dl_lm",
+]
+
+for cmd in commands:
+    run_command(cmd)
 
 setup(
     name="detection",

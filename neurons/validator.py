@@ -34,16 +34,6 @@ from detection.validator.data_generator import DataGenerator
 from detection.validator.models import ValDataRow
 from detection.validator.text_completion import OllamaModel
 
-import subprocess
-
-def run_command(command):
-    try:
-        subprocess.run(command, check=True, shell=True)
-        print(f"Successfully executed: {command}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error executing command: {command}")
-        print(f"Error details: {e}")
-
 
 class Validator(BaseValidatorNeuron):
     """
@@ -89,17 +79,6 @@ class Validator(BaseValidatorNeuron):
 
         self.out_of_domain_f1_scores = np.ones(257)
         self.out_of_domain_alpha = 0.2
-
-        commands = [
-            "apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev -y",
-            "cd cc_processor && make install",
-            "cd cc_processor && make install",
-            "cd cc_processor && make lang=en dl_lm",
-        ]
-
-        bt.logging.info("Installing cc_net")
-        for cmd in commands:
-            run_command(cmd)
 
     async def build_queries(self) -> tuple[List[ValDataRow], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
