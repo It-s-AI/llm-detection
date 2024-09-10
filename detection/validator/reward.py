@@ -1,5 +1,5 @@
 # The MIT License (MIT)
- # Copyright © 2024 It's AI
+# Copyright © 2024 It's AI
 import traceback
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -51,11 +51,11 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
 
 
 def count_penalty(
-    y_pred: np.array,
-    check_predictions: np.array,
-    check_ids: np.array,
-    version_predictions_array: List
-    ) -> float:
+        y_pred: np.array,
+        check_predictions: np.array,
+        check_ids: np.array,
+        version_predictions_array: List
+) -> float:
     bad = np.any((y_pred < 0) | (y_pred > 1))
 
     if (check_predictions.round(2) != y_pred[check_ids].round(2)).any():
@@ -66,14 +66,16 @@ def count_penalty(
 
     return 0 if bad else 1
 
-    
+
 def get_rewards(
-    self,
-    labels: list[list[list[bool]]],
-    responses: List[TextSynapse],
-    check_responses: List[TextSynapse],
-    version_responses: List[TextSynapse],
-    check_ids: np.array
+        self,
+        labels: list[list[list[bool]]],
+        responses: List[TextSynapse],
+        check_responses: List[TextSynapse],
+        version_responses: List[TextSynapse],
+        check_ids: np.array,
+        out_of_domain_ids: np.array,
+        update_out_of_domain: bool = False
 ) -> torch.FloatTensor:
     """
     Returns a tensor of rewards for the given query and responses.
@@ -96,8 +98,12 @@ def get_rewards(
         cur_ids = np.where(cur_mask)[0]
         flatten_check_ids.append(cur_ids)
 
-    labels = [np.concatenate(el) for el in labels]
+    flatten_out_of_domain_masks = []
+    for uid_labels in labels:
+        cur_mask = np.concatenate([len(text_labels) * [i in out_of_domain_ids] for i, text_labels in enumerate(uid_labels)])
+        flatten_out_of_domain_masks.append(cur_mask)
 
+    labels = [np.concatenate(el) for el in labels]
 
     rewards = []
     metrics = []
@@ -113,12 +119,24 @@ def get_rewards(
 
             bt.logging.info(f"{predictions_array.shape}, {labels[uid].shape}, {check_predictions_array.shape}, {flatten_check_ids[uid].shape}")
 
-            miner_reward, metric = reward(predictions_array, labels[uid])
+            mask = flatten_out_of_domain_masks[uid]
+            out_of_domain_miner_reward, out_of_domain_metric = reward(predictions_array[mask], labels[uid][mask])
+
+            miner_reward, metric = reward(predictions_array[~mask], labels[uid][~mask])
             penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[uid], version_predictions_list[uid])
+
+            if update_out_of_domain:
+                self.out_of_domain_f1_scores[uid] = self.out_of_domain_f1_scores[uid] * (1 - self.out_of_domain_alpha) + \
+                                                    out_of_domain_metric['f1_score'] * self.out_of_domain_alpha
+
+            if self.out_of_domain_f1_scores[uid] < self.config.neuron.out_of_domain_min_f1_score:
+                penalty = 0
 
             miner_reward *= penalty
             rewards.append(miner_reward)
             metric['penalty'] = penalty
+            metric['out_of_domain_f1_score'] = out_of_domain_metric['f1_score']
+            metric['weighted_out_of_domain_f1_score'] = self.out_of_domain_f1_scores[uid]
             metrics.append(metric)
         except Exception as e:
             bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels[uid]))

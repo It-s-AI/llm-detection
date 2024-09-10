@@ -74,7 +74,7 @@ class DataGenerator:
                             text_auged, augs, labels_auged = self.augmentator(text, labels)
                             assert len(text_auged.split()) == len(labels_auged)
                         except:
-                            logging.error("Got error during augmentations for text: {} \n and labels: {}".format(text, labels))
+                            bt.logging.error("Got error during augmentations for text: {} \n and labels: {}".format(text, labels))
                             logging.info(traceback.format_exc())
                             continue
 
@@ -183,10 +183,10 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
             try:
                 start_ind = len(full_data) // 10000 * 10000
                 cur_path = output_path[:-4] + '_{}'.format(start_ind) + '.csv'
-                df[start_ind:].to_csv(cur_path, index=False)
+                df[start_ind:].to_csv(cur_path, index=False, on_bad_lines=False)
                 bt.logging.info("Saved {} samples into {}".format(len(df[start_ind:]), cur_path))
             except:
-                bt.logging.error("Coudnt save data into file")
+                bt.logging.error("Coudnt save data into file: {}".format(traceback.format_exc()))
 
         epoch += 1
         time.sleep(1)

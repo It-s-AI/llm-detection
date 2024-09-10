@@ -77,12 +77,15 @@ class Validator(BaseValidatorNeuron):
         self.generator = DataGenerator(models, None)
         bt.logging.info(f"Generator initialized {self.generator}")
 
+        self.out_of_domain_f1_scores = np.ones(257)
+        self.out_of_domain_alpha = 0.2
+
     async def build_queries(self) -> tuple[List[ValDataRow], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
-        data = self.generator.generate_data(n_human_samples=25, n_ai_samples=75)
+        data = self.generator.generate_data(n_human_samples=50, n_ai_samples=150)
         texts = [el for el in data]
         labels = [el.segmentation_labels for el in data]
-        return texts, labels
+        return texts, labels,
 
     async def forward(self):
         """
