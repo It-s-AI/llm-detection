@@ -74,6 +74,8 @@ with codecs.open(
 commands = [
     "cd cc_net && make install",
     "cd cc_net && make install",
+    "cd cc_net && pip uninstall cc_net",
+    "cd cc_net && pip install -e .",
     "cd cc_net && make lang=en dl_lm",
 ]
 
