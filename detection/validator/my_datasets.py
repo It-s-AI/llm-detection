@@ -36,7 +36,7 @@ class TextDataset(Iterator):
             dataset = self.get_iter()
             return dataset
         except Exception as e:
-            logging.error("Got exception during {} dataset initializing: {}, retrying...".format(self.name, e))
+            bt.logging.error("Got exception during {} dataset initializing: {}, retrying...".format(self.name, e))
             time.sleep(60)
             return self.init_dataset()
 

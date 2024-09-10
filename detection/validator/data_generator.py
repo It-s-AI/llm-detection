@@ -74,7 +74,7 @@ class DataGenerator:
                             text_auged, augs, labels_auged = self.augmentator(text, labels)
                             assert len(text_auged.split()) == len(labels_auged)
                         except:
-                            logging.error("Got error during augmentations for text: {} \n and labels: {}".format(text, labels))
+                            bt.logging.error("Got error during augmentations for text: {} \n and labels: {}".format(text, labels))
                             logging.info(traceback.format_exc())
                             continue
 

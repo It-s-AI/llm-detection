@@ -49,7 +49,7 @@ chmod +x run.sh
 So Ollama models can detect GPUs on your system
 ```bash
 apt update
-apt install lshw
+apt install lshw -y
 ```
 
 ## Download models
@@ -73,7 +73,7 @@ done
 
 Install cc_processer
 ```bash
-sudo apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev -y
+sudo apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev zip unzip -y
 cd cc_net 
 make install
 make install
