@@ -84,9 +84,6 @@ class CommonCrawlDataset(TextDataset):
         self.dumps_2023 = get_2023_dumps()
         logging.info(f"Found {len(self.dumps_2023)} dumps from 2023: {self.dumps_2023}")
         super().__init__(max_prompt_len, 'raw_content')
-        # self.classifier = DebertaClassifier(foundation_model_path="models/deberta-v3-large-hf-weights",
-        #                                     model_path="models/deberta-cc-classifier",
-        #                                     device="cuda")
 
     def get_iter(self):
         seed = int(time.time())
@@ -115,7 +112,7 @@ class HumanDataset(Iterator):
     def __init__(self, max_prompt_len=1500):
         super().__init__()
         self.pile_dataset = PileDataset(max_prompt_len)
-        self.red_pajama_dataset = CommonCrawlDataset(max_prompt_len)
+        self.common_crawl = CommonCrawlDataset(max_prompt_len)
 
     def __next__(self) -> dict:
         res = {}
@@ -123,7 +120,7 @@ class HumanDataset(Iterator):
             el = next(self.pile_dataset)
             res['data_source'] = 'pile'
         else:
-            el = next(self.red_pajama_dataset)
+            el = next(self.common_crawl)
             res['data_source'] = 'common_crawl'
 
         res['text'] = el['real_completion']
@@ -134,7 +131,7 @@ class PromptDataset(Iterator):
     def __init__(self, max_prompt_len=1500):
         super().__init__()
         self.pile_dataset = PileDataset(max_prompt_len)
-        self.red_pajama_dataset = CommonCrawlDataset(max_prompt_len)
+        self.common_crawl = CommonCrawlDataset(max_prompt_len)
         self.max_prompt_len = max_prompt_len
 
     def __next__(self) -> dict:
@@ -144,7 +141,7 @@ class PromptDataset(Iterator):
                 el = next(self.pile_dataset)
                 res['data_source'] = 'pile'
             else:
-                el = next(self.red_pajama_dataset)
+                el = next(self.common_crawl)
                 res['data_source'] = 'common_crawl'
 
             if len(el['prompt']) > self.max_prompt_len:

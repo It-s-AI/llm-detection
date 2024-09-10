@@ -153,13 +153,15 @@ class CCDataset:
 
                 bucket_data = {bucket: [] for bucket in self.allowed_buckets}
                 current_bucket_index = 0
+                finished = {el: False for el in self.allowed_buckets}
 
-                while any(bucket_files.values()) or any(bucket_data.values()):
+                while (any(bucket_files.values()) or any(bucket_data.values())) and sum(finished.values()) < 2:
                     current_bucket = self.allowed_buckets[current_bucket_index]
 
                     if not bucket_data[current_bucket]:
                         if not bucket_files[current_bucket]:
                             current_bucket_index = (current_bucket_index + 1) % len(self.allowed_buckets)
+                            finished[current_bucket] = True
                             continue
 
                         file = random.choice(bucket_files[current_bucket])

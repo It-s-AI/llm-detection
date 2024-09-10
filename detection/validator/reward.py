@@ -125,8 +125,10 @@ def get_rewards(
             miner_reward, metric = reward(predictions_array[~mask], labels[uid][~mask])
             penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[uid], version_predictions_list[uid])
 
-            self.out_of_domain_f1_scores[uid] = self.out_of_domain_f1_scores[uid] * (1 - self.out_of_domain_alpha) + \
-                                                out_of_domain_metric['f1_score'] * self.out_of_domain_alpha
+            if update_out_of_domain:
+                self.out_of_domain_f1_scores[uid] = self.out_of_domain_f1_scores[uid] * (1 - self.out_of_domain_alpha) + \
+                                                    out_of_domain_metric['f1_score'] * self.out_of_domain_alpha
+
             if self.out_of_domain_f1_scores[uid] < self.config.neuron.out_of_domain_min_f1_score:
                 penalty = 0
 
