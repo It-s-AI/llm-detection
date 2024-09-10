@@ -72,8 +72,6 @@ with codecs.open(
     version_string = version_match.group(1)
 
 commands = [
-    "apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev -y",
-    "apt-get install zip unzip -y",
     "cd cc_net && make install",
     "cd cc_net && make install",
     "cd cc_net && make lang=en dl_lm",
