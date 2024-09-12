@@ -71,14 +71,10 @@ ollama list | tail -n +2 | awk '{print $1}' | while read -r model; do
 done
 ```
 
-Install cc_processer
+Install cc_net
 ```bash
 sudo apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev zip unzip -y
-cd cc_net 
-make install
-make install
-make lang=en dl_lm
-cd ..
+pip install -e .
 ```
 
 ## Running the Validator
