@@ -4,7 +4,7 @@
 
 We've collected some frequently asked questions in the Discord Channel and made a FAQ page, hope this help you to run your miners easier. We'll be updating it with fresh questions as they appear:
  
-https://worried-fang-58e.notion.site/FAQ-SN32-f7ba4662bc964514ac1a7b5c8e7ea739
+https://piquant-door-af5.notion.site/FAQ-0de42be01aa948c08cbfe982f2112aa8?pvs=4
 
 ## System Requirements
 
