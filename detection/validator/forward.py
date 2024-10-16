@@ -1,5 +1,6 @@
 # The MIT License (MIT)
 # Copyright © 2024 It's AI
+import logging
 import random
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -35,6 +36,43 @@ import torch
 from detection.validator.segmentation_processer import SegmentationProcesser
 
 
+async def dendrite_with_retries(dendrite: bt.dendrite, axons: list, synapse: TextSynapse, deserialize: bool, timeout: float, cnt_attempts=3) -> List[TextSynapse]:
+    res: List[TextSynapse | None] = [None] * len(axons)
+    idx = list(range(len(axons)))
+    axons = axons.copy()
+    for attempt in range(cnt_attempts):
+        responses: List[TextSynapse] = await dendrite(
+            axons=axons,
+            synapse=synapse,
+            deserialize=deserialize,
+            timeout=timeout
+        )
+
+        new_idx = []
+        new_axons = []
+        for i, synapse in enumerate(responses):
+            if synapse.dendrite.status_code is not None and int(synapse.dendrite.status_code) == 422:
+                if attempt == cnt_attempts - 1:
+                    res[idx[i]] = synapse
+                    bt.logging.info("Wasn't able to get answers from axon {} after 3 attempts".format(axons[i]))
+                else:
+                    new_idx.append(idx[i])
+                    new_axons.append(axons[i])
+            else:
+                res[idx[i]] = synapse
+
+        if len(new_idx):
+            bt.logging.info('Found {} synapses with broken pipe, retrying them'.format(len(new_idx)))
+        else:
+            break
+
+        idx = new_idx
+        axons = new_axons
+
+    assert all([el is not None for el in res])
+    return res
+
+
 async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, timeout, step=25, min_text_length=250):
     all_responses = []
     version_responses = []
@@ -52,7 +90,6 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
         for el in queries:
             text, labels = segmentation_processer.subsample_words(el.text, sum([ell == 0 for ell in el.segmentation_labels]))
             new_text, augs, new_labels = augmentator(text, labels)
-            # print('New labels {}: {} ... {}, cnt_zeros = {}, cnt_ones = {}'.format(len(new_labels), new_labels[:5], new_labels[-5:], len(new_labels) - sum(new_labels), sum(new_labels)))
 
             if len(new_text) >= min_text_length:
                 auged_texts.append(new_text)
@@ -63,7 +100,9 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
 
         final_labels += [auged_labels] * len(subset_axons)
 
-        responses: List[TextSynapse] = await self.dendrite(
+        bt.logging.info("Quering check_ids")
+        responses: List[TextSynapse] = await dendrite_with_retries(
+            dendrite=self.dendrite,
             axons=subset_axons,
             synapse=TextSynapse(
                 texts=[auged_texts[idx] for idx in check_ids],
@@ -75,22 +114,29 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
         )
         check_responses.extend(responses)
 
-        random_version = generate_random_version(
-            self.version, self.least_acceptable_version)
+        if random.random() < 0.2:
+            bt.logging.info("Quering random_version")
+            random_version = generate_random_version(
+                self.version, self.least_acceptable_version)
 
-        responses: List[TextSynapse] = await self.dendrite(
-            axons=subset_axons,
-            synapse=TextSynapse(
-                texts=auged_texts,
-                predictions=[],
-                version=random_version
-            ),
-            deserialize=True,
-            timeout=timeout,
-        )
-        version_responses.extend(responses)
+            responses: List[TextSynapse] = await dendrite_with_retries(
+                dendrite=self.dendrite,
+                axons=subset_axons,
+                synapse=TextSynapse(
+                    texts=auged_texts,
+                    predictions=[],
+                    version=random_version
+                ),
+                deserialize=True,
+                timeout=timeout,
+            )
+            version_responses.extend(responses)
+        else:
+            version_responses.extend([TextSynapse(predictions=[], texts=[]) for _ in range(len(subset_axons))])
 
-        responses: List[TextSynapse] = await self.dendrite(
+        bt.logging.info("Quering predictions")
+        responses: List[TextSynapse] = await dendrite_with_retries(
+            dendrite=self.dendrite,
             axons=subset_axons,
             synapse=TextSynapse(
                 texts=auged_texts,
