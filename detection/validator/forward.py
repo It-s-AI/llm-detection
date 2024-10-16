@@ -51,7 +51,7 @@ async def dendrite_with_retries(dendrite: bt.dendrite, axons: list, synapse: Tex
         new_idx = []
         new_axons = []
         for i, synapse in enumerate(responses):
-            if synapse.dendrite.status_code == "422":
+            if synapse.dendrite.status_code is not None and int(synapse.dendrite.status_code) == 422:
                 if attempt == cnt_attempts - 1:
                     res[idx[i]] = synapse
                     bt.logging.info("Wasn't able to get answers from axon {} after 3 attempts".format(axons[i]))
