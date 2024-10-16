@@ -16,8 +16,8 @@
 # DEALINGS IN THE SOFTWARE.
 
 # Define the version of the template module.
-__version__ = "3.3.1"
-__least_acceptable_version__ = "3.0.1"
+__version__ = "3.4.0"
+__least_acceptable_version__ = "3.3.1"
 version_split = __version__.split(".")
 __spec_version__ = (
     (1000 * int(version_split[0]))
