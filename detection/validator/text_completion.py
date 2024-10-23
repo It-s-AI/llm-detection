@@ -25,6 +25,9 @@ class OllamaModel:
             bt.logging.info("Model {} cannot be found locally - downloading it...".format(model_name))
             ollama.pull(model_name)
             bt.logging.info("Successfully downloaded {}".format(model_name))
+        else:
+            bt.logging.info("Found model {} locally, pulling in case of updates".format(model_name))
+            ollama.pull(model_name)
 
         self.model_name = model_name
         self.num_predict = num_predict
