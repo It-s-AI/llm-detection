@@ -1,6 +1,6 @@
 bittensor==6.9.4
 datasets==2.18.0
-langchain_ollama==0.2.0
+langchain_ollama==0.1.13
 loguru==0.7.0
 numpy==1.24.1
 pandas==2.2.1
@@ -18,7 +18,7 @@ wandb==0.16.4
 hf_transfer
 gdown
 zstandard==0.22.0
-ollama==0.3.0
+ollama==0.1.8
 pyspellchecker==0.8.1
 symspellpy==6.7.7
 typo==0.1.7
