@@ -1,4 +1,5 @@
 import logging
+import random
 import time
 
 import bittensor as bt
@@ -34,12 +35,18 @@ class OllamaModel:
         self.text_cleaner = TextCleaner()
 
     def init_model(self):
-        sampling_temperature = np.clip(np.random.normal(loc=1, scale=0.2), a_min=0, a_max=2)
+        # sapmling order in ollama: top_k, tfs_z, typical_p, top_p, min_p, temperature
+        sampling_temperature = np.clip(np.random.normal(loc=1, scale=0.3), a_min=0, a_max=2)
         # Centered around 1 because that's what's hardest for downstream classification models.
-        frequency_penalty = np.random.uniform(low=0.9, high=1.5)
-        top_k = int(np.random.choice([-1, 20, 40]))
-        top_k = top_k if top_k != -1 else None
+
+        frequency_penalty = np.random.uniform(low=0.7, high=1.6)
+        top_k = int(np.random.choice([-1, 20, 40, 80]))
+        # top_k = top_k if top_k != -1 else None
         top_p = np.random.uniform(low=0.5, high=1)
+
+        if random.random() < 0.1:
+            # greedy strategy
+            sampling_temperature = 0
 
         self.model = Ollama(model=self.model_name,
                             timeout=200,
