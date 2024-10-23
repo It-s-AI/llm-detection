@@ -1,6 +1,6 @@
 bittensor==6.9.4
 datasets==2.18.0
-langchain_community==0.0.27
+langchain_ollama==0.2.0
 loguru==0.7.0
 numpy==1.24.1
 pandas==2.2.1

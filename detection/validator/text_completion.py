@@ -4,7 +4,7 @@ import time
 
 import bittensor as bt
 import numpy as np
-from langchain_community.llms import Ollama
+from langchain_ollama.llms import OllamaLLM
 
 from detection.validator.text_postprocessing import TextCleaner
 import ollama
@@ -51,14 +51,14 @@ class OllamaModel:
             # greedy strategy
             sampling_temperature = 0
 
-        self.model = Ollama(model=self.model_name,
-                            timeout=200,
-                            num_thread=1,
-                            num_predict=self.num_predict,
-                            temperature=sampling_temperature,
-                            repeat_penalty=frequency_penalty,
-                            top_p=top_p,
-                            top_k=top_k)
+        self.model = OllamaLLM(model=self.model_name,
+                               timeout=200,
+                               num_thread=1,
+                               num_predict=self.num_predict,
+                               temperature=sampling_temperature,
+                               repeat_penalty=frequency_penalty,
+                               top_p=top_p,
+                               top_k=top_k)
         self.params = {'top_k': top_k, 'top_p': top_p, 'temperature': sampling_temperature, 'repeat_penalty': frequency_penalty}
 
     def __call__(self, prompt: str, text_completion_mode=False) -> str | None:
@@ -66,7 +66,7 @@ class OllamaModel:
             try:
                 if text_completion_mode:
                     if 'text' not in self.model_name:
-                        system_message = "You're a text completion model, just complete text that user sended you" #. Return text without any supportive - we write add your result right after the user text
+                        system_message = "You're a text completion model, just complete text that user sended you"  # . Return text without any supportive - we write add your result right after the user text
                         text = self.model.invoke([{'role': 'system', 'content': system_message},
                                                   {'role': 'user', 'content': prompt}])
                     else:
