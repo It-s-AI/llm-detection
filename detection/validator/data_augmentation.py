@@ -5,6 +5,9 @@ from nltk import pos_tag
 
 import random
 import nltk
+
+from detection.validator.synonym import SynonymAttack
+
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 
@@ -20,6 +23,7 @@ import typo
 FIXED_ORDER_DATA_AUGMENTATION_STEPS = [
     # {'name': 'SubsampleSentences', 'p': 1},
     # {'name' : 'BuggySpellCheck', 'p': 0.2},
+    {'name': 'ReplaceWithSynonym', 'p': 0.2},
 ]
 
 CHAR_CHANGES = [
@@ -56,6 +60,7 @@ class DataAugmentator:
 
         self.slow_spell_checker = SpellChecker()
         self.sym_spell = SymSpell()
+        self.synonym_attack = SynonymAttack()
 
     def __GetCorrectedWord(self, word):
         # candidates = self.fast_spell_checker.GetCandidates([word], 0)
@@ -160,6 +165,8 @@ class DataAugmentator:
                 text = self.__CapitalizeRandomLetter(text)
             elif augmentation_step['name'] == "RemoveRandomAdjective":
                 text = self.__RemoveRandomAdjective(text)
+            elif augmentation_step['name'] == 'ReplaceWithSynonym':
+                text = self.synonym_attack.attack(text)['generation']
             # elif augmentation_step['name'] == 'SubsampleSentences':
             #     text = self.__SubsampleSentences(text)
             elif 'typo_' in augmentation_step['name']:
