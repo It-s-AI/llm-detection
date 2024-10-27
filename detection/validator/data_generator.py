@@ -13,7 +13,7 @@ from detection.validator.models import ValDataRow
 from detection.validator.my_datasets import HumanDataset, PromptDataset
 from detection.validator.segmentation_processer import SegmentationProcesser
 from detection.validator.text_completion import OllamaModel
-from detection.validator.data_augmentation import DataAugmentator
+from detection.attacks.data_augmentation import DataAugmentator
 
 
 class DataGenerator:

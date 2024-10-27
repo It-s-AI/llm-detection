@@ -11,7 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 class SynonymAttack:
-    def __init__(self, N=0.5):
+    def __init__(self, N=0.3):
         # The percentage of words in the text to be replaced
         self.N = N
         # The probability threshold under which to ignore a BERT synonym

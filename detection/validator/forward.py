@@ -1,6 +1,5 @@
 # The MIT License (MIT)
 # Copyright © 2024 It's AI
-import logging
 import random
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -21,7 +20,7 @@ import bittensor as bt
 import numpy as np
 
 from detection.protocol import TextSynapse
-from detection.validator.data_augmentation import DataAugmentator
+from detection.attacks.data_augmentation import DataAugmentator
 from detection.validator.models import ValDataRow
 from detection.validator.reward import get_rewards
 from detection.utils.uids import get_random_uids
