@@ -17,7 +17,7 @@ class DataAugmentator:
                         {'attacker': DeleteAttack(), 'p': 0.2}]
 
     def __call__(self, text, labels):
-        text = text.strip().copy()
+        text = text.strip()
 
         applied_augs = []
         for augmentation_step in self.attacks:
