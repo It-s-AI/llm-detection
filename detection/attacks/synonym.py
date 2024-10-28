@@ -142,4 +142,5 @@ class SynonymAttack:
             toks[i] = synonym["token_str"]
             edits.append((len("".join(toks[:i])), len("".join(toks[: i + 1]))))
 
-        return {"generation": "".join(toks), "num_edits": len(edits), "edits": edits}
+        # return {"generation": "".join(toks), "num_edits": len(edits), "edits": edits}
+        return "".join(toks)
