@@ -23,7 +23,7 @@ pyspellchecker==0.8.1
 symspellpy==6.7.7
 typo==0.1.7
 scalecodec
-fasttext==
+fasttext==0.9.3
 
 bs4
 pre-commit==3.3.2
