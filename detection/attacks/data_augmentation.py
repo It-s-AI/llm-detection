@@ -6,6 +6,7 @@ from detection.attacks.spelling import SpellingAttack
 from detection.attacks.synonym import SynonymAttack
 
 nltk.download('punkt')
+nltk.download('stopwords')
 nltk.download('averaged_perceptron_tagger')
 
 
