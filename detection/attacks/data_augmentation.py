@@ -14,9 +14,10 @@ nltk.download('averaged_perceptron_tagger')
 class DataAugmentator:
     def __init__(self,):
         self.attacks = [{'attacker': SpellingAttack(), 'p': 0.5},
-                        {'attacker': ParaphraseAttack(), 'p': 0.2, 'apply_label': 1},
                         {'attacker': SynonymAttack(), 'p': 0.2},
                         {'attacker': DeleteAttack(), 'p': 0.2}]
+
+        # {'attacker': ParaphraseAttack(), 'p': 0.2, 'apply_label': 1}, - needs too much GPU
 
     def __call__(self, text, labels):
         text = text.strip()
