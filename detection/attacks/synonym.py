@@ -1,5 +1,6 @@
 import itertools
 import os
+import random
 from copy import copy
 from pathlib import Path
 
@@ -11,9 +12,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 class SynonymAttack:
-    def __init__(self, N=0.3):
+    def __init__(self, max_p=0.3):
         # The percentage of words in the text to be replaced
-        self.N = N
+        self.max_p = max_p
         # The probability threshold under which to ignore a BERT synonym
         self.bert_threshold = 0.0025
         # The total number of top k BERT candidates to consider
@@ -130,7 +131,8 @@ class SynonymAttack:
         # Select the total number of words to alter as some percentage N of total word tokens
         # (with the maximum being the total number of words with valid synonyms)
         candidates = [x for x in candidates if x[2]]
-        words_to_alter = min(int(len(word_spans) * self.N), len(candidates))
+        N = random.randint(1, int(100 * self.max_p)) / 100
+        words_to_alter = min(int(len(word_spans) * N), len(candidates))
 
         # Sort candidates by their BERT score
         candidates = sorted(candidates, key=lambda x: x[2]["score"], reverse=True)
