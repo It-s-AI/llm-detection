@@ -46,7 +46,6 @@ class SpellingAttack:
         return modified_text
 
     def attack(self, text):
-        text = text.copy()
         augs = []
         n_repeated = random.randint(1, self.max_cycles)
         for i in range(n_repeated):
