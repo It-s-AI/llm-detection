@@ -21,7 +21,6 @@ class DeleteAttack:
         return ' '.join(tokens)
 
     def attack(self, text):
-        text = text.copy()
         n = random.randint(1, self.max_remove_words)
         for i in range(n):
             text = self.remove_random_adjective(text)
