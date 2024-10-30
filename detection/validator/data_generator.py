@@ -134,7 +134,7 @@ class DataGenerator:
 @click.option("--n_ai_samples", default=75)
 @click.option("--n_human_samples", default=25)
 def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
-    text_models = [OllamaModel(model_name='llama3.1:8b-text-q4_0'),
+    text_models = [OllamaModel(model_name='llama3:text'),
                    OllamaModel(model_name='llama3.1'),
                    OllamaModel(model_name='llama3.2'),
                    OllamaModel(model_name='llama2:13b'),
@@ -143,7 +143,7 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
                    OllamaModel(model_name='qwen2.5:32b'),
                    OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
 
-                   OllamaModel(model_name='command-r'),  # -
+                   OllamaModel(model_name='command-r'),
                    OllamaModel(model_name='command-r'),
                    OllamaModel(model_name='command-r'),
 
@@ -151,13 +151,13 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
                    OllamaModel(model_name='gemma2:27b-text-q4_0'),
 
                    OllamaModel(model_name='mistral:text'),
-                   OllamaModel(model_name='mistral-nemo:12b'),  # -
+                   OllamaModel(model_name='mistral-nemo:12b'),
                    OllamaModel(model_name='mistral-small:22b'),
 
-                   OllamaModel(model_name='internlm2:7b-chat-v2.5-q4_0'),
+                   OllamaModel(model_name='internlm2:7b'),
                    OllamaModel(model_name='internlm2:20b'),
 
-                   OllamaModel(model_name='yi:34b-chat'),  # -
+                   OllamaModel(model_name='yi:34b-chat'),
                    OllamaModel(model_name='deepseek-v2:16b'),
                    OllamaModel(model_name='openhermes'),
                    ]

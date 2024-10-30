@@ -5,7 +5,7 @@ from nltk import pos_tag
 
 class DeleteAttack:
     def __init__(self, max_remove_words=5):
-        self.max_remove_words = 5
+        self.max_remove_words = max_remove_words
 
     def remove_random_adjective(self, text):
         tokens = text.split()

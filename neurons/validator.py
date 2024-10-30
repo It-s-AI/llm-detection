@@ -53,24 +53,31 @@ class Validator(BaseValidatorNeuron):
         self.load_state()
 
         models = [OllamaModel(model_name='llama3:text'),
+                  OllamaModel(model_name='llama3.1'),
+                  OllamaModel(model_name='llama3.2'),
                   OllamaModel(model_name='llama2:13b'),
-                  OllamaModel(model_name='codellama:13b'),
 
-                  OllamaModel(model_name='qwen2:7b-text-q4_0'),
-                  OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+                  OllamaModel(model_name='qwen2.5:14b'),
+                  OllamaModel(model_name='qwen2.5:32b'),
                   OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
 
+                  OllamaModel(model_name='command-r'),
                   OllamaModel(model_name='command-r'),
                   OllamaModel(model_name='command-r'),
 
                   OllamaModel(model_name='gemma2:9b-instruct-q4_0'),
                   OllamaModel(model_name='gemma2:27b-text-q4_0'),
 
-                  OllamaModel(model_name='openchat:7b'),
-                  OllamaModel(model_name='yi:34b'),
-                  OllamaModel(model_name='zephyr:7b-beta'),
-                  OllamaModel(model_name='openhermes'),
-                  OllamaModel(model_name='mistral:text'), ]
+                  OllamaModel(model_name='mistral:text'),
+                  OllamaModel(model_name='mistral-nemo:12b'),
+                  OllamaModel(model_name='mistral-small:22b'),
+
+                  OllamaModel(model_name='internlm2:7b'),
+                  OllamaModel(model_name='internlm2:20b'),
+
+                  OllamaModel(model_name='yi:34b-chat'),
+                  OllamaModel(model_name='deepseek-v2:16b'),
+                  OllamaModel(model_name='openhermes'),]
 
         bt.logging.info(f"Models loaded{models}")
 
@@ -78,7 +85,7 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info(f"Generator initialized {self.generator}")
 
         self.out_of_domain_f1_scores = np.ones(257)
-        self.out_of_domain_alpha = 0.2
+        self.out_of_domain_alpha = 0.15
 
     async def build_queries(self) -> tuple[List[ValDataRow], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
