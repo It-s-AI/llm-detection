@@ -1,6 +1,6 @@
 # The MIT License (MIT)
- # Copyright © 2024 It's AI 
- 
+# Copyright © 2024 It's AI 
+
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
@@ -37,15 +37,17 @@ import time
 
 import json
 
+
 class BaseValidatorNeuron(BaseNeuron):
     """
     Base class for Bittensor validators. Your validator should inherit from this class.
     """
     neuron_type: str = "ValidatorNeuron"
-    
+
     def __init__(self, config=None):
         super().__init__(config=config)
         # Save a copy of the hotkeys to local memory.
+        self.wandb_run = None
         self.hotkeys = copy.deepcopy(self.metagraph.hotkeys)
 
         # Init KeyPair to sign messages to wandb
@@ -73,7 +75,6 @@ class BaseValidatorNeuron(BaseNeuron):
         else:
             bt.logging.warning("axon off, not serving ip to chain.")
 
-
         self.new_wandb_run()
         # Create asyncio event loop to manage async tasks.
         self.loop = asyncio.get_event_loop()
@@ -83,7 +84,6 @@ class BaseValidatorNeuron(BaseNeuron):
         self.is_running: bool = False
         self.thread: threading.Thread = None
         self.lock = asyncio.Lock()
-        
 
     def serve_axon(self):
         """Serve axon to enable external connections."""
@@ -164,7 +164,7 @@ class BaseValidatorNeuron(BaseNeuron):
         except KeyboardInterrupt:
             if self.wandb_run:
                 print("Finishing wandb service...")
-                self.wandb_run.finish()             
+                self.wandb_run.finish()
             self.axon.stop()
             bt.logging.success("Validator killed by keyboard interrupt.")
             exit()
@@ -197,7 +197,7 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.debug("Stopping validator in background thread.")
             if self.wandb_run:
                 print("Finishing wandb service...")
-                self.wandb_run.finish()              
+                self.wandb_run.finish()
             self.should_exit = True
             self.thread.join(5)
             self.is_running = False
@@ -224,7 +224,7 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.debug("Stopping validator in background thread.")
             if self.wandb_run:
                 print("Finishing wandb service...")
-                self.wandb_run.finish()          
+                self.wandb_run.finish()
             self.should_exit = True
             self.thread.join(5)
             self.is_running = False
@@ -345,7 +345,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # shape: [ metagraph.n ]
         alpha: float = self.config.neuron.moving_average_alpha
         self.scores: torch.FloatTensor = alpha * scattered_rewards + (
-            1 - alpha
+                1 - alpha
         ) * self.scores.to(self.device)
         bt.logging.debug(f"Updated moving avg scores: {self.scores}")
 
@@ -373,7 +373,6 @@ class BaseValidatorNeuron(BaseNeuron):
         self.scores = state["scores"]
         self.hotkeys = state["hotkeys"]
 
-
     def new_wandb_run(self):
         """Creates a new wandb run to save information to."""
         # Create a unique run id for this run.
@@ -395,59 +394,58 @@ class BaseValidatorNeuron(BaseNeuron):
         )
 
         bt.logging.debug(f"Started a new wandb run: {name}")
-        
+
     def log_step(
             self,
             uids,
             metrics,
             rewards
-        ):
-            # If we have already completed X steps then we will complete the current wandb run and make a new one.     
-            if (self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0):
-                step_log = {
-                    "timestamp": time.time(),
-                    "uids": uids.tolist(),
-                    "uid_metrics": {},
-                }
-                bt.logging.info(
-                    f"Validator has completed {self.step} run steps. Creating a new wandb run."
-                )
-                self.wandb_run.finish()
-                self.new_wandb_run()            
-    
-                for i, uid in enumerate(uids):
-                    step_log["uid_metrics"][str(uid.item())] = {
-                        "uid": uid.item(),
-                        "weight": self.scores[uid].item(),
-                        "reward": rewards[i].item()
-                    }
-                    step_log["uid_metrics"][str(uid.item())].update(metrics[i])
-             
-                graphed_data = {
-                    "block": self.metagraph.block.item(),
-                    "uid_data": {
-                        str(uids[i].item()): rewards[i].item() for i in range(len(uids))
-                    },
-                    "weight_data": {str(uid.item()): self.scores[uid].item() for uid in uids},
-                }    
-    
-                bt.logging.info(
-                    f"step_log: {step_log}"
-                )  
-                bt.logging.info(
-                    f"graphed_data: {graphed_data}"
-                )              
-                original_format_json = json.dumps(step_log)
+    ):
+        # If we have already completed X steps then we will complete the current wandb run and make a new one.     
+        if self.step % MAX_RUN_STEPS_PER_WANDB_RUN == 0:
+            step_log = {
+                "timestamp": time.time(),
+                "uids": uids.tolist(),
+                "uid_metrics": {},
+            }
+            bt.logging.info(
+                f"Validator has completed {self.step} run steps. Creating a new wandb run."
+            )
+            self.wandb_run.finish()
+            self.new_wandb_run()
 
-                signed_msg = f'0x{self.keypair.sign(original_format_json).hex()}'
-                bt.logging.info("Logging to Wandb")
-                self.wandb_run.log(
-                    {
-                        **graphed_data, 
-                        "original_format_json": original_format_json,
-                        "signed_msg": signed_msg
-                    },
-                    step=self.step,
-                )
-                bt.logging.info("Logged")
-            
+            for i, uid in enumerate(uids):
+                step_log["uid_metrics"][str(uid.item())] = {
+                    "uid": uid.item(),
+                    "weight": self.scores[uid].item(),
+                    "reward": rewards[i].item()
+                }
+                step_log["uid_metrics"][str(uid.item())].update(metrics[i])
+
+            graphed_data = {
+                "block": self.metagraph.block.item(),
+                "uid_data": {
+                    str(uids[i].item()): rewards[i].item() for i in range(len(uids))
+                },
+                "weight_data": {str(uid.item()): self.scores[uid].item() for uid in uids},
+            }
+
+            bt.logging.info(
+                f"step_log: {step_log}"
+            )
+            bt.logging.info(
+                f"graphed_data: {graphed_data}"
+            )
+            original_format_json = json.dumps(step_log)
+
+            signed_msg = f'0x{self.keypair.sign(original_format_json).hex()}'
+            bt.logging.info("Logging to Wandb")
+            self.wandb_run.log(
+                {
+                    **graphed_data,
+                    "original_format_json": original_format_json,
+                    "signed_msg": signed_msg
+                },
+                step=self.step,
+            )
+            bt.logging.info("Logged")
