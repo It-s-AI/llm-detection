@@ -12,7 +12,7 @@ class SegmentationProcesser:
         if not prompt:
             raise Exception("There is should be a prompt during merging")
 
-        if np.random.random() < 0.6:
+        if np.random.random() < 0.5:
             now['text'] = el['prompt'] + el['text']
             now['cnt_first_human'] = len(el['prompt'].split())
         else:

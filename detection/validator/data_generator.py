@@ -131,8 +131,8 @@ class DataGenerator:
 @click.option("--input_path", default=None)
 @click.option("--output_path", default='generated_data.csv')
 @click.option("--n_samples", default=None)
-@click.option("--n_ai_samples", default=75)
-@click.option("--n_human_samples", default=25)
+@click.option("--n_ai_samples", default=70)
+@click.option("--n_human_samples", default=30)
 def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
     text_models = [OllamaModel(model_name='llama3:text'),
                    OllamaModel(model_name='llama3.1'),
