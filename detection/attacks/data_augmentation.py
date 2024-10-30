@@ -21,7 +21,6 @@ class DataAugmentator:
 
     def __call__(self, text, labels):
         text = text.strip()
-        # TODO: fix small min(cnt_human, cnt_ai)
 
         applied_augs = []
         for augmentation_step in self.attacks:
