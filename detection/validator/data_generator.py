@@ -131,8 +131,8 @@ class DataGenerator:
 @click.option("--input_path", default=None)
 @click.option("--output_path", default='generated_data.csv')
 @click.option("--n_samples", default=None)
-@click.option("--n_ai_samples", default=70)
-@click.option("--n_human_samples", default=30)
+@click.option("--n_ai_samples", default=75)
+@click.option("--n_human_samples", default=25)
 def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
     text_models = [OllamaModel(model_name='llama3:text'),
                    OllamaModel(model_name='llama3.1'),
@@ -198,4 +198,4 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
 if __name__ == '__main__':
     main()
 
-# nohup python3 detection/validator/data_generator.py --n_ai_samples=75 --n_human_samples=25 --output_path "data/generated_data.csv" > generator.log &
+# nohup python3 detection/validator/data_generator.py --output_path "data/generated_data_v3.5.csv" > generator.log &
