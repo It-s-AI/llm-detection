@@ -198,4 +198,4 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
 if __name__ == '__main__':
     main()
 
-# nohup python3 detection/validator/data_generator.py --output_path "data/generated_data_v3.5.csv" > generator.log &
+# nohup python3 detection/validator/data_generator.py --output_path "data/generated_data_v3.5.pickle" > generator.log &
