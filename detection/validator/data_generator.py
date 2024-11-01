@@ -185,10 +185,8 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
             df = pd.DataFrame(full_data)
             try:
                 start_ind = len(full_data) // 10000 * 10000
-                cur_path = output_path[:-4] + '_{}'.format(start_ind) + '.csv'
-                df['text'] = df['text'].apply(lambda x: x.strip('"'))
-                df['text_auged'] = df['text_auged'].apply(lambda x: x.strip('"'))
-                df[start_ind:].to_csv(cur_path, index=False)
+                cur_path = output_path[:output_path.rfind('.')] + '_{}'.format(start_ind) + output_path[output_path.rfind('.'):]
+                df[start_ind:].to_pickle(cur_path, index=False)
                 bt.logging.info("Saved {} samples into {}".format(len(df[start_ind:]), cur_path))
             except:
                 bt.logging.error("Coudnt save data into file: {}".format(traceback.format_exc()))
