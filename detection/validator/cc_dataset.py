@@ -9,6 +9,7 @@ import glob
 import gzip
 import json
 import requests
+import bittensor as bt
 
 from cc_net import process_wet_file, jsonql, split_by_lang, perplexity, minify
 from cc_net.stream_cc import StreamMinifier, CUTOFF_CSV  # Import StreamMinifier and CUTOFF_CSV from stream_cc
@@ -20,9 +21,15 @@ logger = logging.getLogger(__name__)
 
 def get_2023_dumps() -> List[str]:
     url = "https://index.commoncrawl.org/collinfo.json"
-    response = requests.get(url)
-    response.raise_for_status()
-    all_dumps = response.json()
+    while True:
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            all_dumps = response.json()
+            break
+        except:
+            bt.logging.info("Couldnt reach {}, retrying in 1min".format(url))
+            time.sleep(60)
 
     dumps_2023 = []
     for dump in all_dumps:
