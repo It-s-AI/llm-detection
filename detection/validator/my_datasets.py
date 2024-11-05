@@ -43,7 +43,7 @@ class TextDataset(Iterator):
     def __next__(self):
         while True:
             try:
-                el = next(self.dataset)
+                el = next(self.dataset).replace('\x00', '')
 
                 document_text = el[self.text_field][:int(self.max_prompt_len * 1.25)]
                 context_len = int(len(document_text) * np.random.uniform(0.25, 0.75))
