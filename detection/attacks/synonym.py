@@ -105,7 +105,8 @@ class SynonymAttack:
         # From the remaining candidates, return the one with the maximum likelihood according to BERT
         return max(candidates, key=lambda x: x["score"], default=None)
 
-    def attack(self, text):
+    def attack(self, text, labels):
+        cnt_human_chars = sum([len(word) + 1 for i, word in enumerate(text.split()) if not labels[i]])
         # Get spans for the words in the text from NLTK
         # e.g. "Hi my name is" -> [(0, 2), (3, 5), (6, 10), (11, 13)]
         word_spans = [(ws + s, we + s) for s, e in self.sspan(text) for ws, we in self.wspan(text[s:e])]
@@ -130,8 +131,8 @@ class SynonymAttack:
 
         # Select the total number of words to alter as some percentage N of total word tokens
         # (with the maximum being the total number of words with valid synonyms)
-        candidates = [x for x in candidates if x[2]]
-        N = random.randint(1, int(100 * self.max_p)) / 100
+        candidates = [x for x in candidates if x[2] and all_spans[x[1]][1] >= cnt_human_chars]
+        N = random.randint(1, int(100 * self.max_p)) / 100 * (len(text) - cnt_human_chars) / len(text)
         words_to_alter = min(int(len(word_spans) * N), len(candidates))
 
         # Sort candidates by their BERT score

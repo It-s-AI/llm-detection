@@ -14,7 +14,7 @@ nltk.download('averaged_perceptron_tagger')
 class DataAugmentator:
     def __init__(self,):
         self.attacks = [{'attacker': SpellingAttack(), 'p': 0.5},
-                        {'attacker': SynonymAttack(), 'p': 0.2},
+                        {'attacker': SynonymAttack(), 'p': 0.2, 'pass_labels': True},
                         {'attacker': DeleteAttack(), 'p': 0.2}]
 
         # {'attacker': ParaphraseAttack(), 'p': 0.2, 'apply_label': 1}, - needs too much GPU
@@ -27,10 +27,10 @@ class DataAugmentator:
             if np.random.random() > augmentation_step['p']:
                 continue
 
-            if 'apply_label' in augmentation_step and augmentation_step['apply_label'] != sum(labels) / len(labels):
-                continue
-
-            text = augmentation_step['attacker'].attack(text)
+            if augmentation_step.get('pass_labels'):
+                text = augmentation_step['attacker'].attack(text, labels)
+            else:
+                text = augmentation_step['attacker'].attack(text)
             applied_augs.append(type(augmentation_step['attacker']).__name__)
 
         n_auged = len(text.split())
