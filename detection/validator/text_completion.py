@@ -1,9 +1,10 @@
 import logging
+import random
 import time
 
 import bittensor as bt
 import numpy as np
-from langchain_community.llms import Ollama
+from langchain_ollama.llms import OllamaLLM
 
 from detection.validator.text_postprocessing import TextCleaner
 import ollama
@@ -24,6 +25,9 @@ class OllamaModel:
             bt.logging.info("Model {} cannot be found locally - downloading it...".format(model_name))
             ollama.pull(model_name)
             bt.logging.info("Successfully downloaded {}".format(model_name))
+        else:
+            bt.logging.info("Found model {} locally, pulling in case of updates".format(model_name))
+            ollama.pull(model_name)
 
         self.model_name = model_name
         self.num_predict = num_predict
@@ -34,21 +38,27 @@ class OllamaModel:
         self.text_cleaner = TextCleaner()
 
     def init_model(self):
-        sampling_temperature = np.clip(np.random.normal(loc=1, scale=0.2), a_min=0, a_max=2)
+        # sapmling order in ollama: top_k, tfs_z, typical_p, top_p, min_p, temperature
+        sampling_temperature = np.clip(np.random.normal(loc=1, scale=0.3), a_min=0, a_max=2)
         # Centered around 1 because that's what's hardest for downstream classification models.
-        frequency_penalty = np.random.uniform(low=0.9, high=1.5)
-        top_k = int(np.random.choice([-1, 20, 40]))
-        top_k = top_k if top_k != -1 else None
+
+        frequency_penalty = np.random.uniform(low=0.7, high=1.6)
+        top_k = int(np.random.choice([-1, 20, 40, 80]))
+        # top_k = top_k if top_k != -1 else None
         top_p = np.random.uniform(low=0.5, high=1)
 
-        self.model = Ollama(model=self.model_name,
-                            timeout=200,
-                            num_thread=1,
-                            num_predict=self.num_predict,
-                            temperature=sampling_temperature,
-                            repeat_penalty=frequency_penalty,
-                            top_p=top_p,
-                            top_k=top_k)
+        if random.random() < 0.1:
+            # greedy strategy
+            sampling_temperature = 0
+
+        self.model = OllamaLLM(model=self.model_name,
+                               timeout=200,
+                               num_thread=1,
+                               num_predict=self.num_predict,
+                               temperature=sampling_temperature,
+                               repeat_penalty=frequency_penalty,
+                               top_p=top_p,
+                               top_k=top_k)
         self.params = {'top_k': top_k, 'top_p': top_p, 'temperature': sampling_temperature, 'repeat_penalty': frequency_penalty}
 
     def __call__(self, prompt: str, text_completion_mode=False) -> str | None:
@@ -56,7 +66,7 @@ class OllamaModel:
             try:
                 if text_completion_mode:
                     if 'text' not in self.model_name:
-                        system_message = "You're a text completion model, just complete text that user sended you" #. Return text without any supportive - we write add your result right after the user text
+                        system_message = "You're a text completion model, just complete text that user sended you"  # . Return text without any supportive - we write add your result right after the user text
                         text = self.model.invoke([{'role': 'system', 'content': system_message},
                                                   {'role': 'user', 'content': prompt}])
                     else:

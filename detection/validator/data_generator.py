@@ -5,6 +5,7 @@ import traceback
 
 import bittensor as bt
 import click
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -12,31 +13,24 @@ from detection.validator.models import ValDataRow
 from detection.validator.my_datasets import HumanDataset, PromptDataset
 from detection.validator.segmentation_processer import SegmentationProcesser
 from detection.validator.text_completion import OllamaModel
-from detection.validator.data_augmentation import DataAugmentator
+from detection.attacks.data_augmentation import DataAugmentator
 
 
 class DataGenerator:
-    def __init__(self, models: list, model_probs: list | None, min_text_length=250):
+    def __init__(self, models: list, min_text_length=250):
         bt.logging.info(f"DataGenerator initializing...")
         bt.logging.info(f"Models {models}")
-        bt.logging.info(f"model_probs {model_probs}")
 
         self.min_text_length = min_text_length
         self.models = models
         self.model_names = [el.model_name for el in models]
+        self.n_models = len(self.models)
         self.augmentator = DataAugmentator()
         self.segmentation_processer = SegmentationProcesser()
-
-        if model_probs is None:
-            self.model_probs = [1 / len(self.models) for i in range(len(self.models))]
-        else:
-            self.model_probs = model_probs
-            assert sum(model_probs) == 1
 
         self.human_dataset = HumanDataset()
         self.prompt_dataset = PromptDataset()
 
-        assert len(self.models) == len(self.model_names) == len(self.model_probs)
         assert len(self.models) != 0
 
         bt.logging.info(f"DataGenerator initialized")
@@ -46,8 +40,10 @@ class DataGenerator:
 
         res = []
         processed = 0
-        for i in tqdm(range(len(self.models)), desc=f"Generating AI data"):
-            cnt_samples = int(n_samples * self.model_probs[i]) if i != len(self.models) - 1 else n_samples - processed
+        generations_per_model = n_samples // self.n_models
+        additional_gen = np.random.choice(np.arange(self.n_models), n_samples - generations_per_model * self.n_models, replace=False)
+        for i in tqdm(range(self.n_models), desc=f"Generating AI data"):
+            cnt_samples = generations_per_model + int(i in additional_gen)
             self.models[i].init_model()
             model = self.models[i]
             model_name = self.model_names[i]
@@ -139,29 +135,36 @@ class DataGenerator:
 @click.option("--n_human_samples", default=25)
 def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
     text_models = [OllamaModel(model_name='llama3:text'),
+                   OllamaModel(model_name='llama3.1'),
+                   OllamaModel(model_name='llama3.2'),
                    OllamaModel(model_name='llama2:13b'),
-                   OllamaModel(model_name='codellama:13b'),
 
-                   OllamaModel(model_name='qwen2:7b-text-q4_0'),
-                   OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+                   OllamaModel(model_name='qwen2.5:14b'),
+                   OllamaModel(model_name='qwen2.5:32b'),
                    OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
 
+                   OllamaModel(model_name='command-r'),
                    OllamaModel(model_name='command-r'),
                    OllamaModel(model_name='command-r'),
 
                    OllamaModel(model_name='gemma2:9b-instruct-q4_0'),
                    OllamaModel(model_name='gemma2:27b-text-q4_0'),
 
-                   OllamaModel(model_name='openchat:7b'),
-                   OllamaModel(model_name='yi:34b'),
-                   OllamaModel(model_name='zephyr:7b-beta'),
-                   OllamaModel(model_name='openhermes'),
-                   OllamaModel(model_name='mistral:text'),]
+                   OllamaModel(model_name='mistral:text'),
+                   OllamaModel(model_name='mistral-nemo:12b'),
+                   OllamaModel(model_name='mistral-small:22b'),
 
-    generator = DataGenerator(text_models, None)
+                   OllamaModel(model_name='internlm2:7b'),
+                   OllamaModel(model_name='internlm2:20b'),
+
+                   OllamaModel(model_name='yi:34b-chat'),
+                   OllamaModel(model_name='deepseek-v2:16b'),
+                   OllamaModel(model_name='openhermes'),
+                   ]
+
+    generator = DataGenerator(text_models)
 
     if input_path is not None:
-        # path_to_prompts = 'prompts.csv'
         data = pd.read_csv(input_path)
         generator.prompt_dataset = iter(data.to_dict('records'))
         n_samples = len(data)
@@ -182,8 +185,8 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
             df = pd.DataFrame(full_data)
             try:
                 start_ind = len(full_data) // 10000 * 10000
-                cur_path = output_path[:-4] + '_{}'.format(start_ind) + '.csv'
-                df[start_ind:].to_csv(cur_path, index=False, on_bad_lines=False)
+                cur_path = output_path[:output_path.rfind('.')] + '_{}'.format(start_ind) + output_path[output_path.rfind('.'):]
+                df[start_ind:].to_csv(cur_path)
                 bt.logging.info("Saved {} samples into {}".format(len(df[start_ind:]), cur_path))
             except:
                 bt.logging.error("Coudnt save data into file: {}".format(traceback.format_exc()))
@@ -195,4 +198,4 @@ def main(input_path, output_path, n_samples, n_ai_samples, n_human_samples):
 if __name__ == '__main__':
     main()
 
-# nohup python3 detection/validator/data_generator.py --n_ai_samples=75 --n_human_samples=25 --output_path "data/generated_data.csv" > generator.log &
+# nohup python3 detection/validator/data_generator.py --output_path "data/generated_data_v3.5.csv" > generator.log &

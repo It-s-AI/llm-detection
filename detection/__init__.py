@@ -16,7 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 # Define the version of the template module.
-__version__ = "3.4.0"
+__version__ = "3.5.0"
 __least_acceptable_version__ = "3.3.1"
 version_split = __version__.split(".")
 __spec_version__ = (
@@ -33,4 +33,4 @@ from . import validator
 
 WANDB_PROJECT = "subnet32"
 WANDB_ENTITY = "itsai-dev"
-MAX_RUN_STEPS_PER_WANDB_RUN = 8
+MAX_RUN_STEPS_PER_WANDB_RUN = 1
