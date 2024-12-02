@@ -2,7 +2,7 @@ import pydantic
 from typing import List, Optional
 import bittensor as bt
 
-from detection import __version__
+# from detection import __version__
 
 class TextRequest(pydantic.BaseModel):
     texts: List[str] = pydantic.Field(
@@ -18,6 +18,3 @@ class TextRequest(pydantic.BaseModel):
     )
     
     version: str = pydantic.Field(default="", title="Version", description="Version of the request schema.")
-
-
-
