@@ -8,9 +8,9 @@ setup_runpod.sh
 wandb/
 wandb/*
 
-models/
+# models/
 models/*
-
+.DS_Store
 nohup.out
 
 # Byte-compiled / optimized / DLL files
