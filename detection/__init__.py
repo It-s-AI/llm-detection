@@ -26,11 +26,6 @@ __spec_version__ = (
 )
 version_url = "https://raw.githubusercontent.com/it-s-ai/llm-detection/main/detection/__init__.py"
 
-# Import all submodules.
-from . import protocol
-from . import base
-from . import validator
-
 WANDB_PROJECT = "subnet32"
 WANDB_ENTITY = "itsai-dev"
 MAX_RUN_STEPS_PER_WANDB_RUN = 1
