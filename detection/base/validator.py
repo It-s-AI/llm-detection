@@ -64,7 +64,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # If it is first run for validator then it will be filled with zeros
         # self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32, device=self.device)
         weight_metagraph = self.subtensor.metagraph(self.config.netuid, lite=False)
-        self.scores = torch.FloatTensor(weight_metagraph.W[self.uid]).to(self.device)
+        self.scores = weight_metagraph.W[self.uid].to(self.device)
 
         # Init sync with the network. Updates the metagraph.
         self.sync()
