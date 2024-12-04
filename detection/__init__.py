@@ -26,9 +26,6 @@ __spec_version__ = (
 )
 version_url = "https://raw.githubusercontent.com/it-s-ai/llm-detection/main/detection/__init__.py"
 
-import os
-os.environ['USE_TORCH'] = '1'
-
 # Import all submodules.
 from . import protocol
 from . import base
