@@ -78,7 +78,11 @@ pip install -e .
 ```
 
 ## Running the Validator
+Note (from bittensor docs): the validator needs to serve an Axon with their IP or they may be blacklisted by the firewall of serving peers on the network.
+
+If you want to properly serve your Axon you need to change --axon.port from 70000 to a real one.
 
 ```bash
 pm2 start run.sh --name llm_detection_validators_autoupdate -- --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --axon.port 70000 --neuron.device cuda:0
 ```
+
