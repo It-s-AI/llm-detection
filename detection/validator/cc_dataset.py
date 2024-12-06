@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_2023_dumps() -> List[str]:
-    all_dumps = json.load(open('cc_net/collinfo.json', 'r'))
+    detection_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    project_dir = os.path.dirname(detection_dir)
+    all_dumps = json.load(open(os.path.join(project_dir, 'cc_net/collinfo.json'), 'r'))
     dumps_2023 = []
     for dump in all_dumps:
         dump = dump['id']
