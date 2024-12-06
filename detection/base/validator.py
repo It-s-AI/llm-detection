@@ -64,7 +64,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # If it is first run for validator then it will be filled with zeros
         # self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32, device=self.device)
         weight_metagraph = self.subtensor.metagraph(self.config.netuid, lite=False)
-        self.scores = weight_metagraph.W[self.uid].to(self.device)
+        self.scores = torch.FloatTensor(weight_metagraph.W[self.uid])
 
         # Init sync with the network. Updates the metagraph.
         self.sync()
@@ -248,14 +248,14 @@ class BaseValidatorNeuron(BaseNeuron):
         raw_weights = torch.nn.functional.normalize(self.scores, p=1, dim=0)
 
         bt.logging.debug("raw_weights", raw_weights)
-        bt.logging.debug("raw_weight_uids", self.metagraph.uids.to("cpu"))
+        bt.logging.debug("raw_weight_uids", self.metagraph.uids)
         # Process the raw weights to final_weights via subtensor limitations.
         (
             processed_weight_uids,
             processed_weights,
         ) = bt.utils.weight_utils.process_weights_for_netuid(
-            uids=self.metagraph.uids.to("cpu"),
-            weights=raw_weights.to("cpu"),
+            uids=self.metagraph.uids,
+            weights=raw_weights.numpy(),
             netuid=self.config.netuid,
             subtensor=self.subtensor,
             metagraph=self.metagraph,
@@ -315,9 +315,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # If so, we need to add new hotkeys and moving averages.
         if len(self.hotkeys) < len(self.metagraph.hotkeys):
             # Update the size of the moving average scores.
-            new_moving_average = torch.zeros((self.metagraph.n)).to(
-                self.device
-            )
+            new_moving_average = torch.zeros((self.metagraph.n))
             min_len = min(len(self.hotkeys), len(self.scores))
             new_moving_average[:min_len] = self.scores[:min_len]
             self.scores = new_moving_average
@@ -337,8 +335,8 @@ class BaseValidatorNeuron(BaseNeuron):
         # Compute forward pass rewards, assumes uids are mutually exclusive.
         # shape: [ metagraph.n ]
         scattered_rewards: torch.FloatTensor = self.scores.scatter(
-            0, torch.tensor(uids).to(self.device), rewards
-        ).to(self.device)
+            0, torch.tensor(uids), rewards
+        )
         bt.logging.debug(f"Scattered rewards: {rewards}")
 
         # Update scores with rewards produced by this step.
@@ -346,7 +344,7 @@ class BaseValidatorNeuron(BaseNeuron):
         alpha: float = self.config.neuron.moving_average_alpha
         self.scores: torch.FloatTensor = alpha * scattered_rewards + (
                 1 - alpha
-        ) * self.scores.to(self.device)
+        ) * self.scores
         bt.logging.debug(f"Updated moving avg scores: {self.scores}")
 
     def save_state(self):

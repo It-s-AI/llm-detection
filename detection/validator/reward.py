@@ -76,7 +76,7 @@ def get_rewards(
         check_ids: np.array,
         out_of_domain_ids: np.array,
         update_out_of_domain: bool = False
-) -> torch.FloatTensor:
+) -> (torch.FloatTensor, list):
     """
     Returns a tensor of rewards for the given query and responses.
 
@@ -117,7 +117,7 @@ def get_rewards(
             predictions_array = np.array(predictions_list[uid])
             check_predictions_array = np.array(check_predictions_list[uid])
 
-            bt.logging.info(f"{predictions_array.shape}, {labels[uid].shape}, {check_predictions_array.shape}, {flatten_check_ids[uid].shape}")
+            # bt.logging.info(f"{predictions_array.shape}, {labels[uid].shape}, {check_predictions_array.shape}, {flatten_check_ids[uid].shape}")
 
             mask = flatten_out_of_domain_masks[uid]
             out_of_domain_miner_reward, out_of_domain_metric = reward(predictions_array[mask], labels[uid][mask])

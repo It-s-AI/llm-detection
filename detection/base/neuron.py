@@ -16,6 +16,8 @@
 
 import copy
 import time
+import traceback
+
 import requests
 import re
 
@@ -142,7 +144,7 @@ class BaseNeuron(ABC):
             # Always save state.
             self.save_state()
         except Exception as e:
-            bt.logging.error("Coundn't sync metagraph or set weights: {}".format(e))
+            bt.logging.error("Coundn't sync metagraph or set weights: {}".format(traceback.format_exc()))
             bt.logging.error("If you use public RPC endpoint try to move to local node")
             time.sleep(5)
             

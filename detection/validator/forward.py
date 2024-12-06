@@ -197,14 +197,14 @@ async def forward(self):
     bt.logging.info("Rewards: {}".format(rewards))
     bt.logging.info("Metrics: {}".format(metrics))
 
-    rewards_tensor = torch.tensor(rewards).to(self.device)
+    rewards_tensor = torch.tensor(rewards)
 
     m = torch.nn.Softmax()
     rewards_tensor = m(rewards_tensor * 100)
 
     bt.logging.info("Normalized rewards: {}".format(rewards_tensor))
 
-    uids_tensor = torch.tensor(miner_uids).to(self.device)
+    uids_tensor = torch.tensor(miner_uids)
     self.update_scores(rewards_tensor, uids_tensor)
 
     self.log_step(miner_uids, metrics, rewards)

@@ -11,7 +11,7 @@
 
 ### [🌐 Website](https://its-ai.org/)  
 ### [⛏️ Mining Docs](docs/mining.md)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🧑‍🏫 Validating Docs](docs/validating.md) 
-### [🗺 Vision & Roadmap](docs/vision_and_roadmap.md)  
+### [🤔 FAQ](docs/FAQ.md)  
 
 </div>
 
