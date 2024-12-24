@@ -30,11 +30,11 @@ class OllamaModel:
             ollama.pull(model_name)
 
         self.model_name = model_name
+        self.base_url = base_url
         self.num_predict = num_predict
         self.model = None
         self.params = {}
         self.init_model()
-        self.base_url = base_url
 
         self.text_cleaner = TextCleaner()
 
