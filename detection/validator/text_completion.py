@@ -16,6 +16,10 @@ class OllamaModel:
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
         """
+        self.model_name = model_name
+        self.base_url = base_url
+        self.num_predict = num_predict
+
         bt.logging.info(f'Initializing OllamaModel {model_name}')
         if num_predict > 1000:
             raise Exception("You're trying to set num_predict to more than 1000, it can lead to context overloading and Ollama hanging")
@@ -29,9 +33,6 @@ class OllamaModel:
             bt.logging.info("Found model {} locally, pulling in case of updates".format(model_name))
             self.ollama_pull(model_name)
 
-        self.model_name = model_name
-        self.base_url = base_url
-        self.num_predict = num_predict
         self.model = None
         self.params = {}
         self.init_model()
