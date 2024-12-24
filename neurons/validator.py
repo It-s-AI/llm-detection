@@ -49,8 +49,6 @@ class Validator(BaseValidatorNeuron):
 
         super(Validator, self).__init__(config=config)
 
-        bt.logging.info("load_state()")
-        self.load_state()
         base_url = self.config.neuron.ollama_url
 
         models = [OllamaModel(model_name='llama3:text', base_url=base_url),

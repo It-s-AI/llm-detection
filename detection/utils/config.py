@@ -165,7 +165,7 @@ def add_args(cls, parser):
             "--neuron.ollama_url",
             type=str,
             help="Url to ollama",
-            default=None,
+            default="http://127.0.0.1:11434",
         )
 
     else:
