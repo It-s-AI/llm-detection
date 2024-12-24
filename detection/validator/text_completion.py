@@ -4,10 +4,10 @@ import time
 
 import bittensor as bt
 import numpy as np
+import requests
 from langchain_ollama.llms import OllamaLLM
 
 from detection.validator.text_postprocessing import TextCleaner
-import ollama
 
 
 class OllamaModel:
@@ -20,14 +20,14 @@ class OllamaModel:
         if num_predict > 1000:
             raise Exception("You're trying to set num_predict to more than 1000, it can lead to context overloading and Ollama hanging")
 
-        pulled_models = [el['name'] for el in ollama.list()['models']] if ollama.list() is not None else []
+        pulled_models = [el['name'] for el in self.ollama_list()['models']] if self.ollama_list() is not None else []
         if model_name not in pulled_models and model_name + ':latest' not in pulled_models:
             bt.logging.info("Model {} cannot be found locally - downloading it...".format(model_name))
-            ollama.pull(model_name)
+            self.ollama_pull(model_name)
             bt.logging.info("Successfully downloaded {}".format(model_name))
         else:
             bt.logging.info("Found model {} locally, pulling in case of updates".format(model_name))
-            ollama.pull(model_name)
+            self.ollama_pull(model_name)
 
         self.model_name = model_name
         self.base_url = base_url
@@ -37,6 +37,14 @@ class OllamaModel:
         self.init_model()
 
         self.text_cleaner = TextCleaner()
+
+    def ollama_list(self):
+        req = requests.get('{}/api/tags'.format(self.base_url))
+        return req.json()
+
+    def ollama_pull(self, model_name):
+        req = requests.post('{}/api/pull'.format(self.base_url), json={'model': model_name})
+        return req.json()
 
     def init_model(self):
         # sapmling order in ollama: top_k, tfs_z, typical_p, top_p, min_p, temperature
