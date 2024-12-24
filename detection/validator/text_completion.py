@@ -45,7 +45,6 @@ class OllamaModel:
 
     def ollama_pull(self, model_name):
         req = requests.post('{}/api/pull'.format(self.base_url), json={'model': model_name})
-        return req.json()
 
     def init_model(self):
         # sapmling order in ollama: top_k, tfs_z, typical_p, top_p, min_p, temperature
