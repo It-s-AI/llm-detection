@@ -11,7 +11,7 @@ import ollama
 
 
 class OllamaModel:
-    def __init__(self, model_name, num_predict=900):
+    def __init__(self, model_name, num_predict=900, base_url=None):
         """
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
@@ -34,6 +34,7 @@ class OllamaModel:
         self.model = None
         self.params = {}
         self.init_model()
+        self.base_url = base_url
 
         self.text_cleaner = TextCleaner()
 
@@ -52,13 +53,16 @@ class OllamaModel:
             sampling_temperature = 0
 
         self.model = OllamaLLM(model=self.model_name,
+                               base_url=self.base_url,
                                timeout=200,
                                num_thread=1,
                                num_predict=self.num_predict,
                                temperature=sampling_temperature,
                                repeat_penalty=frequency_penalty,
                                top_p=top_p,
-                               top_k=top_k)
+                               top_k=top_k,
+                               )
+
         self.params = {'top_k': top_k, 'top_p': top_p, 'temperature': sampling_temperature, 'repeat_penalty': frequency_penalty}
 
     def __call__(self, prompt: str, text_completion_mode=False) -> str | None:
