@@ -14,10 +14,6 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
-import numpy as np
-np.float_ = np.float64
-
 import copy
 import torch
 import asyncio
@@ -351,7 +347,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def save_state(self):
         """Saves the state of the validator to a file."""
-        bt.logging.info("Saving validator state.")
+        bt.logging.info("Saving validator state to {}".format(self.config.neuron.full_path + "/state.pt"))
 
         # Save the state of the validator to file.
         torch.save(
@@ -365,7 +361,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def load_state(self):
         """Loads the state of the validator from a file."""
-        bt.logging.info("Loading validator state.")
+        bt.logging.info("Loading validator state from {}".format(self.config.neuron.full_path + "/state.pt"))
 
         # Load the state of the validator from file.
         state = torch.load(self.config.neuron.full_path + "/state.pt")
