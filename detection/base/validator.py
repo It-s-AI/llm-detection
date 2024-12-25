@@ -65,7 +65,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # weight_metagraph = self.subtensor.metagraph(self.config.netuid, lite=False)
         # self.scores = torch.FloatTensor(weight_metagraph.W[self.uid])
 
-        self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
+        self.scores = torch.zeros(len(self.hotkeys), dtype=torch.float32)
         if os.path.exists(self.config.neuron.full_path + "/state.pt"):
             self.load_state()
 
