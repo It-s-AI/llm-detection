@@ -15,6 +15,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import copy
+import os.path
+
 import torch
 import asyncio
 import threading
@@ -60,10 +62,12 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # Instead of loading zero weights we take latest weights from the previous run
         # If it is first run for validator then it will be filled with zeros
-        # self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32, device=self.device)
         # weight_metagraph = self.subtensor.metagraph(self.config.netuid, lite=False)
         # self.scores = torch.FloatTensor(weight_metagraph.W[self.uid])
-        self.load_state()
+
+        self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
+        if os.path.exists(self.config.neuron.full_path + "/state.pt"):
+            self.load_state()
 
         # Init sync with the network. Updates the metagraph.
         self.sync()
