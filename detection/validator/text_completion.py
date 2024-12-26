@@ -4,38 +4,47 @@ import time
 
 import bittensor as bt
 import numpy as np
+import requests
 from langchain_ollama.llms import OllamaLLM
 
 from detection.validator.text_postprocessing import TextCleaner
-import ollama
 
 
 class OllamaModel:
-    def __init__(self, model_name, num_predict=900):
+    def __init__(self, model_name, num_predict=900, base_url=None):
         """
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
         """
+        self.model_name = model_name
+        self.base_url = base_url
+        self.num_predict = num_predict
+
         bt.logging.info(f'Initializing OllamaModel {model_name}')
         if num_predict > 1000:
             raise Exception("You're trying to set num_predict to more than 1000, it can lead to context overloading and Ollama hanging")
 
-        pulled_models = [el['name'] for el in ollama.list()['models']] if ollama.list() is not None else []
+        pulled_models = [el['name'] for el in self.ollama_list()['models']] if self.ollama_list() is not None else []
         if model_name not in pulled_models and model_name + ':latest' not in pulled_models:
             bt.logging.info("Model {} cannot be found locally - downloading it...".format(model_name))
-            ollama.pull(model_name)
+            self.ollama_pull(model_name)
             bt.logging.info("Successfully downloaded {}".format(model_name))
         else:
             bt.logging.info("Found model {} locally, pulling in case of updates".format(model_name))
-            ollama.pull(model_name)
+            self.ollama_pull(model_name)
 
-        self.model_name = model_name
-        self.num_predict = num_predict
         self.model = None
         self.params = {}
         self.init_model()
 
         self.text_cleaner = TextCleaner()
+
+    def ollama_list(self):
+        req = requests.get('{}/api/tags'.format(self.base_url))
+        return req.json()
+
+    def ollama_pull(self, model_name):
+        req = requests.post('{}/api/pull'.format(self.base_url), json={'model': model_name})
 
     def init_model(self):
         # sapmling order in ollama: top_k, tfs_z, typical_p, top_p, min_p, temperature
@@ -52,13 +61,16 @@ class OllamaModel:
             sampling_temperature = 0
 
         self.model = OllamaLLM(model=self.model_name,
+                               base_url=self.base_url,
                                timeout=200,
                                num_thread=1,
                                num_predict=self.num_predict,
                                temperature=sampling_temperature,
                                repeat_penalty=frequency_penalty,
                                top_p=top_p,
-                               top_k=top_k)
+                               top_k=top_k,
+                               )
+
         self.params = {'top_k': top_k, 'top_p': top_p, 'temperature': sampling_temperature, 'repeat_penalty': frequency_penalty}
 
     def __call__(self, prompt: str, text_completion_mode=False) -> str | None:

@@ -14,9 +14,9 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
-
 import copy
+import os.path
+
 import torch
 import asyncio
 import threading
@@ -62,9 +62,12 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # Instead of loading zero weights we take latest weights from the previous run
         # If it is first run for validator then it will be filled with zeros
-        # self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32, device=self.device)
-        weight_metagraph = self.subtensor.metagraph(self.config.netuid, lite=False)
-        self.scores = torch.FloatTensor(weight_metagraph.W[self.uid])
+        # weight_metagraph = self.subtensor.metagraph(self.config.netuid, lite=False)
+        # self.scores = torch.FloatTensor(weight_metagraph.W[self.uid])
+
+        self.scores = torch.zeros(len(self.hotkeys), dtype=torch.float32)
+        if os.path.exists(self.config.neuron.full_path + "/state.pt"):
+            self.load_state()
 
         # Init sync with the network. Updates the metagraph.
         self.sync()
@@ -247,8 +250,8 @@ class BaseValidatorNeuron(BaseNeuron):
         # raw_weights = m(self.scores * 4)
         raw_weights = torch.nn.functional.normalize(self.scores, p=1, dim=0)
 
-        bt.logging.debug("raw_weights", raw_weights)
-        bt.logging.debug("raw_weight_uids", self.metagraph.uids)
+        bt.logging.info("raw_weights", raw_weights)
+        bt.logging.info("raw_weight_uids", self.metagraph.uids)
         # Process the raw weights to final_weights via subtensor limitations.
         (
             processed_weight_uids,
@@ -260,8 +263,8 @@ class BaseValidatorNeuron(BaseNeuron):
             subtensor=self.subtensor,
             metagraph=self.metagraph,
         )
-        bt.logging.debug("processed_weights", processed_weights)
-        bt.logging.debug("processed_weight_uids", processed_weight_uids)
+        bt.logging.info("processed_weights", processed_weights)
+        bt.logging.info("processed_weight_uids", processed_weight_uids)
 
         # Convert to uint16 weights and uids.
         (
@@ -270,8 +273,8 @@ class BaseValidatorNeuron(BaseNeuron):
         ) = bt.utils.weight_utils.convert_weights_and_uids_for_emit(
             uids=processed_weight_uids, weights=processed_weights
         )
-        bt.logging.debug("uint_weights", uint_weights)
-        bt.logging.debug("uint_uids", uint_uids)
+        bt.logging.info("uint_weights", uint_weights)
+        bt.logging.info("uint_uids", uint_uids)
 
         # Set the weights on chain via our subtensor connection.
         result, msg = self.subtensor.set_weights(
@@ -349,7 +352,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def save_state(self):
         """Saves the state of the validator to a file."""
-        bt.logging.info("Saving validator state.")
+        bt.logging.info("Saving validator state to {}".format(self.config.neuron.full_path + "/state.pt"))
 
         # Save the state of the validator to file.
         torch.save(
@@ -363,13 +366,13 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def load_state(self):
         """Loads the state of the validator from a file."""
-        bt.logging.info("Loading validator state.")
-
+        bt.logging.info("Loading validator state from {}".format(self.config.neuron.full_path + "/state.pt"))
         # Load the state of the validator from file.
-        state = torch.load(self.config.neuron.full_path + "/state.pt")
+        state = torch.load(self.config.neuron.full_path + "/state.pt", weights_only=False)
         self.step = state["step"]
         self.scores = state["scores"]
         self.hotkeys = state["hotkeys"]
+        bt.logging.info("Loaded scores: {}".format(state["scores"]))
 
     def new_wandb_run(self):
         """Creates a new wandb run to save information to."""

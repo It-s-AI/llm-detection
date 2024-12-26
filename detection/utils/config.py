@@ -161,6 +161,13 @@ def add_args(cls, parser):
             default=0.9,
         )
 
+        parser.add_argument(
+            "--neuron.ollama_url",
+            type=str,
+            help="Url to ollama",
+            default="http://127.0.0.1:11434",
+        )
+
     else:
         parser.add_argument(
             "--blacklist.minimum_stake_requirement",
