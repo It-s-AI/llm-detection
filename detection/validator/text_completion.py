@@ -11,7 +11,7 @@ from detection.validator.text_postprocessing import TextCleaner
 
 
 class OllamaModel:
-    def __init__(self, model_name, num_predict=900, base_url=None):
+    def __init__(self, model_name, num_predict=900, base_url="http://127.0.0.1:11434"):
         """
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
