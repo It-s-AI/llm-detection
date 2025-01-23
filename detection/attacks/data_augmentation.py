@@ -34,6 +34,22 @@ class DataAugmentator:
             applied_augs.append(type(augmentation_step['attacker']).__name__)
 
         n_auged = len(text.split())
-        new_cnt_first_human = int(n_auged * (1 - sum(labels) / len(labels)))
-        labels_auged = [0] * new_cnt_first_human + [1] * (n_auged - new_cnt_first_human)
+        first_zeros = 0
+        for i in range(len(labels)):
+            if labels[i] == 0:
+                first_zeros += 1
+            else:
+                break
+        last_zeros = 0
+        for i in range(len(labels) - 1, -1, -1):
+            if labels[i] == 0:
+                last_zeros += 1
+            else:
+                break
+        new_first_zeros = int(n_auged * first_zeros / len(labels))
+        new_last_zeros = int(n_auged * last_zeros / len(labels))
+        new_middle_ones = n_auged - new_first_zeros - new_last_zeros
+        labels_auged = [0] * new_first_zeros + [1] * new_middle_ones + [0] * new_last_zeros
+        if not sum(labels):
+            labels_auged = [0] * n_auged
         return text, applied_augs, labels_auged

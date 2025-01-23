@@ -11,7 +11,7 @@ from detection.validator.text_postprocessing import TextCleaner
 
 
 class OllamaModel:
-    def __init__(self, model_name, num_predict=900, base_url="http://127.0.0.1:11434"):
+    def __init__(self, model_name, num_predict=900, base_url="http://127.0.0.1:11434", in_the_middle_generation=False):
         """
         available models you can find on https://github.com/ollama/ollama
         before running model <model_name> install ollama and run 'ollama pull <model_name>'
@@ -19,6 +19,7 @@ class OllamaModel:
         self.model_name = model_name
         self.base_url = base_url
         self.num_predict = num_predict
+        self.in_the_middle_generation = in_the_middle_generation
 
         bt.logging.info(f'Initializing OllamaModel {model_name}')
         if num_predict > 1000:
@@ -91,6 +92,10 @@ class OllamaModel:
             except Exception as e:
                 bt.logging.info("Couldn't get response from Ollama, probably it's restarting now: {}".format(e))
                 time.sleep(1)
+
+    def complete_text(self, messages: list[dict]) -> str | None:
+        assert self.in_the_middle_generation
+        return self.model.invoke(messages)
 
     def __repr__(self) -> str:
         return f"{self.model_name}"
