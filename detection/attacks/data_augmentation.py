@@ -5,6 +5,7 @@ from detection.attacks.delete import DeleteAttack
 from detection.attacks.spelling import SpellingAttack
 from detection.attacks.synonym import SynonymAttack
 from detection.attacks.paraphrazer import ParaphraseAttack
+from detection.attacks.zero_width_space import ZeroWidthSpaceAttack
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -13,9 +14,11 @@ nltk.download('averaged_perceptron_tagger')
 
 class DataAugmentator:
     def __init__(self,):
-        self.attacks = [{'attacker': SpellingAttack(), 'p': 0.5},
-                        {'attacker': SynonymAttack(), 'p': 0.2, 'pass_labels': True},
-                        {'attacker': DeleteAttack(), 'p': 0.2}]
+        self.attacks = [{'attacker': SynonymAttack(), 'p': 0.05, 'pass_labels': True},
+                        {'attacker': ZeroWidthSpaceAttack(), 'p': 0.05},
+                        {'attacker': SpellingAttack(), 'p': 0.4},
+                        {'attacker': DeleteAttack(), 'p': 0.1},
+                        ]
 
         # {'attacker': ParaphraseAttack(), 'p': 0.2, 'apply_label': 1}, - needs too much GPU
 
