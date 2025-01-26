@@ -4,7 +4,6 @@ import numpy as np
 from detection.attacks.delete import DeleteAttack
 from detection.attacks.spelling import SpellingAttack
 from detection.attacks.synonym import SynonymAttack
-from detection.attacks.paraphrazer import ParaphraseAttack
 from detection.attacks.zero_width_space import ZeroWidthSpaceAttack
 
 nltk.download('punkt')
