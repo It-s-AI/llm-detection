@@ -51,32 +51,44 @@ class Validator(BaseValidatorNeuron):
 
         base_url = self.config.neuron.ollama_url
 
-        models = [OllamaModel(model_name='llama3:text', base_url=base_url),
-                  OllamaModel(model_name='llama3.1', base_url=base_url),
-                  OllamaModel(model_name='llama3.2', base_url=base_url),
-                  OllamaModel(model_name='llama2:13b', base_url=base_url),
-
-                  OllamaModel(model_name='qwen2.5:14b', base_url=base_url),
-                  OllamaModel(model_name='qwen2.5:32b', base_url=base_url),
-                  OllamaModel(model_name='qwen:32b-text-v1.5-q4_0', base_url=base_url),
-
-                  OllamaModel(model_name='command-r', base_url=base_url),
-                  OllamaModel(model_name='command-r', base_url=base_url),
-                  OllamaModel(model_name='command-r', base_url=base_url),
-
-                  OllamaModel(model_name='gemma2:9b-instruct-q4_0', base_url=base_url),
-                  OllamaModel(model_name='gemma2:27b-text-q4_0', base_url=base_url),
-
-                  OllamaModel(model_name='mistral:text', base_url=base_url),
-                  OllamaModel(model_name='mistral-nemo:12b', base_url=base_url),
-                  OllamaModel(model_name='mistral-small:22b', base_url=base_url),
-
-                  OllamaModel(model_name='internlm2:7b', base_url=base_url),
-                  OllamaModel(model_name='internlm2:20b', base_url=base_url),
-
-                  OllamaModel(model_name='yi:34b-chat', base_url=base_url),
-                  OllamaModel(model_name='deepseek-v2:16b', base_url=base_url),
-                  OllamaModel(model_name='openhermes', base_url=base_url),]
+        models = [OllamaModel(model_name='llama2:13b', in_the_middle_generation=True),
+                       OllamaModel(model_name='llama3:text'),
+                       OllamaModel(model_name='llama3:70b', in_the_middle_generation=True),
+                       OllamaModel(model_name='llama3.1:70b-text-q4_0', in_the_middle_generation=True),
+                       OllamaModel(model_name='llama3.2', in_the_middle_generation=True),
+                       OllamaModel(model_name='llama3.3:70b'),
+    
+                       OllamaModel(model_name='qwen:32b-text-v1.5-q4_0'),
+                       OllamaModel(model_name='qwen2:72b-text-q4_0'),
+                       OllamaModel(model_name='qwen2.5:14b', in_the_middle_generation=True),
+                       OllamaModel(model_name='qwen2.5-coder:32b', in_the_middle_generation=True),
+                       OllamaModel(model_name='qwen2.5:72b', in_the_middle_generation=True),
+    
+                       OllamaModel(model_name='command-r', in_the_middle_generation=True),
+                       OllamaModel(model_name='command-r', in_the_middle_generation=True),
+                       OllamaModel(model_name='command-r-plus:104b', in_the_middle_generation=True),
+                       OllamaModel(model_name='command-r-plus:104b', in_the_middle_generation=True),
+                       OllamaModel(model_name='command-r-plus:104b', in_the_middle_generation=True),
+    
+                       OllamaModel(model_name='gemma2:9b-instruct-q4_0', in_the_middle_generation=True),
+                       OllamaModel(model_name='gemma2:27b-text-q4_0'),
+                       OllamaModel(model_name='gemma2:27b', in_the_middle_generation=True),
+    
+                       OllamaModel(model_name='mistral:text'),
+                       OllamaModel(model_name='mistral-nemo:12b', in_the_middle_generation=True),
+                       OllamaModel(model_name='mistral-small:22b', in_the_middle_generation=True),
+                       OllamaModel(model_name='mistral-large:123b', in_the_middle_generation=True),
+    
+                       OllamaModel(model_name='internlm2:7b'),
+                       OllamaModel(model_name='internlm2:20b'),
+                       OllamaModel(model_name='internlm/internlm2.5:20b-chat'),
+    
+                       OllamaModel(model_name='deepseek-v2:16b'),
+                       OllamaModel(model_name='deepseek-r1:14b'),
+                       OllamaModel(model_name='phi4:14b'),
+                       OllamaModel(model_name='aya-expanse:32b'),
+                       OllamaModel(model_name='yi:34b-chat'),
+                       OllamaModel(model_name='athene-v2:72b'),]
 
         bt.logging.info(f"Models loaded{models}")
 
