@@ -17,6 +17,11 @@ from detection.validator.text_completion import OllamaModel
 from detection.attacks.data_augmentation import DataAugmentator
 
 
+AI_THEN_HUMAN_PERCENT = 10
+HUMAN_THEN_AI_PERCENT = 40
+AI_PERCENT = 25
+HUMAN_PERCENT = 25
+
 sent_tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
 def get_sentences(text):
     spans = list(sent_tokenizer.span_tokenize(text))

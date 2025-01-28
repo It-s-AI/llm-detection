@@ -2,6 +2,9 @@ import numpy as np
 import random
 
 
+HUMAN_THEN_AI_PERCENT = 40
+AI_PERCENT = 25
+
 class SegmentationProcesser:
     def __init__(self, ):
         pass
@@ -12,7 +15,7 @@ class SegmentationProcesser:
         if not prompt:
             raise Exception("There is should be a prompt during merging")
 
-        if np.random.random() < 40/(25+40):
+        if np.random.random() < HUMAN_THEN_AI_PERCENT / (HUMAN_THEN_AI_PERCENT + AI_PERCENT):
             now['text'] = el['prompt'] + el['text']
             now['cnt_first_human'] = len(el['prompt'].split())
         else:
@@ -54,16 +57,15 @@ class SegmentationProcesser:
             #             break
             #     return self.subsample_words(' '.join(words[:ind]), labels[:ind])
 
-        first_zeros = 0
-        for i in range(len(labels)):
-            if labels[i] == 0:
-                first_zeros += 1
-            else:
+        split_index = None
+        for i in range(len(labels) - 1):
+            if labels[i] != labels[i + 1]:
+                split_index = i
                 break
         
-        if 0 < first_zeros < len(words):
-            ind = random.randint(max(first_zeros - cnt, 0), min(len(words) - cnt, first_zeros))
-        else:
+        if split_index is not None:  # for two class case
+            ind = random.randint(max(split_index - cnt, 0), min(len(words) - cnt, split_index))
+        else:  # for one class case
             ind = random.randint(0, len(words) - cnt)
 
         res = words[ind:ind + cnt]
