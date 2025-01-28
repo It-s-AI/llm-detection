@@ -93,9 +93,13 @@ class OllamaModel:
                 bt.logging.info("Couldn't get response from Ollama, probably it's restarting now: {}".format(e))
                 time.sleep(1)
 
-    def complete_text(self, messages: list[dict]) -> str | None:
-        assert self.in_the_middle_generation
-        return self.model.invoke(messages)
+    def classic_invoke(self, messages: list[dict]) -> str | None:
+        while True:
+            try:
+                return self.model.invoke(messages)
+            except Exception as e:
+                bt.logging.info("Couldn't get response from Ollama, probably it's restarting now: {}".format(e))
+                time.sleep(1)
 
     def __repr__(self) -> str:
         return f"{self.model_name}"

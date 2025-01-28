@@ -81,7 +81,7 @@ generation_prompts = [
 ]
 
 
-def regenerated_in_the_middle(model, text, summary_prompt, generation_prompt):
+def regenerated_in_the_middle(model: OllamaModel, text, summary_prompt, generation_prompt):
     sentences = get_sentences(text)
     lens = [len(x) for x in sentences]
     first_part = len(sentences) // 3
@@ -120,12 +120,13 @@ def regenerated_in_the_middle(model, text, summary_prompt, generation_prompt):
     end = middle[-diff:] + end
     middle = middle_stripped
 
-    summary = model.complete_text([
+    assert model.in_the_middle_generation
+    summary = model.classic_invoke([
         {"role": "system", "content": summary_prompt},
         {"role": "user", "content": middle}
     ])
     middle_size = len(middle.split())
-    generated_middle = model.complete_text([
+    generated_middle = model.classic_invoke([
         {"role": "system", "content": generation_prompt + f" The middle should be about {middle_size} words long"},
         {"role": "user", "content": f"begin: {begin}\nend: {end}\nsummary: {summary}"}
     ])
