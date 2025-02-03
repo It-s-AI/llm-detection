@@ -66,6 +66,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # self.scores = torch.FloatTensor(weight_metagraph.W[self.uid])
 
         self.scores = torch.zeros(len(self.hotkeys), dtype=torch.float32)
+        self.default_score_value = 0.002
         if os.path.exists(self.config.neuron.full_path + "/state.pt"):
             self.load_state()
 
@@ -312,13 +313,13 @@ class BaseValidatorNeuron(BaseNeuron):
         # Zero out all hotkeys that have been replaced.
         for uid, hotkey in enumerate(self.hotkeys):
             if hotkey != self.metagraph.hotkeys[uid]:
-                self.scores[uid] = 0  # hotkey has been replaced
+                self.scores[uid] = self.default_score_value  # hotkey has been replaced
 
         # Check to see if the metagraph has changed size.
         # If so, we need to add new hotkeys and moving averages.
         if len(self.hotkeys) < len(self.metagraph.hotkeys):
             # Update the size of the moving average scores.
-            new_moving_average = torch.zeros((self.metagraph.n))
+            new_moving_average = torch.ones((self.metagraph.n)) * self.default_score_value
             min_len = min(len(self.hotkeys), len(self.scores))
             new_moving_average[:min_len] = self.scores[:min_len]
             self.scores = new_moving_average
