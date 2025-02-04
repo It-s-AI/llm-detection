@@ -87,7 +87,7 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
         auged_texts = []
         auged_labels = []
         for el in queries:
-            text, labels = segmentation_processer.subsample_words(el.text, sum([ell == 0 for ell in el.segmentation_labels]))
+            text, labels = segmentation_processer.subsample_words(el.text, el.segmentation_labels)
             new_text, augs, new_labels = augmentator(text, labels)
 
             if len(new_text) >= min_text_length:
