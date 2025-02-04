@@ -37,7 +37,7 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
     preds = np.round(y_pred)
 
     # accuracy = accuracy_score(y_true, preds)
-    cm = confusion_matrix(y_true, preds, labels=[0, 1])
+    cm = confusion_matrix(y_true, preds)
     tn, fp, fn, tp = cm.ravel()
     f1 = f1_score(y_true, preds)
     ap_score = average_precision_score(y_true, y_pred)
@@ -103,7 +103,7 @@ def get_rewards(
         cur_mask = np.concatenate([len(text_labels) * [i in out_of_domain_ids] for i, text_labels in enumerate(uid_labels)])
         flatten_out_of_domain_masks.append(cur_mask)
 
-    labels = [np.concatenate(el) for el in labels]
+    labels = [np.concatenate(el).astype(bool) for el in labels]
 
     rewards = []
     metrics = []
