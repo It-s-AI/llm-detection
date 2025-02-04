@@ -37,7 +37,7 @@ def reward(y_pred: np.array, y_true: np.array) -> float:
     preds = np.round(y_pred)
 
     # accuracy = accuracy_score(y_true, preds)
-    cm = confusion_matrix(y_true, preds)
+    cm = confusion_matrix(y_true, preds, labels=[0, 1])
     tn, fp, fn, tp = cm.ravel()
     f1 = f1_score(y_true, preds)
     ap_score = average_precision_score(y_true, y_pred)
