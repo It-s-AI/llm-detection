@@ -93,7 +93,7 @@ class Validator(BaseValidatorNeuron):
 
         bt.logging.info(f"Models loaded{models}")
 
-        self.generator = DataGenerator(models)
+        self.generator = DataGenerator(models, device=self.config.neuron.device)
         bt.logging.info(f"Generator initialized {self.generator}")
 
         self.out_of_domain_f1_scores = np.ones(257)

@@ -12,8 +12,8 @@ nltk.download('averaged_perceptron_tagger')
 
 
 class DataAugmentator:
-    def __init__(self,):
-        self.attacks = [{'attacker': SynonymAttack(), 'p': 0.05, 'pass_labels': True},
+    def __init__(self, device):
+        self.attacks = [{'attacker': SynonymAttack(device=device), 'p': 0.05, 'pass_labels': True},
                         {'attacker': ZeroWidthSpaceAttack(), 'p': 0.05},
                         {'attacker': SpellingAttack(), 'p': 0.4},
                         {'attacker': DeleteAttack(), 'p': 0.1},
