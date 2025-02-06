@@ -12,7 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 class SynonymAttack:
-    def __init__(self, max_p=0.4):
+    def __init__(self, max_p=0.4, device=0):
         # The percentage of words in the text to be replaced
         self.max_p = max_p
         # The probability threshold under which to ignore a BERT synonym
@@ -28,7 +28,7 @@ class SynonymAttack:
         self.pos_window_size = 4
 
         # Load BERT
-        device = 0 if torch.cuda.is_available() else -1
+        # device = 0 if torch.cuda.is_available() else -1
         tok_kwargs = {"truncation": True}
         self.bert = transformers.pipeline(
             "fill-mask", model="bert-base-cased", device=device, tokenizer_kwargs=tok_kwargs

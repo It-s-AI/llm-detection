@@ -77,7 +77,7 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
     version_responses = []
     check_responses = []
     final_labels = []
-    augmentator = DataAugmentator()
+    augmentator = DataAugmentator(device=self.config.neuron.device)
     segmentation_processer = SegmentationProcesser()
 
     for i in range(0, len(axons), step):
