@@ -2,7 +2,8 @@
 
 # System Requirements
 
-Validators will need enough processing power to inference multiple models. It is required to have a GPU (atleast NVIDIA RTX 4090) with minimum 16 GB of VRAM (24 GB is recommended). 
+Validators will need enough processing power to inference multiple models. It is required to have a GPU (we commend NVIDIA A100) with minimum 80GB of VRAM. 
+Also you need to have at least 1T of disk space.
 
 ## Installation
 
