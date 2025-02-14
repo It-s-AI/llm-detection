@@ -135,7 +135,7 @@ def regenerated_in_the_middle(model: OllamaModel, text, summary_prompt, generati
 
 
 class DataGenerator:
-    def __init__(self, models: list, min_text_length=250):
+    def __init__(self, models: list, min_text_length=250, device=0):
         bt.logging.info(f"DataGenerator initializing...")
         bt.logging.info(f"Models {models}")
 
@@ -145,7 +145,7 @@ class DataGenerator:
         self.n_models = len(self.models)
         self.n_models_with_in_the_middle = sum([el.in_the_middle_generation for el in models])
         self.models_with_in_the_middle = [i for i in range(self.n_models) if self.models[i].in_the_middle_generation]
-        self.augmentator = DataAugmentator()
+        self.augmentator = DataAugmentator(device)
         self.segmentation_processer = SegmentationProcesser()
 
         self.human_dataset = HumanDataset()
