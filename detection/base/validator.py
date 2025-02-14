@@ -341,7 +341,7 @@ class BaseValidatorNeuron(BaseNeuron):
         scattered_rewards: torch.FloatTensor = self.scores.scatter(
             0, torch.tensor(uids), rewards
         )
-        bt.logging.debug(f"Scattered rewards: {rewards}")
+        bt.logging.info(f"Scattered rewards: {rewards}")
 
         # Update scores with rewards produced by this step.
         # shape: [ metagraph.n ]
@@ -370,6 +370,10 @@ class BaseValidatorNeuron(BaseNeuron):
         bt.logging.info("Loading validator state from {}".format(self.config.neuron.full_path + "/state.pt"))
         # Load the state of the validator from file.
         state = torch.load(self.config.neuron.full_path + "/state.pt", weights_only=False)
+        if len(state['scores']) != len(self.scores):
+            bt.logging.info("Found different number of scores in previuos and current state. Ignoring previuos state.")
+            return None
+
         self.step = state["step"]
         self.scores = state["scores"]
         self.hotkeys = state["hotkeys"]
