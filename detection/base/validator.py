@@ -341,7 +341,7 @@ class BaseValidatorNeuron(BaseNeuron):
         scattered_rewards: torch.FloatTensor = self.scores.scatter(
             0, torch.tensor(uids), rewards
         )
-        bt.logging.debug(f"Scattered rewards: {rewards}")
+        bt.logging.info(f"Scattered rewards: {rewards}")
 
         # Update scores with rewards produced by this step.
         # shape: [ metagraph.n ]
