@@ -11,7 +11,7 @@
 
 ### [🌐 Website](https://its-ai.org/)  
 ### [⛏️ Mining Docs](docs/mining.md)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🧑‍🏫 Validating Docs](docs/validating.md) 
-### [🤔 FAQ](docs/FAQ.md)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🎯Incentive mechanism](docs/incentive.md)   
+### [🤔 FAQ](docs/FAQ.md)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🎯Incentive mechanism](docs/incentive.md)   
 
 </div>
 
@@ -39,7 +39,7 @@ Here is a key highlights of It's AI, which will be fully covered further:
 5) Incentive mechanism. Time and benchmarks proven validation process that makes miners work in the right direction. Thanks to it we've become a new state-of-the-art solution on all three considered academia-known benchmarks.
 
 ![Raid leaderboard](docs/raid_leaderboard.png)
-<p align="center">RAID leaderboard</p>
+<p align="center">*RAID leaderboard results*</p>
 
 ## Key Highlights (Full)
 ### Most accurate ai-detector
