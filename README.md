@@ -89,3 +89,5 @@ If you want to dig deeper into incentive mechanism, check out [incentive doc](do
 The tokens known as “Tao” or “Alpha Tao” associated with our subnet are not issued, sponsored, or endorsed by ITSAI TECHNOLOGIES - FZCO. These tokens are managed independently within the Bittensor ecosystem, and ITSAI TECHNOLOGIES - FZCO holds no responsibility or control over their issuance, distribution, or any related securities offerings.
 
 ITSAI TECHNOLOGIES - FZCO is not engaged in any securities offerings, investment schemes, or similar financial arrangements associated with Tao or Alpha Tao tokens. By accessing or using our website, you acknowledge and agree that any participation in token-related activities is entirely separate from our business operations. We expressly disclaim any and all claims related to securities, investments, or financial returns that may be associated with these tokens.
+
+Participation in any token-based or blockchain-related activities carries inherent risks. Users and investors are encouraged to conduct their own due diligence and seek independent financial or legal advice before engaging in such activities.
