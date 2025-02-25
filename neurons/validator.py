@@ -97,7 +97,7 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info(f"Generator initialized {self.generator}")
 
         self.out_of_domain_f1_scores = np.ones(257)
-        self.out_of_domain_alpha = 0.15
+        self.out_of_domain_alpha = 0.2
 
     async def build_queries(self) -> tuple[List[ValDataRow], np.array]:
         bt.logging.info(f"Generating texts for challenges...")
