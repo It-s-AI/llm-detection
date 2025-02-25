@@ -35,6 +35,9 @@ import torch
 from detection.validator.segmentation_processer import SegmentationProcesser
 
 
+EPOCH_MIN_TIME = 90 * 60
+
+
 async def dendrite_with_retries(dendrite: bt.dendrite, axons: list, synapse: TextSynapse, deserialize: bool, timeout: float, cnt_attempts=3) -> List[TextSynapse]:
     res: List[TextSynapse | None] = [None] * len(axons)
     idx = list(range(len(axons)))
@@ -167,6 +170,8 @@ async def forward(self):
     # Define how the validator selects a miner to query, how often, etc.
     # bt.logging.info(f"STEPS {self.step} {self.step%300} {not (self.step % 300)}")
 
+    request_start = time.time()
+
     available_axon_size = len(self.metagraph.axons) - 1  # Except our own
     miner_selection_size = min(available_axon_size, self.config.neuron.sample_size)
     miner_uids = get_random_uids(self, k=miner_selection_size)
@@ -208,3 +213,8 @@ async def forward(self):
     self.update_scores(rewards_tensor, uids_tensor)
 
     self.log_step(miner_uids, metrics, rewards)
+
+    request_end = time.time()
+    if request_end - request_start < EPOCH_MIN_TIME:
+        bt.logging.info(f"Finished too fast, sleeping for {EPOCH_MIN_TIME - (request_end - request_start)} seconds")
+        time.sleep(EPOCH_MIN_TIME - (request_end - request_start))
