@@ -13,6 +13,9 @@ from collections.abc import Iterator
 from detection.validator.cc_dataset import CCDataset, get_2023_dumps
 from neurons.miners.deberta_classifier import DebertaClassifier
 
+PILE_COUNT = 80
+CC_COUNT = 40
+
 
 class TextDataset(Iterator):
     def __init__(self, max_prompt_len, text_field):
@@ -134,11 +137,12 @@ class PromptDataset(Iterator):
         self.pile_dataset = PileDataset(max_prompt_len)
         self.common_crawl = CommonCrawlDataset(max_prompt_len)
         self.max_prompt_len = max_prompt_len
+        self.pile_probability = PILE_COUNT / (PILE_COUNT + CC_COUNT)
 
     def __next__(self) -> dict:
         while True:
             res = {}
-            if random.random() > 0.5:
+            if random.random() < self.pile_probability:
                 el = next(self.pile_dataset)
                 res['data_source'] = 'pile'
             else:
