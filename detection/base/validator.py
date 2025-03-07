@@ -17,6 +17,7 @@
 import copy
 import os.path
 
+import numpy as np
 import torch
 import asyncio
 import threading
@@ -66,6 +67,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # self.scores = torch.FloatTensor(weight_metagraph.W[self.uid])
 
         self.scores = torch.zeros(len(self.hotkeys), dtype=torch.float32)
+        self.has_enough_stake = torch.ones(len(self.hotkeys), dtype=torch.float32)
         self.default_score_value = 0.002
         if os.path.exists(self.config.neuron.full_path + "/state.pt"):
             self.load_state()
@@ -326,6 +328,17 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # Update the hotkeys.
         self.hotkeys = copy.deepcopy(self.metagraph.hotkeys)
+        self.has_enough_stake = torch.zeros(len(self.hotkeys), dtype=torch.float32)
+
+        coldkey_stake = {}
+        for coldkey in np.unique(self.metagraph.coldkeys):
+            coldkey_stake[coldkey] = 0
+            for hotkey_stake in self.subtensor.get_stake_for_coldkey(coldkey):
+                coldkey_stake[coldkey] += hotkey_stake.stake.tao if hotkey_stake.netuid == self.config.netuid else 0
+
+        for i, coldkey in enumerate(self.metagraph.coldkeys):
+            self.has_enough_stake[i] = coldkey_stake[coldkey] - self.config.neuron.min_alpha_amount >= 0
+            coldkey_stake[coldkey] -= self.config.neuron.min_alpha_amount
 
     def update_scores(self, rewards: torch.FloatTensor, uids: List[int]):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""

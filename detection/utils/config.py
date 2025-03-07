@@ -168,6 +168,13 @@ def add_args(cls, parser):
             default="http://127.0.0.1:11434",
         )
 
+        parser.add_argument(
+            "--neuron.min_alpha_amount",
+            type=str,
+            help="Minimum amount of alphas that miner needs to participate in mining",
+            default=500,
+        )
+
     else:
         parser.add_argument(
             "--blacklist.minimum_stake_requirement",
