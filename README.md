@@ -27,6 +27,7 @@ While ChatGpt alone has more than 1.8 billion monthly visits, we believe that th
 * Emission before dTao: 1.77%
 * Registered: March 2024
 * Website: https://its-ai.org
+* Twitter(X): https://x.com/ai_detection
 * Benchmark report: https://its-ai.org/benchmarks.pdf
 * Pitch deck: https://its-ai.org/pitchdeck.pdf
 
