@@ -107,6 +107,7 @@ def get_rewards(
 
     rewards = []
     metrics = []
+    bt.logging.info("Uid enough stake: {}".format(self.has_enough_stake))
     for uid in range(len(predictions_list)):
         try:
             if not self.has_enough_stake[uid] or len(predictions_list[uid]) != len(labels[uid]) or len(check_predictions_list[uid]) != len(flatten_check_ids[uid]):
