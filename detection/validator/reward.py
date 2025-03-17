@@ -113,7 +113,7 @@ def get_rewards(
         try:
             if not self.has_enough_stake[uid] or len(predictions_list[i]) != len(labels[i]) or len(check_predictions_list[i]) != len(flatten_check_ids[i]):
                 rewards.append(0)
-                metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 0, 'enough_stake': self.has_enough_stake[uid]})
+                metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 0, 'enough_stake': self.has_enough_stake[uid].item()})
                 continue
 
             predictions_array = np.array(predictions_list[i])
@@ -139,7 +139,7 @@ def get_rewards(
             metric['penalty'] = penalty
             metric['out_of_domain_f1_score'] = out_of_domain_metric['f1_score']
             metric['weighted_out_of_domain_f1_score'] = self.out_of_domain_f1_scores[i]
-            metric['enough_stake'] = self.has_enough_stake[uid]
+            metric['enough_stake'] = self.has_enough_stake[uid].item()
             metrics.append(metric)
         except Exception as e:
             bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(i, predictions_list[i], labels[i]))
