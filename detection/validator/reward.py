@@ -71,6 +71,7 @@ def get_rewards(
         self,
         labels: list[list[list[bool]]],
         responses: List[TextSynapse],
+        miner_uids: List[int],
         check_responses: List[TextSynapse],
         version_responses: List[TextSynapse],
         check_ids: np.array,
@@ -108,24 +109,23 @@ def get_rewards(
     rewards = []
     metrics = []
     bt.logging.info("Uid enough stake: {}".format(self.has_enough_stake))
-    for uid in range(len(predictions_list)):
+    for i, uid in enumerate(miner_uids):
         try:
-            # not self.has_enough_stake[uid] or
-            if len(predictions_list[uid]) != len(labels[uid]) or len(check_predictions_list[uid]) != len(flatten_check_ids[uid]):
+            if not self.has_enough_stake[uid] or len(predictions_list[i]) != len(labels[i]) or len(check_predictions_list[i]) != len(flatten_check_ids[i]):
                 rewards.append(0)
-                metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 0})
+                metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 0, 'enough_stake': self.has_enough_stake[uid]})
                 continue
 
-            predictions_array = np.array(predictions_list[uid])
-            check_predictions_array = np.array(check_predictions_list[uid])
+            predictions_array = np.array(predictions_list[i])
+            check_predictions_array = np.array(check_predictions_list[i])
 
-            # bt.logging.info(f"{predictions_array.shape}, {labels[uid].shape}, {check_predictions_array.shape}, {flatten_check_ids[uid].shape}")
+            # bt.logging.info(f"{predictions_array.shape}, {labels[i].shape}, {check_predictions_array.shape}, {flatten_check_ids[i].shape}")
 
-            mask = flatten_out_of_domain_masks[uid]
-            out_of_domain_miner_reward, out_of_domain_metric = reward(predictions_array[mask], labels[uid][mask])
+            mask = flatten_out_of_domain_masks[i]
+            out_of_domain_miner_reward, out_of_domain_metric = reward(predictions_array[mask], labels[i][mask])
 
-            miner_reward, metric = reward(predictions_array[~mask], labels[uid][~mask])
-            penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[uid], version_predictions_list[uid])
+            miner_reward, metric = reward(predictions_array[~mask], labels[i][~mask])
+            penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[i], version_predictions_list[i])
 
             if update_out_of_domain:
                 self.out_of_domain_f1_scores[uid] = self.out_of_domain_f1_scores[uid] * (1 - self.out_of_domain_alpha) + \
@@ -138,10 +138,11 @@ def get_rewards(
             rewards.append(miner_reward)
             metric['penalty'] = penalty
             metric['out_of_domain_f1_score'] = out_of_domain_metric['f1_score']
-            metric['weighted_out_of_domain_f1_score'] = self.out_of_domain_f1_scores[uid]
+            metric['weighted_out_of_domain_f1_score'] = self.out_of_domain_f1_scores[i]
+            metric['enough_stake'] = self.has_enough_stake[uid]
             metrics.append(metric)
         except Exception as e:
-            bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(uid, predictions_list[uid], labels[uid]))
+            bt.logging.error("Couldn't count miner reward for {}, his predictions = {} and his labels = {}".format(i, predictions_list[i], labels[i]))
             bt.logging.info(traceback.format_exc())
             rewards.append(0)
             metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 1})

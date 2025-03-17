@@ -193,6 +193,7 @@ async def forward(self):
     rewards, metrics = get_rewards(self,
                                    labels=final_labels,
                                    responses=all_responses,
+                                   miner_uids=miner_uids.tolist(),
                                    check_responses=check_responses,
                                    version_responses=version_responses,
                                    check_ids=check_ids,
