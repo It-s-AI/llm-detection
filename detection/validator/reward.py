@@ -110,7 +110,8 @@ def get_rewards(
     bt.logging.info("Uid enough stake: {}".format(self.has_enough_stake))
     for uid in range(len(predictions_list)):
         try:
-            if not self.has_enough_stake[uid] or len(predictions_list[uid]) != len(labels[uid]) or len(check_predictions_list[uid]) != len(flatten_check_ids[uid]):
+            # not self.has_enough_stake[uid] or
+            if len(predictions_list[uid]) != len(labels[uid]) or len(check_predictions_list[uid]) != len(flatten_check_ids[uid]):
                 rewards.append(0)
                 metrics.append({'fp_score': 0, 'f1_score': 0, 'ap_score': 0, 'penalty': 0})
                 continue
