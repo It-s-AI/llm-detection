@@ -170,7 +170,7 @@ def add_args(cls, parser):
 
         parser.add_argument(
             "--neuron.min_alpha_amount",
-            type=str,
+            type=int,
             help="Minimum amount of alphas that miner needs to participate in mining",
             default=500,
         )
