@@ -208,16 +208,17 @@ async def forward(self):
 
     m = torch.nn.Softmax()
     rewards_tensor = m(rewards_tensor * 100)
-    bt.logging.info("Normalized rewards: {}".format(rewards_tensor))
 
+    bt.logging.info("Normalized rewards: {}".format(rewards_tensor))
     uids_tensor = torch.tensor(miner_uids)
-    # not_available_uids = []
-    # for uid in range(self.metagraph.n.item()):
-    #     if uid not in uids_tensor:
-    #         not_available_uids.append(uid)
-    # uids_tensor = torch.concatenate([uids_tensor, torch.tensor(not_available_uids)])
-    # rewards_tensor = torch.concatenate([rewards_tensor, torch.zeros(len(not_available_uids))])
-    # bt.logging.info('Found {} unavailable uids, set zero to them'.format(len(not_available_uids)))
+
+    not_available_uids = []
+    for uid in range(self.metagraph.n.item()):
+        if uid not in uids_tensor:
+            not_available_uids.append(uid)
+    uids_tensor = torch.concatenate([uids_tensor, torch.tensor(not_available_uids)])
+    rewards_tensor = torch.concatenate([rewards_tensor, torch.zeros(len(not_available_uids))])
+    bt.logging.info('Found {} unavailable uids, set zero to them: {}'.format(len(not_available_uids), not_available_uids))
 
     self.update_scores(rewards_tensor, uids_tensor)
     self.log_step(miner_uids, metrics, rewards)
