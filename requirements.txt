@@ -24,6 +24,7 @@ typo==0.1.7
 scalecodec
 fasttext-numpy2==0.10.4
 accelerate==1.0.1
+bittensor-cli==9.0.2
 
 bs4
 pre-commit==3.3.2

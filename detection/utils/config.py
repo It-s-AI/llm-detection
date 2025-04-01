@@ -138,6 +138,20 @@ def add_args(cls, parser):
         )
 
         parser.add_argument(
+            "--neuron.moving_average_alpha_early",
+            type=float,
+            help="Moving average alpha parameter, how much to add of the new observation.",
+            default=0.3,
+        )
+
+        parser.add_argument(
+            "--neuron.counter_threshold",
+            type=int,
+            help="Counter threshold parameter, how many requests to make before using the moving average alpha.",
+            default=10,
+        )
+
+        parser.add_argument(
             "--neuron.axon_off",
             "--axon_off",
             action="store_true",
