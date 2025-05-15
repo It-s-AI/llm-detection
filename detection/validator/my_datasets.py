@@ -14,7 +14,7 @@ from detection.validator.cc_dataset import CCDataset, get_2023_dumps
 from neurons.miners.deberta_classifier import DebertaClassifier
 
 PILE_COUNT = 80
-CC_COUNT = 40
+CC_COUNT = 0
 PILE_PROB = PILE_COUNT / (PILE_COUNT + CC_COUNT)
 
 
@@ -77,7 +77,7 @@ class PileDataset(TextDataset):
     def get_iter(self):
         seed = int(time.time())
         dataset = iter(
-            load_dataset("monology/pile-uncopyrighted", streaming=True)['train'].shuffle(
+            load_dataset("allenai/c4", "en", streaming=True)['train'].shuffle(
                 seed=seed, buffer_size=100000
             )
         )

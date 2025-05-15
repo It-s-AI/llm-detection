@@ -13,10 +13,10 @@ nltk.download('averaged_perceptron_tagger')
 
 class DataAugmentator:
     def __init__(self, device=0):
-        self.attacks = [{'attacker': SynonymAttack(device=device), 'p': 0.05, 'pass_labels': True},
-                        {'attacker': ZeroWidthSpaceAttack(), 'p': 0.05},
+        self.attacks = [#{'attacker': SynonymAttack(device=device), 'p': 0.05, 'pass_labels': True},
+                        #{'attacker': ZeroWidthSpaceAttack(), 'p': 0.05},
                         {'attacker': SpellingAttack(), 'p': 0.4},
-                        {'attacker': DeleteAttack(), 'p': 0.1},
+                        #{'attacker': DeleteAttack(), 'p': 0.1},
                         ]
 
         # {'attacker': ParaphraseAttack(), 'p': 0.2, 'apply_label': 1}, - needs too much GPU
