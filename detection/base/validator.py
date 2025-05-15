@@ -17,6 +17,7 @@
 import copy
 import os.path
 
+import numpy as np
 import torch
 import asyncio
 import threading
@@ -66,7 +67,11 @@ class BaseValidatorNeuron(BaseNeuron):
         # self.scores = torch.FloatTensor(weight_metagraph.W[self.uid])
 
         self.scores = torch.zeros(len(self.hotkeys), dtype=torch.float32)
-        self.default_score_value = 0.002
+        self.counter = torch.zeros(len(self.hotkeys), dtype=torch.float32)
+        self.has_enough_stake = torch.ones(len(self.hotkeys), dtype=torch.float32)
+        self.update_has_enough_stake()
+
+        self.default_score_value = 0
         if os.path.exists(self.config.neuron.full_path + "/state.pt"):
             self.load_state()
 
@@ -293,6 +298,19 @@ class BaseValidatorNeuron(BaseNeuron):
         else:
             bt.logging.error(f"set_weights failed {msg}")
 
+    def update_has_enough_stake(self):
+        self.has_enough_stake = torch.zeros(len(self.hotkeys), dtype=torch.float32)
+
+        coldkey_stake = {}
+        for coldkey in np.unique(self.metagraph.coldkeys):
+            coldkey_stake[coldkey] = 0
+            for hotkey_stake in self.subtensor.get_stake_for_coldkey(coldkey):
+                coldkey_stake[coldkey] += hotkey_stake.stake.tao if hotkey_stake.netuid == self.config.netuid else 0
+
+        for i, coldkey in enumerate(self.metagraph.coldkeys):
+            self.has_enough_stake[i] = coldkey_stake[coldkey] - self.config.neuron.min_alpha_amount >= 0
+            coldkey_stake[coldkey] -= self.config.neuron.min_alpha_amount
+
     def resync_metagraph(self):
         """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph."""
         bt.logging.info("resync_metagraph()")
@@ -310,10 +328,13 @@ class BaseValidatorNeuron(BaseNeuron):
         bt.logging.info(
             "Metagraph updated, re-syncing hotkeys, dendrite pool and moving averages"
         )
-        # Zero out all hotkeys that have been replaced.
+        # Zero out all hotkeys that have been replaced and update the counter.
         for uid, hotkey in enumerate(self.hotkeys):
             if hotkey != self.metagraph.hotkeys[uid]:
                 self.scores[uid] = self.default_score_value  # hotkey has been replaced
+                self.counter[uid] = 0
+            else:
+                self.counter[uid] += 1
 
         # Check to see if the metagraph has changed size.
         # If so, we need to add new hotkeys and moving averages.
@@ -326,6 +347,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # Update the hotkeys.
         self.hotkeys = copy.deepcopy(self.metagraph.hotkeys)
+        self.update_has_enough_stake()
 
     def update_scores(self, rewards: torch.FloatTensor, uids: List[int]):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""
@@ -341,13 +363,20 @@ class BaseValidatorNeuron(BaseNeuron):
         scattered_rewards: torch.FloatTensor = self.scores.scatter(
             0, torch.tensor(uids), rewards
         )
-        bt.logging.debug(f"Scattered rewards: {rewards}")
+        bt.logging.info(f"Scattered rewards: {rewards}")
 
         # Update scores with rewards produced by this step.
         # shape: [ metagraph.n ]
         alpha: float = self.config.neuron.moving_average_alpha
-        self.scores: torch.FloatTensor = alpha * scattered_rewards + (
-                1 - alpha
+        alpha_early: float = self.config.neuron.moving_average_alpha_early
+        counter_threshold: int = self.config.neuron.counter_threshold
+
+        real_alpha = torch.where(self.counter < counter_threshold, alpha_early, alpha)
+
+        print(f"real_alpha: {real_alpha}")
+
+        self.scores: torch.FloatTensor = real_alpha * scattered_rewards + (
+                1 - real_alpha
         ) * self.scores
         bt.logging.debug(f"Updated moving avg scores: {self.scores}")
 
@@ -370,6 +399,10 @@ class BaseValidatorNeuron(BaseNeuron):
         bt.logging.info("Loading validator state from {}".format(self.config.neuron.full_path + "/state.pt"))
         # Load the state of the validator from file.
         state = torch.load(self.config.neuron.full_path + "/state.pt", weights_only=False)
+        if len(state['scores']) != len(self.scores):
+            bt.logging.info("Found different number of scores in previuos and current state. Ignoring previuos state.")
+            return None
+
         self.step = state["step"]
         self.scores = state["scores"]
         self.hotkeys = state["hotkeys"]

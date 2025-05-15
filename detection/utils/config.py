@@ -134,7 +134,21 @@ def add_args(cls, parser):
             "--neuron.moving_average_alpha",
             type=float,
             help="Moving average alpha parameter, how much to add of the new observation.",
-            default=0.15,
+            default=0.2,
+        )
+
+        parser.add_argument(
+            "--neuron.moving_average_alpha_early",
+            type=float,
+            help="Moving average alpha parameter, how much to add of the new observation.",
+            default=0.3,
+        )
+
+        parser.add_argument(
+            "--neuron.counter_threshold",
+            type=int,
+            help="Counter threshold parameter, how many requests to make before using the moving average alpha.",
+            default=10,
         )
 
         parser.add_argument(
@@ -166,6 +180,13 @@ def add_args(cls, parser):
             type=str,
             help="Url to ollama",
             default="http://127.0.0.1:11434",
+        )
+
+        parser.add_argument(
+            "--neuron.min_alpha_amount",
+            type=int,
+            help="Minimum amount of alphas that miner needs to participate in mining",
+            default=500,
         )
 
     else:
