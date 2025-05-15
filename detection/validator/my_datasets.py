@@ -78,7 +78,7 @@ class PileDataset(TextDataset):
         seed = int(time.time())
         dataset = iter(
             load_dataset("allenai/c4", "en", streaming=True)['train'].shuffle(
-                seed=seed, buffer_size=1000
+                seed=seed, buffer_size=10000
             )
         )
         return dataset
