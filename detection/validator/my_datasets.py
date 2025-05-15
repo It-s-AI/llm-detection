@@ -83,6 +83,11 @@ class PileDataset(TextDataset):
         )
         return dataset
 
+    def filter_rules_pass(self, prompt, completion):
+        if random.random() > 0.1:
+            return False
+        return True
+
 
 class CommonCrawlDataset(TextDataset):
     def __init__(self, max_prompt_len):
