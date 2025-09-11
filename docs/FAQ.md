@@ -3,6 +3,7 @@
 ## Miners
 ### Do I need alphas to mine?
 Yes, the minimum amount is 500 alphas per hotkey. 
+
 Amount that you have for a hotkey will be calculated as a total amount of stake for the certain coldkey (distributed among its hotkeys or staked somewhere else) divided by the number of active mining hotkeys. If the amount on coldkey is not sufficient to cover all miners, we'll be sorting miner's active hotkeys by UID and then set zero weights for the last positions (until staked amount won't meed amount of active hotkeys).
 
 ### Is there a leaderboard where I can see the performance rankings of miners?
