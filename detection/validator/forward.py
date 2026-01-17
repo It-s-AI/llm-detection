@@ -39,7 +39,7 @@ from detection.validator.segmentation_processer import SegmentationProcesser
 EPOCH_MIN_TIME = 90 * 60
 
 
-async def dendrite_with_retries(dendrite: bt.dendrite, axons: list, synapse: TextSynapse, deserialize: bool, timeout: float, cnt_attempts=3) -> List[TextSynapse]:
+async def dendrite_with_retries(dendrite: bt.Dendrite, axons: list, synapse: TextSynapse, deserialize: bool, timeout: float, cnt_attempts=3) -> List[TextSynapse]:
     res: List[TextSynapse | None] = [None] * len(axons)
     idx = list(range(len(axons)))
     axons = axons.copy()

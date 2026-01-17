@@ -55,7 +55,7 @@ class BaseValidatorNeuron(BaseNeuron):
         self.keypair = self.wallet.hotkey
 
         # Dendrite lets us send messages to other nodes (axons) in the network.
-        self.dendrite = bt.dendrite(wallet=self.wallet)
+        self.dendrite = bt.Dendrite(wallet=self.wallet)
         bt.logging.info(f"Dendrite: {self.dendrite}")
 
         # Set up initial scoring weights for validation
@@ -99,8 +99,8 @@ class BaseValidatorNeuron(BaseNeuron):
 
         bt.logging.info("serving ip to chain...")
         try:
-            self.axon = bt.axon(wallet=self.wallet, config=self.config)
-            # self.axon = bt.axon(wallet=self.wallet, config=self.config
+            self.axon = bt.Axon(wallet=self.wallet, config=self.config)
+            # self.axon = bt.Axon(wallet=self.wallet, config=self.config
 
             try:
                 self.subtensor.serve_axon(
@@ -304,7 +304,8 @@ class BaseValidatorNeuron(BaseNeuron):
         coldkey_stake = {}
         for coldkey in np.unique(self.metagraph.coldkeys):
             coldkey_stake[coldkey] = 0
-            for hotkey_stake in self.subtensor.get_stake_for_coldkey(coldkey):
+            info = self.subtensor.get_stake_info_for_coldkey(coldkey)
+            for hotkey_stake in info:
                 coldkey_stake[coldkey] += hotkey_stake.stake.tao if hotkey_stake.netuid == self.config.netuid else 0
 
         for i, coldkey in enumerate(self.metagraph.coldkeys):
