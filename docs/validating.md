@@ -35,6 +35,11 @@ btcli w new_hotkey
 btcli s register --netuid 32 --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY
 ```
 
+5. Export wandb api key for logging
+```bash
+export WANDB_API_KEY="<YOUR_WANDB_API_KEY>"
+```
+
 ## Install driver
 
 Install PM2 and the jq package on your system.

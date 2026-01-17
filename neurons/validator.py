@@ -59,10 +59,10 @@ class Validator(BaseValidatorNeuron):
                    OllamaModel(model_name='llama3.3:70b', base_url=ollama_url),
 
                    OllamaModel(model_name='qwen:32b-text-v1.5-q4_0', base_url=ollama_url),
-                   OllamaModel(model_name='qwen2:72b-text-q4_0', base_url=ollama_url),
                    OllamaModel(model_name='qwen2.5:14b', base_url=ollama_url, in_the_middle_generation=True),
                    OllamaModel(model_name='qwen2.5-coder:32b', base_url=ollama_url, in_the_middle_generation=True),
                    OllamaModel(model_name='qwen2.5:72b', base_url=ollama_url, in_the_middle_generation=True),
+                   OllamaModel(model_name='qwen3:32b', base_url=ollama_url, in_the_middle_generation=True),
 
                    OllamaModel(model_name='command-r', base_url=ollama_url, in_the_middle_generation=True),
                    OllamaModel(model_name='command-r', base_url=ollama_url, in_the_middle_generation=True),
@@ -70,11 +70,8 @@ class Validator(BaseValidatorNeuron):
                    OllamaModel(model_name='command-r-plus:104b', base_url=ollama_url, in_the_middle_generation=True),
                    OllamaModel(model_name='command-r-plus:104b', base_url=ollama_url, in_the_middle_generation=True),
 
-                   OllamaModel(model_name='gemma2:9b-instruct-q4_0', base_url=ollama_url, in_the_middle_generation=True),
                    OllamaModel(model_name='gemma2:27b-text-q4_0', base_url=ollama_url),
-                   OllamaModel(model_name='gemma2:27b', base_url=ollama_url, in_the_middle_generation=True),
 
-                   OllamaModel(model_name='mistral:text', base_url=ollama_url),
                    OllamaModel(model_name='mistral-nemo:12b', base_url=ollama_url, in_the_middle_generation=True),
                    OllamaModel(model_name='mistral-small:22b', base_url=ollama_url, in_the_middle_generation=True),
                    OllamaModel(model_name='mistral-large:123b', base_url=ollama_url, in_the_middle_generation=True),
@@ -82,6 +79,8 @@ class Validator(BaseValidatorNeuron):
                    OllamaModel(model_name='internlm2:7b', base_url=ollama_url),
                    OllamaModel(model_name='internlm2:20b', base_url=ollama_url),
                    OllamaModel(model_name='internlm/internlm2.5:20b-chat', base_url=ollama_url),
+                   OllamaModel(model_name='internlm/internlm2.5:latest', base_url=ollama_url, in_the_middle_generation=True),
+                   OllamaModel(model_name='internlm/internlm2.5:20b-chat', base_url=ollama_url, in_the_middle_generation=True),
 
                    OllamaModel(model_name='deepseek-v2:16b', base_url=ollama_url),
                    OllamaModel(model_name='deepseek-r1:14b', base_url=ollama_url),
@@ -89,7 +88,7 @@ class Validator(BaseValidatorNeuron):
                    OllamaModel(model_name='aya-expanse:32b', base_url=ollama_url),
                    OllamaModel(model_name='yi:34b-chat', base_url=ollama_url),
                    OllamaModel(model_name='athene-v2:72b', base_url=ollama_url),
-                   ]
+                ]
 
         bt.logging.info(f"Models loaded{models}")
 
