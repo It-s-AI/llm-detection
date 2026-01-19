@@ -10,7 +10,7 @@ Requests==2.31.0
 rich==13.7.1
 scikit_learn==1.5.2
 setuptools==70.0.0
-torch==2.8.0
+torch==2.4.1
 tqdm==4.66.2
 transformers==4.36.0
 nltk==3.8.1
