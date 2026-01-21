@@ -9,6 +9,7 @@ import nltk
 import torch
 import transformers
 from sklearn.metrics.pairwise import cosine_similarity
+import torch, sys
 
 
 class SynonymAttack:
@@ -106,6 +107,12 @@ class SynonymAttack:
         return max(candidates, key=lambda x: x["score"], default=None)
 
     def attack(self, text, labels):
+        print("torch.__version__:", torch.__version__)
+        print("torch.version.cuda:", torch.version.cuda)
+        print("torch.__file__:", torch.__file__)
+        if torch.cuda.is_available():
+            print("gpu:", torch.cuda.get_device_name(0))
+            print("capability:", torch.cuda.get_device_capability(0))
         cnt_human_chars = sum([len(word) + 1 for i, word in enumerate(text.split()) if not labels[i]])
         # Get spans for the words in the text from NLTK
         # e.g. "Hi my name is" -> [(0, 2), (3, 5), (6, 10), (11, 13)]
