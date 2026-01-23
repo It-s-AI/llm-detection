@@ -10,6 +10,8 @@ import torch
 import transformers
 from sklearn.metrics.pairwise import cosine_similarity
 import torch, sys
+import pydantic
+import pydantic_core
 
 
 class SynonymAttack:
@@ -113,6 +115,8 @@ class SynonymAttack:
         if torch.cuda.is_available():
             print("gpu:", torch.cuda.get_device_name(0))
             print("capability:", torch.cuda.get_device_capability(0))
+        print(f"Pydantic version: {pydantic.__version__}")
+        print(f"Pydantic Core version: {pydantic_core.__version__}")
         cnt_human_chars = sum([len(word) + 1 for i, word in enumerate(text.split()) if not labels[i]])
         # Get spans for the words in the text from NLTK
         # e.g. "Hi my name is" -> [(0, 2), (3, 5), (6, 10), (11, 13)]
