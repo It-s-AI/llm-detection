@@ -8,6 +8,7 @@ args=()
 version_location="./detection/__init__.py"
 version="__version__"
 delay=0 # Default delay value in hours
+interpreter="python3" # Default interpreter
 
 old_args=$@
 
@@ -164,6 +165,10 @@ while [[ $# -gt 0 ]]; do
           delay=$(($2 * 3600))
           shift 2
           ;;
+        --interpreter) # Handle interpreter argument
+          interpreter="$2"
+          shift 2
+          ;;
         *)
           # Add '=' sign between flag and value
           args+=("'$arg'")
@@ -220,7 +225,7 @@ echo "module.exports = {
   apps : [{
     name   : '$proc_name',
     script : '$script',
-    interpreter: 'python3',
+    interpreter: '$interpreter',
     min_uptime: '5m',
     max_restarts: '5',
     args: [$joined_args]
