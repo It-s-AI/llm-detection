@@ -186,7 +186,7 @@ def add_args(cls, parser):
             "--neuron.min_alpha_amount",
             type=int,
             help="Minimum amount of alphas that miner needs to participate in mining",
-            default=500,
+            default=0,
         )
 
     else:
@@ -194,7 +194,7 @@ def add_args(cls, parser):
             "--blacklist.minimum_stake_requirement",
             type=int,
             help="Minimum amount of stake needed to send request to miners.",
-            default=1_000,
+            default=30_000,
         )
 
         parser.add_argument(
