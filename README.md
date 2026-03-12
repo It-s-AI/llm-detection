@@ -31,7 +31,7 @@ While ChatGpt alone has more than 1.8 billion monthly visits, we believe that th
 ## Key Highlights (TL;DR)
 Here is a key highlights of It's AI, which will be fully covered further:
 1) Most accurate ai-detector in the world according to MGTD benchmark (ICAIE, 2025)
-2) More than just a subnet. We've have a fully operating ITSAI TECHNOLOGIES - FZCO, which is helping us to growth real-world adoption.
+2) More than just a subnet. We've have a fully operating ITSAI TECHNOLOGIES - FZCO and already generating revenue. More than 22k webiste visits in February.
 3) Constantly improving. We've already developed website, web app, chrome extension, API, X bot and many more (find full description below). Try It's AI by yourself at https://its-ai.org.
 4) High market potential. More than 3 billion dollars in market size in just English-speaking countries and we're going right for it. The real-world demand is evident, as demonstrated by our competitors: GptZero (50m$ valuation), CopyLeaks (4m$ last year revenue), ZeroGpt (10m monthly visits) and others.
 5) Incentive mechanism. Time and benchmarks proven validation process that makes miners work in the right direction. Thanks to it we've become a new state-of-the-art solution on all three considered academia-known benchmarks.
@@ -64,21 +64,18 @@ Don't judge us by what we say, judge us by what we've done. Here is the list of 
 * Python SDK. Access It's AI detector right from the Python code
 * Twitter bot - https://x.com/itsaibot. Verify content that you read instantly on X.
 
-### Business part and market potential
-With dTao it will become much more important to not just build cool stuff, but be able to get real revenue outside of bittensor and It's AI certainly has great potential in it. Below you can find info about our business part and how we're already generating revenue outside of bittensor.
-
-#### Market size: TAM, SAM, SOM (US education segment only)
+### Market size: TAM, SAM, SOM (US education segment only)
 While there're several segment audience for AI detection, the biggest one of them is Education and below you can find our market analysis for US educational segment alone, where AI/plagiarism tools are already widely adopted. 
 
 **TAM** (Total Addressable Market): ~4K universities, ~130K K–12 schools, ~20M higher-ed students; at ~$8–12/student/year for integrity tools that’s **$250–300M** (higher-ed + K–12 + adjacent). 
 
-**SAM** (Serviceable Available Market): assuming ~50% of universities and ~10% of schools actively adopt such tools in 2025, we get **~$120–150M**. 
+**SAM** (Serviceable Available Market): assuming ~50% of universities and ~10% of schools actively adopt such tools in 2025, we get **$120–150M**. 
 
 **SOM** (Serviceable Obtainable Market): for a high-precision player like It’s AI, capturing 2–3% of SAM in 12–24 months implies **$3–5M ARR** potential in US education alone—before corporate or content-verification use cases. 
 
 Globally, the AI-detector market is projected at **~$580M in 2025 → $2B+ by 2030**, so the same share yields a much larger opportunity over time. Full breakdown: [TAM, SAM, SOM explained (X)](https://x.com/ai_detection/status/1982089789361868906).
 
-#### Real world adoption
+### Real world adoption
 It's AI is already not just a technology - it's a market-ready product, which we're monetsing. In Feb 2026 we hit 1000+ organic daily visits on its-ai.org and 22k monthly visits - that's a 10x increase since November and we're keep growing fast.
 
 We also looking for an Enterprise adoption - already running two pilots with private schools in UAE and planning to start recieving first Enterpise money since the new academic year.
