@@ -138,7 +138,7 @@ def get_rewards(
             rewards.append(miner_reward)
             metric['penalty'] = penalty
             metric['out_of_domain_f1_score'] = out_of_domain_metric['f1_score']
-            metric['weighted_out_of_domain_f1_score'] = self.out_of_domain_f1_scores[i]
+            metric['weighted_out_of_domain_f1_score'] = self.out_of_domain_f1_scores[uid]
             metric['enough_stake'] = self.has_enough_stake[uid].item()
             metrics.append(metric)
         except Exception as e:
