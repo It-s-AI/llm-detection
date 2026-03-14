@@ -53,16 +53,16 @@ async def dendrite_with_retries(dendrite: bt.Dendrite, axons: list, synapse: Tex
 
         new_idx = []
         new_axons = []
-        for i, synapse in enumerate(responses):
-            if synapse.dendrite.status_code is not None and int(synapse.dendrite.status_code) == 422:
+        for i, resp in enumerate(responses):
+            if resp.dendrite.status_code is not None and int(resp.dendrite.status_code) == 422:
                 if attempt == cnt_attempts - 1:
-                    res[idx[i]] = synapse
+                    res[idx[i]] = resp
                     bt.logging.info("Wasn't able to get answers from axon {} after 3 attempts".format(axons[i]))
                 else:
                     new_idx.append(idx[i])
                     new_axons.append(axons[i])
             else:
-                res[idx[i]] = synapse
+                res[idx[i]] = resp
 
         if len(new_idx):
             bt.logging.info('Found {} synapses with broken pipe, retrying them'.format(len(new_idx)))
