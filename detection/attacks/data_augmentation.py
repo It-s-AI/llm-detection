@@ -52,9 +52,13 @@ class DataAugmentator:
                     last_zeros += 1
                 else:
                     break
-            new_first_zeros = int(n_auged * first_zeros / len(labels))
-            new_last_zeros = int(n_auged * last_zeros / len(labels))
+            new_first_zeros = round(n_auged * first_zeros / len(labels))
+            new_last_zeros = round(n_auged * last_zeros / len(labels))
+            # Clamp so the three segments always sum to exactly n_auged
             new_middle_ones = n_auged - new_first_zeros - new_last_zeros
+            if new_middle_ones < 0:
+                new_last_zeros = n_auged - new_first_zeros
+                new_middle_ones = 0
             labels_auged = [0] * new_first_zeros + [1] * new_middle_ones + [0] * new_last_zeros
 
         return text, applied_augs, labels_auged
