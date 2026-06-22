@@ -77,7 +77,7 @@ While there're several segment audience for AI detection, the biggest one of the
 Globally, the AI-detector market is projected at **~$580M in 2025 → $2B+ by 2030**, so the same share yields a much larger opportunity over time. Full breakdown: [TAM, SAM, SOM explained (X)](https://x.com/ai_detection/status/1982089789361868906).
 
 ### Real world adoption
-It's AI is already not just a technology - it's a market-ready product, which we're monetsing. In Feb 2026 we hit 1000+ organic daily visits on its-ai.org and 22k monthly visits - that's a 10x increase since November and we're keep growing fast.
+It's AI is already not just a technology - it's a market-ready product, which we're monetsing. In April 2026 we hit 1000+ organic daily visits on its-ai.org and 45k monthly visits - that's a 25%+ month to month growth since November and we're keep growing fast.
 
 We also looking for an Enterprise adoption - already running two pilots with private schools in UAE and planning to start recieving first Enterpise money since the new academic year.
 
