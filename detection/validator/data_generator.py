@@ -130,8 +130,9 @@ def regenerated_in_the_middle(model: OllamaModel, text, summary_prompt, generati
         {"role": "system", "content": generation_prompt + f" The middle should be about {middle_size} words long"},
         {"role": "user", "content": f"begin: {begin}\nend: {end}\nsummary: {summary}"}
     ])
-    labels = [0] * len(begin.split()) + [1] * len(generated_middle.strip().split()) + [0] * len(end.split())
-    return begin + generated_middle.strip() + end, labels
+    generated_middle_stripped = generated_middle.strip()
+    labels = [0] * len(begin.split()) + [1] * len(generated_middle_stripped.split()) + [0] * len(end.split())
+    return begin + ' ' + generated_middle_stripped + ' ' + end, labels
 
 
 class DataGenerator:
