@@ -71,12 +71,12 @@ class SegmentationProcesser:
         res = words[ind:ind + cnt]
         labels = labels[ind:ind + cnt]
 
-        if random.random() > 0.5 and len(res):
-            sent_ind = random.randint(0, len(res[0]) - 1)
+        if random.random() > 0.5 and len(res) and len(res[0]) > 1:
+            sent_ind = random.randint(0, len(res[0]) - 2)
             res[0] = res[0][sent_ind:]
 
-        if random.random() > 0.5:
-            sent_ind = random.randint(0, len(res[-1]) - 1)
+        if random.random() > 0.5 and len(res) and len(res[-1]) > 1:
+            sent_ind = random.randint(1, len(res[-1]) - 1)
             res[-1] = res[-1][:sent_ind]
 
         return ' '.join(res), labels
