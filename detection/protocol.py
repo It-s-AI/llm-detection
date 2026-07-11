@@ -48,6 +48,13 @@ class TextSynapse(bt.Synapse):
 
     version: str = ""
 
+    # --- End-to-end encryption of predictions (miner -> validator) ---
+    # enc_pubkey: validator's ephemeral X25519 public key (hex), set on the request.
+    # enc_predictions: miner's predictions sealed to enc_pubkey (hex ciphertext).
+    # Predictions travel encrypted so a passive reader of the wire cannot copy them.
+    enc_pubkey: str = ""
+    enc_predictions: str = ""
+
     def deserialize(self) -> float:
         """
         Deserialize output. This method retrieves the response from

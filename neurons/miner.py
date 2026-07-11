@@ -25,6 +25,7 @@ import random
 import detection
 
 from detection.utils.weight_version import is_version_in_range
+from detection.utils.encryption import encrypt_predictions
 
 # import base miner class which takes care of most of the boilerplate
 from detection.base.miner import BaseMinerNeuron
@@ -96,7 +97,10 @@ class Miner(BaseMinerNeuron):
         preds = [[pred] * len(text.split()) for pred, text in zip(preds, input_data)]
         bt.logging.info(f"Made predictions in {int(time.time() - start_time)}s")
 
-        synapse.predictions = preds
+        # Seal predictions to the validator's ephemeral key so a reader of the
+        # wire only sees ciphertext. Only the validator can decrypt.
+        synapse.enc_predictions = encrypt_predictions(preds, synapse.enc_pubkey)
+        synapse.predictions = []
         return synapse
 
 

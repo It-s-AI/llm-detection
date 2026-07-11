@@ -25,6 +25,7 @@ from detection.attacks.data_augmentation import DataAugmentator
 from detection.validator.models import ValDataRow
 from detection.validator.reward import get_rewards
 from detection.utils.uids import get_random_uids
+from detection.utils.encryption import generate_keypair, decrypt_predictions
 from detection.validator.generate_version import generate_random_version
 
 from detection import __version__
@@ -76,6 +77,23 @@ async def dendrite_with_retries(dendrite: bt.Dendrite, axons: list, synapse: Tex
     return res
 
 
+def _decrypt_responses(responses, private_key):
+    """Replace each response's encrypted predictions with the decrypted list.
+
+    Only the validator holds `private_key`, so a passive reader of the wire
+    could not have decrypted these. Responses that fail to decrypt are treated
+    as empty (scored zero downstream).
+    """
+    for r in responses:
+        if getattr(r, "enc_predictions", ""):
+            try:
+                r.predictions = decrypt_predictions(r.enc_predictions, private_key)
+            except Exception as e:
+                bt.logging.warning(f"Failed to decrypt predictions: {e}")
+                r.predictions = []
+    return responses
+
+
 async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, timeout, step=25, min_text_length=250):
     all_responses = []
     version_responses = []
@@ -83,6 +101,11 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
     final_labels = []
     augmentator = DataAugmentator(device=self.config.neuron.device)
     segmentation_processer = SegmentationProcesser()
+
+    # Ephemeral X25519 keypair for this query round. The public key is sent with
+    # every request; miners seal their predictions to it, and only we can open
+    # them with the private key held here in memory.
+    enc_private_key, enc_pubkey = generate_keypair()
 
     for i in range(0, len(axons), step):
         bt.logging.info(f"Sending challenges to the #{i} subset of miners with size {step}")
@@ -110,11 +133,13 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
             synapse=TextSynapse(
                 texts=[auged_texts[idx] for idx in check_ids],
                 predictions=[],
-                version=__version__
+                version=__version__,
+                enc_pubkey=enc_pubkey
             ),
             deserialize=True,
             timeout=timeout,
         )
+        _decrypt_responses(responses, enc_private_key)
         check_responses.extend(responses)
 
         if random.random() < 0.2:
@@ -128,11 +153,13 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
                 synapse=TextSynapse(
                     texts=auged_texts,
                     predictions=[],
-                    version=random_version
+                    version=random_version,
+                    enc_pubkey=enc_pubkey
                 ),
                 deserialize=True,
                 timeout=timeout,
             )
+            _decrypt_responses(responses, enc_private_key)
             version_responses.extend(responses)
         else:
             version_responses.extend([TextSynapse(predictions=[], texts=[]) for _ in range(len(subset_axons))])
@@ -144,11 +171,13 @@ async def get_all_responses(self, axons, queries: List[ValDataRow], check_ids, t
             synapse=TextSynapse(
                 texts=auged_texts,
                 predictions=[],
-                version=__version__
+                version=__version__,
+                enc_pubkey=enc_pubkey
             ),
             deserialize=True,
             timeout=timeout,
         )
+        _decrypt_responses(responses, enc_private_key)
         all_responses.extend(responses)
 
         # Log the results for monitoring purposes.

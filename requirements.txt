@@ -33,3 +33,4 @@ sentencepiece
 tenacity
 wikipedia
 wikipedia_sections
+pynacl

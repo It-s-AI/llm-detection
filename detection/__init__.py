@@ -16,8 +16,11 @@
 # DEALINGS IN THE SOFTWARE.
 
 # Define the version of the template module.
-__version__ = "3.14.0"
-__least_acceptable_version__ = "3.8.0"
+# 3.15.0 introduces end-to-end encryption of miner -> validator predictions.
+# least_acceptable_version is raised to 3.15.0 so updated miners ignore any
+# validator running a pre-encryption version.
+__version__ = "3.15.0"
+__least_acceptable_version__ = "3.15.0"
 version_split = __version__.split(".")
 __spec_version__ = (
     (1000 * int(version_split[0]))
