@@ -127,7 +127,9 @@ def get_rewards(
             miner_reward, metric = reward(predictions_array[~mask], labels[i][~mask])
             penalty = count_penalty(predictions_array, check_predictions_array, flatten_check_ids[i], version_predictions_list[i])
 
-            if update_out_of_domain:
+            # Only average the OOD quality score over rounds the miner answered.
+            responded = len(predictions_list[i]) == len(labels[i]) and len(predictions_list[i]) > 0
+            if update_out_of_domain and responded:
                 self.out_of_domain_f1_scores[uid] = self.out_of_domain_f1_scores[uid] * (1 - self.out_of_domain_alpha) + \
                                                     out_of_domain_metric['f1_score'] * self.out_of_domain_alpha
 
