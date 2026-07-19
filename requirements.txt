@@ -7,7 +7,7 @@ pandas==2.2.3
 pydantic==2.10.3
 pydantic-core==2.27.1
 pylatexenc==2.10
-Requests==2.31.0
+Requests==2.33.0
 rich==13.7.1
 scikit_learn==1.5.2
 setuptools==70.0.0
