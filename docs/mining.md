@@ -25,8 +25,17 @@ git clone https://github.com/It-s-AI/llm-detection
 3. Install the requirements. From your virtual environment, run
 ```shell
 cd llm-detection
+rm -rf detection.egg-info                 # avoid stale build metadata
 python -m pip install -e .
 ```
+
+Confirm the correct package was installed (must be `detection`, and `bittensor`
+must be present):
+```shell
+python -c "import bittensor, detection; print('ok', bittensor.__version__)"
+```
+If you use `uv` and this fails after the wrong package built (e.g. `cc-net`
+instead of `detection`), clear the cache and reinstall: `uv cache clean && uv pip install -e . --refresh`.
 
 4. Download models for LLM classification
 ```commandline

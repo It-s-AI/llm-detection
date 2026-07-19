@@ -16,6 +16,11 @@
 # DEALINGS IN THE SOFTWARE.
 
 import os
+
+# bittensor 10.1+ skips argparse CLI parsing unless this is disabled, which
+# would drop our --netuid/--neuron.*/--blacklist.* args (config.neuron is None).
+os.environ["BT_NO_PARSE_CLI_ARGS"] = "false"
+
 import torch
 import argparse
 import bittensor as bt
