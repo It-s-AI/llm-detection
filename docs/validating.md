@@ -91,8 +91,13 @@ kenlm/sentencepiece:
 
 ```bash
 sudo apt-get install build-essential cmake libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev zlib1g-dev libbz2-dev liblzma-dev zip unzip -y
+rm -rf detection.egg-info
 pip install -e .
+python -c "import bittensor, detection; print('ok', bittensor.__version__)"
 ```
+
+The install above must build `detection` (not `cc-net`) and pull `bittensor`.
+If you use `uv` and the wrong package builds, run `uv cache clean && uv pip install -e . --refresh` before continuing.
 
 Then build and install cc_net itself. `TAR_OPTIONS=--no-same-owner` avoids a
 `tar: Cannot change ownership ... Operation not permitted` failure when running
