@@ -84,13 +84,35 @@ ollama list | tail -n +2 | awk '{print $1}' | while read -r model; do
 done
 ```
 
-Install cc_net
+Install cc_net (validator-only).
+
+First install the project and the build toolchain cc_net needs to compile
+kenlm/sentencepiece:
 
 ```bash
-sudo apt-get install build-essential libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev zip unzip -y
+sudo apt-get install build-essential cmake libboost-system-dev libboost-thread-dev libboost-program-options-dev libboost-test-dev zlib1g-dev libbz2-dev liblzma-dev zip unzip -y
 pip install -e .
-bash scripts/install_cc_net.sh
 ```
+
+Then build and install cc_net itself. `TAR_OPTIONS=--no-same-owner` avoids a
+`tar: Cannot change ownership ... Operation not permitted` failure when running
+as root in a container. Install cc_net (editable) *before* `make install` so
+that `make` skips its own internal `pip install .` step.
+
+```bash
+cd cc_net
+export TAR_OPTIONS="--no-same-owner"
+pip install -e .
+make install
+make lang=en dl_lm
+cd ..
+```
+
+Note: cc_net must be installed into the same environment your validator runs in.
+If you manage the venv with `uv`, use `uv pip install -e .` instead of
+`pip install -e .` — the plain `pip` binary does not exist inside a uv venv, so
+cc_net would silently install elsewhere (or not at all) and you'd hit
+`ModuleNotFoundError: No module named 'cc_net'` when starting the validator.
 
 ## Running the Validator
 
