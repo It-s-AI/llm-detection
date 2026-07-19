@@ -8,7 +8,7 @@ pydantic==2.10.3
 pydantic-core==2.27.1
 pylatexenc==2.10
 Requests==2.33.0
-rich==13.7.1
+rich==15.0.0
 scikit_learn==1.5.2
 setuptools==70.0.0
 torch==2.8.0
@@ -22,10 +22,9 @@ zstandard==0.22.0
 pyspellchecker==0.8.1
 symspellpy==6.7.7
 typo==0.1.7
-scalecodec
 fasttext-numpy2==0.10.4
 accelerate==1.0.1
-bittensor-cli==9.17.0
+bittensor-cli==9.23.2
 
 bs4
 pre-commit==3.3.2
