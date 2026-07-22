@@ -33,7 +33,7 @@ setup(
         "beautifulsoup4>=4.7.1",
         "pandas>=0.23.4",
         "requests>=2.22.0",
-        "fasttext>=0.9.1",
+        "fasttext-numpy2>=0.10.4",
         "sentencepiece>=0.1.82",
         "kenlm @ git+https://github.com/kpu/kenlm.git@master",
         "func_argparse>=1.1.1",

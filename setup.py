@@ -22,18 +22,6 @@ import pathlib
 from os import path
 from io import open
 from setuptools import setup, find_packages
-from pkg_resources import parse_requirements
-
-import subprocess
-
-
-def run_command(command):
-    try:
-        subprocess.run(command, check=True, shell=True)
-        print(f"Successfully executed: {command}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error executing command: {command}")
-        print(f"Error details: {e}")
 
 
 def read_requirements(path):
@@ -70,18 +58,6 @@ with codecs.open(
         r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
     )
     version_string = version_match.group(1)
-
-commands = [
-    "cd cc_net && make install",
-    "cd cc_net && make install",
-    "cd cc_net && pip uninstall cc_net",
-    "cd cc_net && pip install -e .",
-    "cd cc_net && make lang=en dl_lm",
-]
-
-print('Setting up cc_net')
-for cmd in commands:
-    run_command(cmd)
 
 setup(
     name="detection",
