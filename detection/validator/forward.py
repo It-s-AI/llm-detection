@@ -78,19 +78,34 @@ async def dendrite_with_retries(dendrite: bt.Dendrite, axons: list, synapse: Tex
 
 
 def _decrypt_responses(responses, private_key):
-    """Replace each response's encrypted predictions with the decrypted list.
+    """STEP 1 (transition): accept BOTH encrypted and plaintext responses.
 
-    Only the validator holds `private_key`, so a passive reader of the wire
-    could not have decrypted these. Responses that fail to decrypt are treated
-    as empty (scored zero downstream).
+    - Encrypted miner: returns `enc_predictions` sealed to our ephemeral key ->
+      decrypt into `predictions`. Only the validator holds `private_key`, so a
+      passive reader of the wire could not have read these.
+    - Legacy/plaintext miner (not yet upgraded): returns `predictions` directly
+      with no `enc_predictions` -> accepted as-is.
+
+    Both paths are scored normally. The per-round counts below let us see when
+    every miner has migrated to encryption, at which point step 2 can drop the
+    plaintext path and require encryption. A response carrying `enc_predictions`
+    that fails to decrypt is zeroed (scored zero downstream).
     """
+    n_enc = n_plain = n_fail = 0
     for r in responses:
         if getattr(r, "enc_predictions", ""):
             try:
                 r.predictions = decrypt_predictions(r.enc_predictions, private_key)
+                n_enc += 1
             except Exception as e:
                 bt.logging.warning(f"Failed to decrypt predictions: {e}")
                 r.predictions = []
+                n_fail += 1
+        elif r.predictions:
+            # Plaintext response from a not-yet-upgraded miner — accepted as-is.
+            n_plain += 1
+    bt.logging.info(
+        f"Responses accepted: {n_enc} encrypted, {n_plain} plaintext, {n_fail} decrypt-failed")
     return responses
 
 
