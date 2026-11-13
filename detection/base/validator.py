@@ -246,6 +246,10 @@ class BaseValidatorNeuron(BaseNeuron):
         """
         Sets the validator weights to the metagraph hotkeys based on the scores it has received from the miners. The weights determine the trust and incentive level the validator assigns to miner nodes on the network.
         """
+        # Mechanism 1 first: bittensor's set_weights skips sending when the blocks since mechanism 0's
+        # last update are within the rate limit, whatever the mechid; the chain itself rate-limits each
+        # mechanism separately. Right after a mechanism-0 update, mechanism 1 would never be sent.
+        self.set_humanizer_weights()
 
         # Check if self.scores contains any NaN values and log a warning if it does.
         if torch.isnan(self.scores).any():
@@ -300,8 +304,6 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.info("set_weights on chain successfully!")
         else:
             bt.logging.error(f"set_weights failed {msg}")
-
-        self.set_humanizer_weights()
 
     def set_humanizer_weights(self):
         """Mechanism 1 (humanizer competition): weights from the owner's signed leaderboard.

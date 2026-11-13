@@ -186,11 +186,17 @@ def set_mechanism_weights(
     version_key: int,
     *,
     mechid: int = MECHID,
+    block_time: float = 12.0,
     info: Callable[[str], None] = print,
     error: Callable[[str], None] = print,
 ) -> bool:
     """Set mechanism-1 weights from the leaderboard; False (and nothing sent) when the subnet has no
-    such mechanism yet or anything fails. Mechanism 0 is never touched here."""
+    such mechanism yet or anything fails. Mechanism 0 is never touched here.
+
+    Call it BEFORE setting mechanism-0 weights in the same cycle: bittensor's ``set_weights`` checks the
+    rate limit against mechanism 0's last update (whatever the mechid) and silently sends nothing if it
+    was just updated, while the chain limits each mechanism on its own (localnet, report 11).
+    ``block_time`` only matters with commit-reveal (12 s on finney, 0.25 s on a fast-block localnet)."""
     try:
         if subtensor.get_mechanism_count(netuid) <= mechid:
             return False
@@ -209,6 +215,7 @@ def set_mechanism_weights(
             uids=uint_uids,
             weights=uint_weights,
             mechid=mechid,
+            block_time=block_time,
             wait_for_finalization=False,
             wait_for_inclusion=False,
             version_key=version_key,
