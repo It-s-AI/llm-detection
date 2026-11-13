@@ -27,6 +27,9 @@ from typing import List
 from traceback import print_exception
 
 from detection.base.neuron import BaseNeuron
+from detection.validator.humanizer_mechanism import (
+    DEFAULT_PUBLIC_KEY, DEFAULT_URLS, HumanizerLeaderboard, set_mechanism_weights
+)
 from detection import (
     __version__, WANDB_PROJECT,
     WANDB_ENTITY, MAX_RUN_STEPS_PER_WANDB_RUN
@@ -297,6 +300,29 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.info("set_weights on chain successfully!")
         else:
             bt.logging.error(f"set_weights failed {msg}")
+
+        self.set_humanizer_weights()
+
+    def set_humanizer_weights(self):
+        """Mechanism 1 (humanizer competition): weights from the owner's signed leaderboard.
+
+        Does nothing until the subnet has a second mechanism; any failure leaves mechanism 0 untouched.
+        """
+        if self.config.humanizer.disable:
+            return
+        if getattr(self, "humanizer", None) is None:
+            urls = [u.strip() for u in (self.config.humanizer.urls or "").split(",") if u.strip()]
+            self.humanizer = HumanizerLeaderboard(
+                urls or list(DEFAULT_URLS),
+                self.config.humanizer.public_key or DEFAULT_PUBLIC_KEY,
+                self.config.netuid,
+                state_path=os.path.join(self.config.neuron.full_path, "humanizer_leaderboard.json"),
+                log=bt.logging.warning,
+            )
+        set_mechanism_weights(
+            self.humanizer, self.subtensor, self.wallet, self.metagraph, self.config.netuid,
+            self.spec_version, info=bt.logging.info, error=bt.logging.error,
+        )
 
     def update_has_enough_stake(self):
         self.has_enough_stake = torch.zeros(len(self.hotkeys), dtype=torch.float32)
