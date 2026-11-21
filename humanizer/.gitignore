@@ -1,0 +1,30 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.swp
+*.swo
+*.pem
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.uv-cache/
+
+# local runtime state (ledgers, caches, datasets, recordings with live data)
+/var/
+/data/
+
+# agent worktrees / local tooling
+.claude/

@@ -1,0 +1,47 @@
+{
+  "version": "2026-11-09",
+  "currency": "usd",
+  "comment": "Public price card (D-80). Miners pay quantity x rate per line item. Detector prices are the vendors' list prices; judge prices are OpenRouter list prices at card time; Lium is the hourly price of an H100 CVM pod incl. setup. Changing any rate means a new version (its sha256 is pinned in every quote and statement).",
+  "detectors": {
+    "pangram": {
+      "rate_usd": 0.05,
+      "per_words": 100,
+      "rounding": "ceil_per_text"
+    },
+    "gptzero": {
+      "rate_usd": 0.15,
+      "per_words": 1000,
+      "rounding": "exact"
+    },
+    "zerogpt": {
+      "rate_usd": 0.069,
+      "per_words": 1000,
+      "rounding": "exact"
+    }
+  },
+  "judges": {
+    "openai/gpt-6-luna": {
+      "in_per_mtok": 0.1,
+      "out_per_mtok": 0.5
+    },
+    "google/gemini-3.8-flash": {
+      "in_per_mtok": 0.825,
+      "out_per_mtok": 4.125
+    },
+    "anthropic/claude-sonnet-5.5": {
+      "in_per_mtok": 2.0,
+      "out_per_mtok": 10.0
+    }
+  },
+  "judge_quote_per_output_usd": 0.04,
+  "lium": {
+    "rate_per_hour_usd": 2.5,
+    "quote_hours": 1.5
+  },
+  "payment_fee_estimate": {
+    "pct": 0.06,
+    "fixed_usd": 0.35,
+    "note": "Stripe account settles in AED: card processing 3.9% + AED 1, currency conversion 1%, VAT 5% on fees (test payment 2026-11-09: $0.64 on $6.83); estimate with margin"
+  },
+  "quote_ttl_seconds": 3600
+}

@@ -1,0 +1,15 @@
+{
+ "n_eval": 78,
+ "n_prod": 40,
+ "eval_maxsim_mean": 0.14421017083505275,
+ "eval_maxsim_median": 0.13480048254750415,
+ "prod_maxsim_mean": 0.12474543714034399,
+ "prod_maxsim_median": 0.11611624677561501,
+ "auroc_eval_closer_than_prod": 0.6009615384615384,
+ "verdict": "no evidence of leak",
+ "openrouter": {
+  "cap": 25.0,
+  "spent": 1.2162691299999986,
+  "reserved": 0.01576948
+ }
+}

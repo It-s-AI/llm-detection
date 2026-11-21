@@ -1,0 +1,10 @@
+[Unit]
+Description=Period rotation every 15 minutes (prod only: building a period costs money)
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

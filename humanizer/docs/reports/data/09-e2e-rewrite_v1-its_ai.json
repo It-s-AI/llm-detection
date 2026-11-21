@@ -1,0 +1,126 @@
+{
+ "public": {
+  "submission_id": "p1-rewrite-itsai",
+  "hotkey": "5Fp1-rewrite-test",
+  "stage": "done",
+  "updated_at": 1794929061.0710542,
+  "period_id": "p1",
+  "S": 0.0442,
+  "crowned": true,
+  "bundle_ran": true,
+  "levels": {
+   "1": 457,
+   "0.5": 25,
+   "0": 2
+  },
+  "gates": {
+   "G1": {
+    "1": 477,
+    "0.5": 6,
+    "0": 1
+   },
+   "G2": {
+    "1": 477,
+    "0.5": 6,
+    "0": 1
+   },
+   "G3": {
+    "1": 469,
+    "0.5": 14,
+    "0": 1
+   }
+  },
+  "judge_errors": 0,
+  "detectors": {
+   "its_ai": {
+    "E": 0.0442,
+    "auroc": 1.0,
+    "p_human": 0.0884
+   }
+  },
+  "S_king": 0.0109,
+  "delta": 0.0334,
+  "lower_bound": 0.0296,
+  "alpha": 0.05,
+  "charged_cents": 666
+ },
+ "statement": {
+  "judge:anthropic/claude-sonnet-5.5": [
+   445031,
+   101
+  ],
+  "judge:google/gemini-3.8-flash": [
+   3588034,
+   508
+  ],
+  "judge:openai/gpt-6-luna": [
+   3250641,
+   57
+  ],
+  "lium:h100": [
+   0.0,
+   0
+  ]
+ },
+ "settlement": {
+  "submission_id": "p1-rewrite-itsai",
+  "hold_cents": 2311,
+  "charged_cents": 666,
+  "returned_cents": 1645,
+  "statement_total_cents": 666
+ },
+ "levels": {
+  "1.0": 457,
+  "0.5": 25,
+  "0.0": 2
+ },
+ "score": {
+  "S": 0.04422203936638275,
+  "auroc": {
+   "its_ai": 0.9999780200457185
+  },
+  "p_human": {
+   "its_ai": 0.0884001188242024
+  },
+  "evasion": {
+   "its_ai": 0.04422203936638275
+  },
+  "severe_rate": 0.004132231404958678,
+  "minor_rate": 0.05165289256198347,
+  "excluded_strata": []
+ },
+ "crown": {
+  "crown": true,
+  "delta": 0.03335683747127542,
+  "lower": 0.029586339394737638,
+  "se": 0.0022968709216074777,
+  "s_king": 0.010865201895107323,
+  "s_challenger": 0.04422203936638275
+ },
+ "run": {
+  "status": "ok",
+  "reason": "",
+  "pod_seconds": 0.0,
+  "cost_usd": null
+ },
+ "judge_tokens": {
+  "google/gemini-3.8-flash": [
+   2946656,
+   641378
+  ],
+  "openai/gpt-6-luna": [
+   2651508,
+   599133
+  ],
+  "anthropic/claude-sonnet-5.5": [
+   431169,
+   13862
+  ]
+ },
+ "seconds": 2686.4,
+ "n_human": 484,
+ "missing_human": 0,
+ "owner_spent": {
+  "openrouter": 6.222
+ }
+}

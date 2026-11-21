@@ -1,0 +1,138 @@
+{
+ "n": 78,
+ "n_human": 78,
+ "rewriter": "openai/gpt-5.4-mini",
+ "rewrite_cost": 0.14198175,
+ "subs": {
+  "king_identity": {
+   "gate_pass_rate": 0.5769230769230769,
+   "gate_status_counts": {
+    "pass": 45,
+    "fail": 33,
+    "error": 0
+   },
+   "gate_cost": 0.2955,
+   "mean_scores": {
+    "gptzero": 1.0,
+    "zerogpt": 0.6389102564102566,
+    "its_ai": 0.9828370088369173
+   },
+   "words_mean": 259.9102564102564
+  },
+  "challenger_rewrite": {
+   "gate_pass_rate": 0.38461538461538464,
+   "gate_status_counts": {
+    "pass": 30,
+    "fail": 48,
+    "error": 0
+   },
+   "gate_cost": 0.3047,
+   "mean_scores": {
+    "gptzero": 1.0,
+    "zerogpt": 0.5453289473684211,
+    "its_ai": 0.9683913641911536
+   },
+   "words_mean": 273.12820512820514
+  }
+ },
+ "crown": {
+  "king_identity": {
+   "S": 2.6405702402481546e-16,
+   "E_d": {
+    "gptzero": 2.220446049250313e-16,
+    "zerogpt": 0.05598290598290623
+   },
+   "auroc": {
+    "gptzero": 0.9999999999999999,
+    "zerogpt": 0.9720085470085469
+   },
+   "gate_pass_rate": 0.5769230769230769
+  },
+  "challenger_rewrite": {
+   "S": 2.6405702402481546e-16,
+   "E_d": {
+    "gptzero": 2.220446049250313e-16,
+    "zerogpt": 0.06495726495726495
+   },
+   "auroc": {
+    "gptzero": 0.9999999999999999,
+    "zerogpt": 0.9675213675213675
+   },
+   "gate_pass_rate": 0.38461538461538464
+  },
+  "crown": {
+   "decision": false,
+   "delta": 0.0,
+   "lower": 0.0,
+   "se": 3.968664367759922e-18,
+   "reasons": [
+    "FAIL: q_0.05(dS*) = +0.0000 <= delta_min = +0.0000 (dS = +0.0000, se = 0.0000, B = 2000)",
+    "FAIL: challenger gate pass rate 0.385 < 0.950"
+   ]
+  }
+ },
+ "proxy_its_ai": {
+  "king_identity": {
+   "S": 2.220446049250313e-16,
+   "E_d": {
+    "its_ai": 2.220446049250313e-16
+   },
+   "auroc": {
+    "its_ai": 0.9999999999999999
+   },
+   "gate_pass_rate": 0.5769230769230769
+  },
+  "challenger_rewrite": {
+   "S": 2.220446049250313e-16,
+   "E_d": {
+    "its_ai": 2.220446049250313e-16
+   },
+   "auroc": {
+    "its_ai": 0.9999999999999999
+   },
+   "gate_pass_rate": 0.38461538461538464
+  },
+  "crown": {
+   "decision": false,
+   "delta": 0.0,
+   "lower": 0.0,
+   "se": 0.0,
+   "reasons": [
+    "FAIL: q_0.05(dS*) = +0.0000 <= delta_min = +0.0000 (dS = +0.0000, se = 0.0000, B = 2000)",
+    "FAIL: challenger gate pass rate 0.385 < 0.950"
+   ]
+  }
+ },
+ "ledger": {
+  "gptzero": {
+   "cap": 20.0,
+   "spent": 11.818349999999999,
+   "reserved": 0.0
+  },
+  "its_ai": {
+   "cap": Infinity,
+   "spent": 0.0,
+   "reserved": 0.0
+  },
+  "lium": {
+   "cap": 50.0,
+   "spent": 0.05652444229444445,
+   "reserved": 0.0
+  },
+  "openrouter": {
+   "cap": 25.0,
+   "spent": 1.66085707,
+   "reserved": 0.0
+  },
+  "pangram": {
+   "cap": 30.0,
+   "spent": 27.199999999999964,
+   "reserved": 0.0
+  },
+  "zerogpt": {
+   "cap": 10.0,
+   "spent": 5.454864000000002,
+   "reserved": 0.0
+  }
+ }
+}

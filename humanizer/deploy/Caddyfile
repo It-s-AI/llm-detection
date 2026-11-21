@@ -1,0 +1,22 @@
+# Only the API is exposed (/v1/*); the app listens on localhost. Replace SERVER_ADDRESS with either:
+#  * the server's public IP: Let's Encrypt IP certificates are short-lived (~6 days, renewed by Caddy),
+#    so the "shortlived" profile below is required; or
+#  * a host name (eval.example.org): then the tls block may go (a regular 90-day certificate).
+SERVER_ADDRESS {
+	tls {
+		issuer acme {
+			profile shortlived
+		}
+	}
+	encode gzip
+	request_body {
+		max_size 1MB
+	}
+	@api path /v1/*
+	handle @api {
+		reverse_proxy 127.0.0.1:8032
+	}
+	handle {
+		respond "not found" 404
+	}
+}

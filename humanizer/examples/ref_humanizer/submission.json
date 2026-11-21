@@ -1,0 +1,1 @@
+{"name": "ref-qwen3-4b-lora", "entrypoint": "humanize:humanize", "license": "Apache-2.0", "batch_size": 64}

@@ -1,0 +1,181 @@
+{
+ "manifest": {
+  "period_id": "pilot-1",
+  "commitment": "f193347581eb77044a8b595d3f9207a28849b41534b5e9306956715a16c5fa4c",
+  "block_hash": "9274680d3a09957069d4ec7ff3507aa2b5635566dda03c1aacad9a42c783191e",
+  "merkle_root": "15301c910aaff477f5cc243bcd2d82235fc500ace7c066e6a2c744080d494e43",
+  "n_items": 78,
+  "n_requested": 80,
+  "n_human_ref": 78,
+  "genre_counts": {
+   "academic": 7,
+   "article_blog": 12,
+   "creative": 4,
+   "email_letter": 8,
+   "essay": 23,
+   "forum_qa": 8,
+   "news": 8,
+   "review": 8
+  },
+  "generator_counts": {
+   "openai/gpt-5.4": 14,
+   "google/gemini-3.6-flash": 6,
+   "qwen/qwen3.8-27b": 7,
+   "openai/gpt-6-sol": 5,
+   "deepseek/deepseek-v4-pro": 15,
+   "qwen/qwen3.7-plus": 5,
+   "mistralai/mistral-large-4-0": 3,
+   "anthropic/claude-haiku-5.5": 6,
+   "anthropic/claude-sonnet-5.5": 2,
+   "x-ai/grok-4.7": 2,
+   "google/gemini-3.5-flash": 2,
+   "openai/gpt-5.4-mini": 11
+  },
+  "config_sha256": "f4d5324b1f313859d0e76c79f39c0338f0da23369b02125a13c79321cb0a43b4",
+  "created_at": 1794168398.525857,
+  "cost_usd": 0.4364
+ },
+ "n_ai": 78,
+ "n_human": 78,
+ "human_match": {
+  "exact": 78
+ },
+ "ai_words_mean": 259.9102564102564,
+ "human_words_mean": 240.25641025641025,
+ "detectors": {
+  "its_ai": {
+   "errors_ai": 0,
+   "errors_human": 0,
+   "auroc_raw_ai_vs_human": 1.0,
+   "auroc_stratified": 1.0,
+   "excluded_strata": [],
+   "admitted": true,
+   "per_genre_auroc": {
+    "academic": 1.0,
+    "article_blog": 1.0,
+    "creative": 1.0,
+    "email_letter": 1.0,
+    "essay": 1.0,
+    "forum_qa": 1.0,
+    "news": 1.0,
+    "review": 1.0
+   },
+   "candidate_auroc": {
+    "mean_word_prob": 1.0,
+    "fraction_words_ai": 1.0
+   },
+   "mean_ai": 0.9827,
+   "mean_human": 0.025
+  },
+  "zerogpt": {
+   "errors_ai": 0,
+   "errors_human": 1,
+   "auroc_raw_ai_vs_human": 0.965,
+   "auroc_stratified": 0.9667,
+   "excluded_strata": [],
+   "admitted": true,
+   "per_genre_auroc": {
+    "academic": 1.0,
+    "article_blog": 0.9931,
+    "creative": 0.8333,
+    "email_letter": 1.0,
+    "essay": 1.0,
+    "forum_qa": 0.8828,
+    "news": 0.9219,
+    "review": 0.9375
+   },
+   "candidate_auroc": {
+    "fake_percentage": 0.965,
+    "is_human_raw": 0.0316
+   },
+   "mean_ai": 0.6403,
+   "mean_human": 0.026
+  },
+  "gptzero": {
+   "errors_ai": 0,
+   "errors_human": 0,
+   "auroc_raw_ai_vs_human": 1.0,
+   "auroc_stratified": 1.0,
+   "excluded_strata": [],
+   "admitted": true,
+   "per_genre_auroc": {
+    "academic": 1.0,
+    "article_blog": 1.0,
+    "creative": 1.0,
+    "email_letter": 1.0,
+    "essay": 1.0,
+    "forum_qa": 1.0,
+    "news": 1.0,
+    "review": 1.0
+   },
+   "candidate_auroc": {
+    "p_ai": 1.0,
+    "p_mixed": 0.5,
+    "p_ai_plus_mixed": 1.0,
+    "completely_generated_prob": 1.0,
+    "average_generated_prob": 1.0
+   },
+   "mean_ai": 1.0,
+   "mean_human": 0.0
+  },
+  "pangram": {
+   "errors_ai": 0,
+   "errors_human": 0,
+   "auroc_raw_ai_vs_human": 1.0,
+   "auroc_stratified": 1.0,
+   "excluded_strata": [],
+   "admitted": true,
+   "per_genre_auroc": {
+    "academic": 1.0,
+    "article_blog": 1.0,
+    "creative": 1.0,
+    "email_letter": 1.0,
+    "essay": 1.0,
+    "forum_qa": 1.0,
+    "news": 1.0,
+    "review": 1.0
+   },
+   "candidate_auroc": {
+    "fraction_ai": 1.0,
+    "fraction_ai_or_assisted": 1.0,
+    "weighted_window_ai": 1.0,
+    "weighted_humanizer": 1.0,
+    "max_ai_humanizer": 1.0
+   },
+   "mean_ai": 1.0,
+   "mean_human": 0.0
+  }
+ },
+ "ledger": {
+  "gptzero": {
+   "cap": 20.0,
+   "spent": 8.361149999999997,
+   "reserved": 0.0
+  },
+  "its_ai": {
+   "cap": Infinity,
+   "spent": 0.0,
+   "reserved": 0.0
+  },
+  "lium": {
+   "cap": 50.0,
+   "spent": 0.05652444229444445,
+   "reserved": 0.0
+  },
+  "openrouter": {
+   "cap": 25.0,
+   "spent": 0.8285748000000001,
+   "reserved": 0.0
+  },
+  "pangram": {
+   "cap": 30.0,
+   "spent": 27.199999999999964,
+   "reserved": 0.0
+  },
+  "zerogpt": {
+   "cap": 10.0,
+   "spent": 3.846129000000001,
+   "reserved": 0.0
+  }
+ }
+}

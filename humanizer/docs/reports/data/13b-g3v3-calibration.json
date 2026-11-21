@@ -1,0 +1,213 @@
+{
+ "table": {
+  "light_edit": {
+   "expected": [
+    1.0
+   ],
+   "n": 24,
+   "ok": 0.75,
+   "too_strict": 0.25,
+   "too_lenient": 0.0,
+   "judges_agree": 0.4166666666666667,
+   "dist": {
+    "1.0": 18,
+    "0.75": 6
+   }
+  },
+  "paraphrase": {
+   "expected": [
+    1.0
+   ],
+   "n": 24,
+   "ok": 1.0,
+   "too_strict": 0.0,
+   "too_lenient": 0.0,
+   "judges_agree": 0.75,
+   "dist": {
+    "1.0": 24
+   }
+  },
+  "register": {
+   "expected": [
+    1.0
+   ],
+   "n": 24,
+   "ok": 0.7916666666666666,
+   "too_strict": 0.20833333333333334,
+   "too_lenient": 0.0,
+   "judges_agree": 0.4166666666666667,
+   "dist": {
+    "1.0": 19,
+    "0.75": 3,
+    "0.5": 2
+   }
+  },
+  "format": {
+   "expected": [
+    1.0
+   ],
+   "n": 24,
+   "ok": 0.75,
+   "too_strict": 0.25,
+   "too_lenient": 0.0,
+   "judges_agree": 0.625,
+   "dist": {
+    "1.0": 18,
+    "0.75": 6
+   }
+  },
+  "person_tense": {
+   "expected": [
+    1.0
+   ],
+   "n": 24,
+   "ok": 0.625,
+   "too_strict": 0.375,
+   "too_lenient": 0.0,
+   "judges_agree": 0.625,
+   "dist": {
+    "1.0": 15,
+    "0.75": 8,
+    "0.5": 1
+   }
+  },
+  "contradict": {
+   "expected": [
+    1.0
+   ],
+   "n": 24,
+   "ok": 0.7083333333333334,
+   "too_strict": 0.2916666666666667,
+   "too_lenient": 0.0,
+   "judges_agree": 0.6666666666666666,
+   "dist": {
+    "1.0": 17,
+    "0.75": 1,
+    "0.0": 6
+   }
+  },
+  "insert": {
+   "expected": [
+    1.0
+   ],
+   "n": 24,
+   "ok": 1.0,
+   "too_strict": 0.0,
+   "too_lenient": 0.0,
+   "judges_agree": 1.0,
+   "dist": {
+    "1.0": 24
+   }
+  },
+  "typos_few": {
+   "expected": [
+    0.75
+   ],
+   "n": 24,
+   "ok": 1.0,
+   "too_strict": 0.0,
+   "too_lenient": 0.0,
+   "judges_agree": 1.0,
+   "dist": {
+    "0.75": 24
+   }
+  },
+  "splice_one": {
+   "expected": [
+    0.75
+   ],
+   "n": 24,
+   "ok": 0.7916666666666666,
+   "too_strict": 0.0,
+   "too_lenient": 0.20833333333333334,
+   "judges_agree": 0.625,
+   "dist": {
+    "1.0": 5,
+    "0.75": 19
+   }
+  },
+  "typos": {
+   "expected": [
+    0.5
+   ],
+   "n": 24,
+   "ok": 1.0,
+   "too_strict": 0.0,
+   "too_lenient": 0.0,
+   "judges_agree": 1.0,
+   "dist": {
+    "0.5": 24
+   }
+  },
+  "odd_words": {
+   "expected": [
+    0.5
+   ],
+   "n": 24,
+   "ok": 0.9583333333333334,
+   "too_strict": 0.041666666666666664,
+   "too_lenient": 0.0,
+   "judges_agree": 0.9583333333333334,
+   "dist": {
+    "0.5": 23,
+    "0.0": 1
+   }
+  },
+  "splice": {
+   "expected": [
+    0.75,
+    0.5
+   ],
+   "n": 24,
+   "ok": 1.0,
+   "too_strict": 0.0,
+   "too_lenient": 0.0,
+   "judges_agree": 0.4583333333333333,
+   "dist": {
+    "0.75": 18,
+    "0.5": 6
+   }
+  },
+  "broken": {
+   "expected": [
+    0.0
+   ],
+   "n": 24,
+   "ok": 1.0,
+   "too_strict": 0.0,
+   "too_lenient": 0.0,
+   "judges_agree": 1.0,
+   "dist": {
+    "0.0": 24
+   }
+  },
+  "shuffle": {
+   "expected": [
+    0.0
+   ],
+   "n": 24,
+   "ok": 1.0,
+   "too_strict": 0.0,
+   "too_lenient": 0.0,
+   "judges_agree": 0.9583333333333334,
+   "dist": {
+    "0.0": 24
+   }
+  },
+  "artifacts": {
+   "expected": [
+    0.0
+   ],
+   "n": 24,
+   "ok": 1.0,
+   "too_strict": 0.0,
+   "too_lenient": 0.0,
+   "judges_agree": 0.20833333333333334,
+   "dist": {
+    "0.0": 24
+   }
+  }
+ },
+ "errors": 0,
+ "spent": 1.6136809999999997
+}

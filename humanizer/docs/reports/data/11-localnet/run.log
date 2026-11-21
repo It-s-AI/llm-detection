@@ -1,0 +1,56 @@
++ cd /work
++ docker info
++ docker pull ghcr.io/opentensor/subtensor-localnet:devnet-ready
++ docker run -d --name localnet -p 9944:9944 -p 9945:9945 ghcr.io/opentensor/subtensor-localnet:devnet-ready
+9238e0f8226e4f233f08a4cf3944937d54742733930756d997bf9a01a4654469
++ /work/venv/bin/pip install -q bittensor==10.5.0 pynacl
++ python3 --version
+Python 3.12.3
+++ seq 1 180
++ for i in $(seq 1 180)
++ curl -s -m 3 -H 'Content-Type: application/json' -d '{"id":1,"jsonrpc":"2.0","method":"system_health"}' http://127.0.0.1:9944
++ grep -q peers
++ break
++ docker logs localnet
++ tail -5
+2026-11-13 11:59:17 🎁 Prepared block for proposing at 202 (2 ms) hash: 0xbf57451abd3654c4fe71b470ed5712682f82073450c4074e6dd995e28294395f; parent_hash: 0x7ef9…85cb; end: NoMoreTransactions; extrinsics_count: 2    
+2026-11-13 11:59:17 🔖 Pre-sealed block for proposal at 202. Hash now 0x11aa4e7c90b7e50902ae28a0c6c89db8bee100fcf7cb09fcb3a42d5c93a71771, previously 0xbf57451abd3654c4fe71b470ed5712682f82073450c4074e6dd995e28294395f.    
+2026-11-13 11:59:17 🏆 Imported #202 (0x7ef9…85cb → 0x11aa…1771)    
+2026-11-13 11:59:17 🏆 Imported #202 (0x7ef9…85cb → 0x11aa…1771)    
+2026-11-13 11:59:17 🏆 Imported #202 (0x7ef9…85cb → 0x11aa…1771)    
++ timeout 3000 /work/venv/bin/python /work/mech1_test.py
+{"step": "freeze_window_0", "ok": true, "msg": "Success", "t": 3.5, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "network_rate_limit_0", "ok": true, "msg": "Success", "t": 4.8, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "register_subnet", "ok": true, "msg": "Success", "t": 7.5}
+{"step": "start_call", "ok": true, "msg": "Success", "t": 7.8}
+{"step": "tempo_20", "ok": true, "msg": "Success", "t": 10.2, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "cr_off", "ok": true, "msg": "Success", "t": 11.5, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "rate_limit_100", "ok": true, "msg": "Success", "t": 14.2, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "mech_count_2_at_default_uids", "ok": false, "msg": "Success", "t": 15.5, "sudo_result": "{'sudo_result': {'Err': {'Module': {'index': 7, 'error': '0x7d000000'}}}}"}
+{"step": "max_uids_128", "ok": true, "msg": "Success", "t": 18.2, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "mech_count_2_at_128_uids", "ok": true, "msg": "Success", "t": 19.5, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "mech_split_90_10", "ok": true, "msg": "Success", "t": 22.2, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "register_val", "ok": true, "msg": "Success", "t": 23.5}
+{"step": "register_m1", "ok": true, "msg": "Success", "t": 26.2}
+{"step": "register_m2", "ok": true, "msg": "Success", "t": 27.5}
+{"step": "stake_val", "ok": true, "msg": "Success", "t": 30.2}
+{"step": "validator_permit", "ok": null, "msg": null, "t": 33.3, "permit": true}
+{"step": "A_info", "ok": null, "msg": null, "t": 64.5, "info": "humanizer weights (mechanism 1): {0: 11565, 3: 65535}"}
+{"step": "A_info", "ok": null, "msg": null, "t": 64.5, "info": "humanizer set_weights on chain successfully!"}
+{"step": "A_mech1_via_validator_code", "ok": true, "msg": "", "t": 64.5}
+{"step": "A_mech0_right_after", "ok": true, "msg": "Success", "t": 64.5}
+{"step": "C_mech0_first", "ok": true, "msg": "Success", "t": 110.5}
+{"step": "C_mech1_right_after_mech0", "ok": false, "msg": "None", "t": 110.5, "sudo_result": "n/a (AttributeError)"}
+{"step": "cr_on", "ok": true, "msg": "Success", "t": 113.0, "sudo_result": "{'sudo_result': {'Ok': ()}}"}
+{"step": "B_info", "ok": null, "msg": null, "t": 143.9, "info": "humanizer weights (mechanism 1): {2: 65535, 3: 43690}"}
+{"step": "B_info", "ok": null, "msg": null, "t": 143.9, "info": "humanizer set_weights on chain successfully!"}
+{"step": "B_mech1_via_validator_code", "ok": true, "msg": "", "t": 143.9}
+{"step": "B_mech0_right_after", "ok": true, "msg": "Success", "t": 144.0}
+{"step": "D_info", "ok": null, "msg": null, "t": 194.8, "info": "humanizer weights (mechanism 1): {0: 11565, 3: 65535}"}
+{"step": "D_info", "ok": null, "msg": null, "t": 194.8, "info": "humanizer set_weights on chain successfully!"}
+{"step": "D_mech1_via_validator_code", "ok": true, "msg": "", "t": 194.8}
+{"step": "D_mech0_right_after", "ok": true, "msg": "Success", "t": 195.0}
+{"step": "done", "ok": null, "msg": null, "t": 245.0}
++ echo exit=0
+exit=0
++ docker logs localnet

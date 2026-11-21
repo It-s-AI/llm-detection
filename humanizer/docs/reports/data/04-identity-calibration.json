@@ -1,0 +1,12 @@
+{
+  "what": "Gate pass rate when the output is IDENTICAL to the input (must be ~100%). Pilot period inputs.",
+  "runs": [
+    {"judges": "claude-haiku-5.5 + gpt-6-luna", "quote_matching": "strict", "items": "0-19", "pass": 14, "n": 20},
+    {"judges": "claude-haiku-5.5 + gpt-6-luna", "quote_matching": "typography-tolerant", "items": "0-19", "pass": 17, "n": 20},
+    {"judges": "claude-haiku-5.5 + gpt-6-luna", "quote_matching": "tolerant + sentence context", "items": "0-39", "pass": 26, "n": 40},
+    {"judges": "claude-sonnet-5.5 + gpt-6-sol", "quote_matching": "tolerant + sentence context", "items": "20-39", "pass": 12, "n": 20, "cost_per_item_usd": 0.0786}
+  ],
+  "failing_gate": "G1 only (meaning); misses are almost all 'verifier said not entailed' on facts whose sentence is present verbatim",
+  "crown_demo": {"king": "identity", "challenger": "one-pass rewrite (gpt-5.4-mini)", "S_both": 0.0,
+                 "gptzero_auroc": 1.0, "zerogpt_auroc": [0.972, 0.968], "gate_pass": {"identity": 0.577, "rewrite": 0.385}}
+}
