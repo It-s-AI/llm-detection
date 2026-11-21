@@ -55,7 +55,11 @@ decisions behind them are in [`spec.md`](spec.md) (`D-xx`). How to build and sub
   order. Layout, licenses and a working example: [`examples/ref_humanizer`](../examples/ref_humanizer/README.md).
 * **One submission per registration of a hotkey.** A cancelled, expired-unpaid or failed-on-our-side
   submission does not use it. The same bundle (same sha256) from another hotkey is refused.
-* Submissions run **one at a time, in the order they were paid**.
+* **Keep your registration until you are evaluated.** Right before your evaluation runs (also when it
+  resumes after a pause) we check that your hotkey still holds the registration it submitted from. If it
+  was pruned meanwhile, the submission is dropped and nothing is charged: a crown from a lost
+  registration could not be paid anyway.
+* Submissions run **in the order they were paid**, several at once, each on its own pod.
 
 ## 4. Execution
 

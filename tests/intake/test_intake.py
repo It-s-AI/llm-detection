@@ -707,3 +707,17 @@ def test_the_king_is_rescored_from_his_saved_outputs_when_conditions_change(tmp_
     assert CountingReplay.calls == 0  # his saved outputs, no new pod
     assert KingRun.load(path, KEY).fingerprint == "fp-new"
     assert w.store_for(w.ctx.period_id).status(sid)["stage"] == "done"  # the miner's own record untouched
+
+
+def test_a_challenger_pruned_while_waiting_is_not_evaluated_or_charged(tmp_path):
+    w = World(tmp_path)
+    m = SeedSigner(b"\x07" * 32).ss58_address
+    w.pay(m)
+    sid = w.svc.submit(m, bundle_url=URL, bundle_sha256=_sha(m), bundle_bytes=10)["submission_id"]
+    before = w.billing.accounts.balance(m)
+    w.gone.add(m)  # its UID was pruned (immunity over) while the submission waited in the queue
+    CountingReplay.calls = 0
+    out = w.worker.run_once()
+    assert out == {"submission_id": sid, "state": "failed"} and CountingReplay.calls == 0  # no pod
+    assert w.billing.accounts.balance(m) == before and w.billing.accounts.hold(sid).status == "released"
+    assert "lost its registration" in w.store_for(w.ctx.period_id).status(sid)["reason"]
