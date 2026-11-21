@@ -173,4 +173,5 @@ The test launch publishes the code, the rules and the reference humanizer so tha
 **it takes no submissions.** An evaluation costs the same as in production (judges and a GPU pod) and
 would give nothing in return. The evaluator's public API is up in read-only mode (`/v1/info`,
 `/v1/leaderboard`, `/v1/results`, `/v1/kings`). Build and check your bundle locally (`miners.md`,
-section 1). Submissions open at the production launch on mainnet subnet 32.
+section 1). Submissions open on **Monday, 2026-11-23, 12:00 UTC** on mainnet subnet 32; at the same
+moment the validators on v4 start giving the competition its half of the weights.
