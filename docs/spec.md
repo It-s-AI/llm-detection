@@ -122,6 +122,13 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
   for G1; the result is the minimum across gates. `scripts/injection_check.py`: 5 kinds of attacks (a note to the reviewer,
   closing the tag, an insertion in brackets, fake JSON, hidden characters) on clean and corrupted outputs —
   the final level did not go up even once (90 out of 90).
+  **Injection screen (owner's decision 2026-11-21):** the defence above relies on the judges that the injection
+  targets, so a dedicated screen judge runs first (`configs/gates.json` `injection_screen`, Claude Sonnet 5.5 pinned
+  to one provider): it only looks for text aimed at an AI/reviewer/grader and must quote it; a quote that is in the
+  output and not in the input makes the output level 0 before G1-G3, which never see it. Live calibration
+  (`scripts/injection_screen_check.py`): 0 of 276 clean rewrites flagged (LLM rewrites, Phrasly, the reference
+  humanizer), 150 of 150 injected outputs caught (15 attack forms, including one telling the screen to answer no);
+  ~$0.004 per output.
 - **D-44 ✅** Judges for G1–G3: GPT-6 Luna + Gemini 3.8 Flash, arbiter — Claude Sonnet 5.5 (`configs/gates.json`).
   Calibrations 2026-11-09: G1 (report 04b) — 0 false rejections out of 72 correct edits, distortions and insertions 24/24;
   G2/G3 by level (report 04c) — gross violations 24/24, minor ones 92–100%, natural paraphrase: G2 24/24 clean,
@@ -273,6 +280,7 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
 | 2026-11-13 | D-14, D-92 | Localnet: two mechanisms can be enabled only when `max_allowed_uids × 2 ≤ 256` (SN32 currently has 256 UIDs); the validator sets mechanism 1 before mechanism 0 (the SDK checks the rate limit against mechanism 0); the 90/10 split and burn via the owner's UID confirmed with money | report 11 |
 | 2026-11-13 | D-14, D-58, D-66, Q-13 | Owner's decisions: 128 UIDs × 2 mechanisms; one submission per hotkey registration, rollback when a king is deregistered; before the reveal the miner sees the level distribution (overall and per gate) and each detector's contribution (E, AUROC, P_human), but not the texts of the judges' reasons | owner's decisions 2026-11-13 |
 | 2026-11-20 | D-43 | G3 calibration: severity on a single scale of impact on the reader (not tied to the defect type), only findings shared by both judges count (the milder rating), "gross" — by agreement of both or by the arbiter; no exception lists tailored to the samples | calibration 24×15, $3.7; Q-12 samples |
+| 2026-11-21 | D-45 | Injection screen before G1–G3: a dedicated judge that must quote the injected passage; level 0 and no quality judges for a flagged output; 0/276 false positives, 150/150 attacks caught | owner's requirement |
 | 2026-11-21 | D-26 | Identical conditions for king and challenger: zero tolerance for missing verdicts/scores (retries, pause), judges pinned to one provider, scoring fingerprint with king rescoring, detector-model checks (versions, canaries from H), one GPU model | owner's requirement |
 | 2026-11-21 | D-13 | Launch window: 3 days after the first miner crown the kings get 25% of the competition's share, 75% is burned; everything is burned while the baseline is king | owner's decision |
 | 2026-11-21 | D-10, D-14, D-92 | 50/50 share (detection and humanizer); when the leaderboard is unavailable, the last kings are paid rather than burn; the evaluator code is the `humanizer/` folder in It-s-AI/llm-detection, branch `v4` | owner's decisions |

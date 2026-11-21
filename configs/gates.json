@@ -11,6 +11,12 @@
     "google/gemini-3.8-flash": "google-vertex",
     "anthropic/claude-sonnet-5.5": "google-vertex"
   },
+  "injection_screen": {
+    "comment": "a dedicated judge before G1-G3 (owner's decision 2026-11-21): an output with a verified injected passage is level 0 and never reaches the quality judges",
+    "judges": [
+      "anthropic/claude-sonnet-5.5"
+    ]
+  },
   "judge_overrides": {
     "qwen/qwen3.8-flash": {
       "max_tokens": 12000
