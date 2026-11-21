@@ -228,6 +228,20 @@ class QueueWorker:
                 crowned = self._settle_crown(row, ctx, king, store)
             self._close(row, "done", note="recovered after settlement")
             return {"submission_id": row.id, "state": "done", "crowned": crowned}
+        # the hotkey must still hold the registration it submitted from: after a long queue or long pauses
+        # (up to ~26 h of backoff) a challenger past its 24 h immunity may have been pruned, and a crown
+        # would not count; nothing is run or charged then
+        reg = self.env.is_registered
+        if (
+            reg is not None
+            and not row.owner_job
+            and row.reg_block is not None
+            and not reg(row.hotkey, row.reg_block)
+        ):
+            self._give_up(
+                row, store, "the hotkey lost its registration before the evaluation; nothing was charged"
+            )
+            return {"submission_id": row.id, "state": "failed"}
         sub = Submission(row.id, row.hotkey, bundle_url=self._pod_url(row), bundle_sha256=row.bundle_sha256,
                          name=row.name or "", reg_block=row.reg_block)  # fmt: skip
         env = self.env
