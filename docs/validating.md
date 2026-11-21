@@ -150,8 +150,17 @@ If no fresh leaderboard can be had (the owner's server is down, a bad signature)
 valid leaderboard keep their share; it is kept on disk and survives restarts. Only a validator that has
 never received a valid leaderboard sends the humanizer half to the subnet owner's UID (burn).
 
-Until the release that builds in the leaderboard's public key and URL, the humanizer share is not applied
-and your weights are exactly as in v3, so v4 is safe to deploy early.
+**Start: Monday, 2026-11-23, 12:00 UTC.** Before that moment v4 sets exactly the v3 weights and does not
+even fetch the leaderboard, so you can update now; every validator on v4 switches to 50/50 at the same
+moment, by the clock, with nothing to do on your side.
+
+**Updating.** The code is the `v4` branch. `run.sh` follows the branch you are on, so switch once and the
+auto-update keeps you current:
+
+```bash
+git fetch origin && git checkout v4 && pip install -e .
+pm2 restart llm_detection_validators_autoupdate     # or however you run the validator
+```
 
 | Flag | Default | Meaning |
 |---|---|---|

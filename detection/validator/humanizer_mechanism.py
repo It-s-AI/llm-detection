@@ -18,9 +18,9 @@ a dedicated ed25519 key. A validator:
 The validator keeps the last valid envelope on disk. When no fresh one can be had (the owner's server is
 down, a bad signature), the kings of the last valid leaderboard keep their share, even past its expiry;
 only a validator that has never seen a valid leaderboard burns the share (the subnet owner's UID). The
-share is a constant of this code, so every validator running it sets the same split. Until a release
-builds in the public key (or a validator passes one), the share is not applied and the detection weights
-stay exactly as in v3.
+share is a constant of this code, so every validator running it sets the same split. Before
+``HUMANIZER_START`` (and without a public key) the share is not applied and the detection weights stay
+exactly as in v3, so validators can update early and all switch at the same moment.
 """
 
 from __future__ import annotations
@@ -37,9 +37,16 @@ BURN_KEY = "__burn__"
 MECHID = 1
 #: share of the weights that goes to the humanizer competition (D-14); the rest stays with detection
 HUMANIZER_SHARE = 0.5
-# Filled in at launch (the public key of the owner's leaderboard signing key and its URLs).
-DEFAULT_PUBLIC_KEY = ""
-DEFAULT_URLS: Tuple[str, ...] = ()
+#: the humanizer competition starts for every validator at the same moment: 2026-11-23 12:00 UTC.
+#: Before it, v4 sets exactly the v3 weights and does not even fetch the leaderboard.
+HUMANIZER_START = 1795435200
+
+
+def humanizer_started(now: Optional[float] = None) -> bool:
+    return (time.time() if now is None else now) >= HUMANIZER_START
+# the public key of the subnet owner's leaderboard signing key and where the leaderboard is served
+DEFAULT_PUBLIC_KEY = "68e3af98273b94279c06381deaaef3811723304f238478e489d7f95fc7d880cf"
+DEFAULT_URLS: Tuple[str, ...] = ("https://188.245.168.78/v1/leaderboard",)
 
 
 class LeaderboardError(ValueError):

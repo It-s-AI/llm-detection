@@ -168,3 +168,11 @@ def test_without_any_leaderboard_only_the_share_is_burned():
     det = [0.0, 1.0, 1.0, 0.0]
     out = hm.blend(det, board({}).dense(HOTKEYS, "5Fowner"))
     assert out == pytest.approx([0.5, 0.25, 0.25, 0.0])  # owner UID 0 = burn
+
+
+def test_the_humanizer_share_starts_for_everyone_at_the_same_moment():
+    assert not hm.humanizer_started(hm.HUMANIZER_START - 1)
+    assert hm.humanizer_started(hm.HUMANIZER_START)
+    import datetime as dt
+
+    assert dt.datetime.fromtimestamp(hm.HUMANIZER_START, dt.timezone.utc).isoformat() == "2026-11-23T12:00:00+00:00"

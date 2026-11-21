@@ -28,7 +28,7 @@ from traceback import print_exception
 
 from detection.base.neuron import BaseNeuron
 from detection.validator.humanizer_mechanism import (
-    DEFAULT_PUBLIC_KEY, DEFAULT_URLS, HUMANIZER_SHARE, HumanizerLeaderboard, blend
+    DEFAULT_PUBLIC_KEY, DEFAULT_URLS, HUMANIZER_SHARE, HumanizerLeaderboard, blend, humanizer_started
 )
 from detection import (
     __version__, WANDB_PROJECT,
@@ -309,8 +309,8 @@ class BaseValidatorNeuron(BaseNeuron):
         launch (no public key built in or given) and with --humanizer.disable the detection weights are
         returned unchanged. If this round's computation fails, the previous humanizer vector is reused."""
         key = self.config.humanizer.public_key or DEFAULT_PUBLIC_KEY
-        if self.config.humanizer.disable or not key:
-            return detection
+        if self.config.humanizer.disable or not key or not humanizer_started():
+            return detection  # before 2026-11-23 12:00 UTC: exactly the v3 weights
         try:
             if getattr(self, "humanizer", None) is None:
                 urls = [u.strip() for u in (self.config.humanizer.urls or "").split(",") if u.strip()]
