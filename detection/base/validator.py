@@ -303,10 +303,11 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.error(f"set_weights failed {msg}")
 
     def add_humanizer_share(self, detection: torch.FloatTensor) -> torch.FloatTensor:
-        """Both competitions in one weight vector: detection keeps ``1 - HUMANIZER_SHARE``, the humanizer
-        competition gets ``HUMANIZER_SHARE`` from the owner's signed leaderboard (its kings; burn to the
-        owner's UID when no valid leaderboard). Before the launch (no public key built in or given) and with
-        --humanizer.disable the detection weights are returned unchanged; so is any failure here."""
+        """Both competitions in one weight vector, half each: detection keeps ``1 - HUMANIZER_SHARE``, the
+        humanizer competition gets ``HUMANIZER_SHARE`` from the owner's signed leaderboard (its kings; the
+        last valid leaderboard's kings through an outage; burn only if none was ever received). Before the
+        launch (no public key built in or given) and with --humanizer.disable the detection weights are
+        returned unchanged. If this round's computation fails, the previous humanizer vector is reused."""
         key = self.config.humanizer.public_key or DEFAULT_PUBLIC_KEY
         if self.config.humanizer.disable or not key:
             return detection
@@ -320,12 +321,20 @@ class BaseValidatorNeuron(BaseNeuron):
                     state_path=os.path.join(self.config.neuron.full_path, "humanizer_leaderboard.json"),
                     log=bt.logging.warning,
                 )
-            owner = self.subtensor.get_subnet_owner_hotkey(self.config.netuid)
-            hum = self.humanizer.dense(list(self.metagraph.hotkeys), owner)
-            out = blend(detection.cpu().tolist(), hum, HUMANIZER_SHARE)
-        except Exception as e:  # never block the detection weights
-            bt.logging.error(f"humanizer share not applied: {e}")
-            return detection
+            try:
+                self._subnet_owner = self.subtensor.get_subnet_owner_hotkey(self.config.netuid)
+            except Exception as e:  # an RPC hiccup: the owner hotkey does not change
+                if getattr(self, "_subnet_owner", None) is None:
+                    raise
+                bt.logging.warning(f"subnet owner lookup failed, using the cached one: {e}")
+            self._humanizer_vector = self.humanizer.dense(list(self.metagraph.hotkeys), self._subnet_owner)
+        except Exception as e:
+            if getattr(self, "_humanizer_vector", None) is None:
+                bt.logging.error(f"humanizer share not applied: {e}")
+                return detection
+            bt.logging.error(f"humanizer share: reusing the previous vector ({e})")
+        hum = self._humanizer_vector
+        out = blend(detection.cpu().tolist(), hum, HUMANIZER_SHARE)
         bt.logging.info(
             "humanizer share",
             {uid: round(w * HUMANIZER_SHARE, 6) for uid, w in enumerate(hum) if w > 0},

@@ -2,9 +2,9 @@
 # Copyright © 2026 It's AI
 """The humanizer competition's share of the validator's weights (v4: one weight vector, no second mechanism).
 
-SN32 runs two competitions on one set of weights. Detection miners are scored by the validators as before
-and get ``1 - HUMANIZER_SHARE`` of the weights. The humanizer competition gets ``HUMANIZER_SHARE``: the
-subnet owner's evaluator runs miners' humanizers against paid AI detectors, keeps one king and publishes
+SN32 runs two competitions on one set of weights, half each. Detection miners are scored by the validators
+as before and get ``1 - HUMANIZER_SHARE`` of the weights. The humanizer competition gets ``HUMANIZER_SHARE``:
+the subnet owner's evaluator runs miners' humanizers against paid AI detectors, keeps one king and publishes
 the payouts (85/10/5 to the current king and the two previous distinct kings) as a leaderboard signed with
 a dedicated ed25519 key. A validator:
 
@@ -13,14 +13,14 @@ a dedicated ed25519 key. A validator:
    that the sequence number never goes back (a replayed older leaderboard is refused),
 3. maps hotkeys to UIDs; shares of hotkeys not registered and the "__burn__" share go to the subnet
    owner's UID (burn),
-4. with nothing valid (owner server down past the expiry, bad signature): the whole share goes to burn,
-   so nobody gains from an outage,
-5. blends: ``(1 - HUMANIZER_SHARE) * detection + HUMANIZER_SHARE * humanizer``.
+4. blends: ``(1 - HUMANIZER_SHARE) * detection + HUMANIZER_SHARE * humanizer``.
 
-The share is fixed here, not in the signed payload: even a stolen leaderboard key can move at most this
-share. The validator keeps the last valid envelope on disk, so a short outage of the owner's server
-changes nothing until that envelope expires. Until a release builds in the public key (or a validator
-passes one), the share is not applied and the detection weights stay exactly as in v3.
+The validator keeps the last valid envelope on disk. When no fresh one can be had (the owner's server is
+down, a bad signature), the kings of the last valid leaderboard keep their share, even past its expiry;
+only a validator that has never seen a valid leaderboard burns the share (the subnet owner's UID). The
+share is a constant of this code, so every validator running it sets the same split. Until a release
+builds in the public key (or a validator passes one), the share is not applied and the detection weights
+stay exactly as in v3.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ BURN_KEY = "__burn__"
 #: competition id in the signed payload ("mechid": 1 = the humanizer competition); not a chain mechanism
 MECHID = 1
 #: share of the weights that goes to the humanizer competition (D-14); the rest stays with detection
-HUMANIZER_SHARE = 0.10
+HUMANIZER_SHARE = 0.5
 # Filled in at launch (the public key of the owner's leaderboard signing key and its URLs).
 DEFAULT_PUBLIC_KEY = ""
 DEFAULT_URLS: Tuple[str, ...] = ()
@@ -54,8 +54,10 @@ def verify_envelope(
     mechid: int = MECHID,
     now: Optional[float] = None,
     min_seq: int = 0,
+    allow_expired: bool = False,
 ) -> Dict[str, Any]:
-    """The payload of a valid envelope (the same rules as humanizer_eval/publish/leaderboard.py)."""
+    """The payload of a valid envelope (the same rules as humanizer/src/humanizer_eval/publish/leaderboard.py).
+    ``allow_expired``: the last accepted envelope, kept on disk, stays usable after its expiry."""
     from nacl.exceptions import BadSignatureError
     from nacl.signing import VerifyKey
 
@@ -68,7 +70,7 @@ def verify_envelope(
         raise LeaderboardError(f"bad envelope or signature: {type(e).__name__}") from e
     if p.get("schema") != SCHEMA or p.get("netuid") != netuid or p.get("mechid") != mechid:
         raise LeaderboardError("leaderboard is for another schema, subnet or mechanism")
-    if not (p["issued_at"] - 300 <= now < p["expires_at"]):
+    if now < p["issued_at"] - 300 or (now >= p["expires_at"] and not allow_expired):
         raise LeaderboardError("leaderboard expired or not yet valid")
     if int(p["seq"]) < min_seq:
         raise LeaderboardError("leaderboard is older than one already accepted")
@@ -132,7 +134,7 @@ class HumanizerLeaderboard:
             env = st.get("envelope")
             if env is not None:
                 self.payload = verify_envelope(env, self.public_key_hex, netuid=self.netuid,
-                                               mechid=self.mechid, now=self._now())
+                                               mechid=self.mechid, now=self._now(), allow_expired=True)
                 self.envelope = env
         except (OSError, ValueError, LeaderboardError) as e:
             self._log(f"humanizer leaderboard state not used: {e}")
@@ -147,9 +149,10 @@ class HumanizerLeaderboard:
 
     # --- refresh ---------------------------------------------------------------------------------
     def refresh(self) -> Optional[Dict[str, Any]]:
-        """Fetch a newer valid leaderboard if any URL has one; the current valid payload or None."""
+        """Fetch a newer valid leaderboard if any URL has one. Returns the newest accepted payload, even
+        past its expiry (its kings keep their share through an outage), or None if there never was one."""
         if not self.public_key_hex:
-            self._log("humanizer leaderboard: no public key configured; burning its share")
+            self._log("humanizer leaderboard: no public key configured")
             return None
         for url in self.urls:
             try:
@@ -164,8 +167,9 @@ class HumanizerLeaderboard:
                 self._save()
             break
         if self.payload is not None and self._now() >= self.payload["expires_at"]:
-            self._log("humanizer leaderboard expired; burning its share")
-            self.payload = None
+            self._log("humanizer leaderboard: no fresh one; the kings of the last valid one keep their share")
+        elif self.payload is None:
+            self._log("humanizer leaderboard: none received yet; its share goes to burn")
         return self.payload
 
     # --- weights ---------------------------------------------------------------------------------

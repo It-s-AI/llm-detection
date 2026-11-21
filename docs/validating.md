@@ -132,21 +132,23 @@ pm2 start run.sh --name llm_detection_validators_autoupdate -- --wallet.name YOU
 
 ## Humanizer competition (v4)
 
-From v4 the subnet runs two competitions on **one** set of weights; there is no second mechanism.
+From v4 the subnet runs two competitions on **one** set of weights, **half each**; there is no second
+mechanism.
 
-* **Detection** (unchanged): your validator scores the detection miners as before. They get **90%** of
+* **Detection** (unchanged): your validator scores the detection miners as before. They get **50%** of
   your weights, in the same proportions as in v3.
-* **Humanizer competition**: **10%** of your weights. The subnet owner's evaluator runs the miners'
-  humanizers against paid AI detectors and publishes the payouts (85/10/5 to the current king and the two
-  previous distinct kings) as a **signed leaderboard**. Your validator fetches it, checks the ed25519
-  signature against the key built into the release, the subnet, the expiry and that the sequence number
-  never goes back, and maps the hotkeys to UIDs. You run no extra evaluation, need no new API key and pay
-  nothing extra.
+* **Humanizer competition**: the other **50%**. The subnet owner's evaluator (its code is in
+  [`humanizer/`](../humanizer)) runs the miners' humanizers against paid AI detectors and publishes the
+  payouts (85/10/5 to the current king and the two previous distinct kings) as a **signed leaderboard**.
+  Your validator fetches it, checks the ed25519 signature against the key built into the release, the
+  subnet, the expiry and that the sequence number never goes back, and maps the hotkeys to UIDs. You run
+  no extra evaluation, need no new API key and pay nothing extra.
 
-If no valid leaderboard is available (the owner's server is down past the 3-hour expiry, or a bad
-signature), the 10% goes to the subnet owner's UID (burn), so no miner gains from an outage. The last
-valid leaderboard is kept on disk, so a short outage changes nothing. The 10% is fixed in the code, not
-in the signed leaderboard: even a stolen leaderboard key cannot move more than that.
+The split is a constant of this code, so every validator on v4 sets it the same way.
+
+If no fresh leaderboard can be had (the owner's server is down, a bad signature), the kings of the last
+valid leaderboard keep their share; it is kept on disk and survives restarts. Only a validator that has
+never received a valid leaderboard sends the humanizer half to the subnet owner's UID (burn).
 
 Until the release that builds in the leaderboard's public key and URL, the humanizer share is not applied
 and your weights are exactly as in v3, so v4 is safe to deploy early.
@@ -156,6 +158,3 @@ and your weights are exactly as in v3, so v4 is safe to deploy early.
 | `--humanizer.urls` | built-in | comma-separated leaderboard URLs (a mirror, for example) |
 | `--humanizer.public_key` | built-in | hex ed25519 public key of the leaderboard signer |
 | `--humanizer.disable` | off | leave the humanizer competition out (not recommended: your weights then differ from the other validators') |
-
-The evaluator, the rules of the humanizer competition and the leaderboard format are documented in the
-evaluator's repository.

@@ -69,7 +69,7 @@ def test_weights_map_hotkeys_and_burn_to_owner_uid():
     assert dict(zip(uids, w)) == pytest.approx({2: 0.85, 1: 0.10, 0: 0.05})  # deregistered -> burn
 
 
-def test_nothing_valid_burns_everything():
+def test_never_a_valid_leaderboard_burns_everything():
     bad = envelope({"5Fa": 1.0}, key=SigningKey(b"\x09" * 32))
     for served in ({}, {"https://a": bad}, {"https://a": envelope({"5Fa": 1.0}, netuid=33)}):
         uids, w = board(served).weights(HOTKEYS, "5Fowner")
@@ -83,7 +83,7 @@ def test_second_url_used_when_first_is_down():
     assert (uids, w) == ([3], [1.0])
 
 
-def test_last_valid_kept_through_outage_until_expiry(tmp_path):
+def test_last_kings_keep_their_share_through_an_outage(tmp_path):
     clock = Clock()
     served = {"https://a": envelope({"5Fa": 1.0})}
     b = board(served, tmp_path, clock)
@@ -91,11 +91,22 @@ def test_last_valid_kept_through_outage_until_expiry(tmp_path):
     served.clear()  # the owner's server goes down
     clock.t += 3600
     assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
-    # a validator restart reloads the saved envelope
-    b2 = board(served, tmp_path, clock)
+    clock.t += 30 * 86400  # long past the expiry: still the last king, no burn
+    assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
+    b2 = board(served, tmp_path, clock)  # a validator restart reloads the saved (expired) envelope
     assert b2.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
-    clock.t += 2 * 3600 + 1  # past the expiry: burn
-    assert b2.weights(HOTKEYS, "5Fowner") == ([0], [1.0])
+
+
+def test_an_expired_envelope_is_never_accepted_as_new(tmp_path):
+    clock = Clock()
+    b = board({"https://a": envelope({"5Fa": 1.0})}, tmp_path, clock)
+    assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
+    clock.t += 10 * 3600
+    stale_newer = envelope({"5Fc": 1.0}, now=T0 + 3600)  # newer seq, but already expired when fetched
+    b.urls, b._fetch = ["https://a"], lambda url, timeout: stale_newer
+    assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
+    with pytest.raises(hm.LeaderboardError, match="expired"):
+        hm.verify_envelope(stale_newer, PUB, netuid=32, now=clock.t)
 
 
 def test_replayed_older_leaderboard_refused(tmp_path):
@@ -133,14 +144,15 @@ def test_dense_vector_per_uid():
     assert b.dense(HOTKEYS, "5Fowner") == pytest.approx([0.05, 0.10, 0.85, 0.0])
 
 
-def test_blend_keeps_detection_at_ninety_percent():
+def test_blend_is_half_and_half():
+    assert hm.HUMANIZER_SHARE == 0.5
     det = [0.0, 2.0, 1.0, 1.0]  # validator scores, not normalized
     hum = [0.05, 0.10, 0.85, 0.0]
     out = hm.blend(det, hum)
     assert sum(out) == pytest.approx(1.0)
-    assert out == pytest.approx([0.005, 0.45 + 0.01, 0.225 + 0.085, 0.225])
+    assert out == pytest.approx([0.025, 0.25 + 0.05, 0.125 + 0.425, 0.125])
     # the humanizer part is exactly the share, the detection part keeps its proportions
-    assert sum(o - 0.9 * d / 4 for o, d in zip(out, det)) == pytest.approx(hm.HUMANIZER_SHARE)
+    assert sum(o - 0.5 * d / 4 for o, d in zip(out, det)) == pytest.approx(hm.HUMANIZER_SHARE)
 
 
 def test_blend_before_launch_or_disabled_changes_nothing():
@@ -148,11 +160,11 @@ def test_blend_before_launch_or_disabled_changes_nothing():
 
 
 def test_blend_with_no_detection_scores_and_misaligned_lengths():
-    assert hm.blend([0.0, 0.0, 0.0], [0.0, 1.0]) == pytest.approx([0.0, 0.1, 0.0])
-    assert hm.blend([1.0, 1.0], [0.0, 0.5, 0.5]) == pytest.approx([0.45, 0.5])  # UID 2 not known yet
+    assert hm.blend([0.0, 0.0, 0.0], [0.0, 1.0]) == pytest.approx([0.0, 0.5, 0.0])
+    assert hm.blend([1.0, 1.0], [0.0, 0.5, 0.5]) == pytest.approx([0.25, 0.5])  # UID 2 not known yet
 
 
-def test_no_valid_leaderboard_burns_only_the_share():
+def test_without_any_leaderboard_only_the_share_is_burned():
     det = [0.0, 1.0, 1.0, 0.0]
     out = hm.blend(det, board({}).dense(HOTKEYS, "5Fowner"))
-    assert out == pytest.approx([0.1, 0.45, 0.45, 0.0])  # owner UID 0 = burn
+    assert out == pytest.approx([0.5, 0.25, 0.25, 0.0])  # owner UID 0 = burn
