@@ -1,0 +1,34 @@
++ cd /work
++ docker info
++ docker pull ghcr.io/opentensor/subtensor-localnet:devnet-ready
++ docker run -d --name localnet -p 9944:9944 -p 9945:9945 ghcr.io/opentensor/subtensor-localnet:devnet-ready
+e4234b7f5c07bbb92b0db9dc9821e04c2424e0a8415655b9cb94a2cf0082d4d5
++ /work/venv/bin/pip install -q bittensor==10.5.0 pynacl
++ python3 --version
+Python 3.12.3
+++ seq 1 180
++ for i in $(seq 1 180)
++ curl -s -m 3 -H 'Content-Type: application/json' -d '{"id":1,"jsonrpc":"2.0","method":"system_health"}' http://127.0.0.1:9944
++ grep -q peers
++ break
++ docker logs localnet
++ tail -5
+2026-11-13 14:08:27 🎁 Prepared block for proposing at 251 (1 ms) hash: 0x9917f985fdb155ccc9192cd57e27fad3b4647d482ef849d373586047b9f54853; parent_hash: 0x9706…cbd3; end: NoMoreTransactions; extrinsics_count: 2    
+2026-11-13 14:08:27 🔖 Pre-sealed block for proposal at 251. Hash now 0x94cbe0e9615ec55ad03e220b18b13250a1a4db11fe8f670ad499a98fbbdbec4e, previously 0x9917f985fdb155ccc9192cd57e27fad3b4647d482ef849d373586047b9f54853.    
+2026-11-13 14:08:27 🏆 Imported #251 (0x9706…cbd3 → 0x94cb…ec4e)    
+2026-11-13 14:08:27 🏆 Imported #251 (0x9706…cbd3 → 0x94cb…ec4e)    
+2026-11-13 14:08:27 Backing off claiming new slot for block authorship: finality is lagging.    
++ timeout 3000 /work/venv/bin/python /work/mech1_test.py
+{"step": "bob_registers_subnet", "ok": true, "msg": "Success", "sudo_result": null, "t": 3.5}
+{"step": "start_call", "ok": true, "msg": "Success", "sudo_result": null, "t": 3.7}
+{"step": "sudo_freeze_0", "ok": true, "msg": "Success", "sudo_result": "{'sudo_result': {'Ok': ()}}", "t": 6.2}
+{"step": "sudo_tempo_40", "ok": true, "msg": "Success", "sudo_result": "{'sudo_result': {'Ok': ()}}", "t": 7.5}
+{"step": "sudo_freeze_10", "ok": true, "msg": "Success", "sudo_result": "{'sudo_result': {'Ok': ()}}", "t": 10.2}
+{"step": "helper_mech_count_2_as_owner", "ok": false, "msg": "Subtensor returned `SubstrateRequestException(Invalid Transaction)` error. This means: `Invalid signing address`.", "sudo_result": null, "t": 10.2}
+{"step": "owner_max_uids_128", "ok": true, "msg": "Success", "sudo_result": null, "t": 12.8}
+{"step": "owner_mech_count_2_try0", "ok": true, "msg": "Success", "sudo_result": null, "t": 14.2}
+{"step": "owner_split_90_10_try0", "ok": true, "msg": "Success", "sudo_result": null, "t": 15.5}
+{"step": "helper_split_as_owner", "ok": false, "msg": "Subtensor returned `SubstrateRequestException(Invalid Transaction)` error. This means: `Invalid signing address`.", "sudo_result": null, "t": 15.5}
++ echo exit=0
+exit=0
++ docker logs localnet

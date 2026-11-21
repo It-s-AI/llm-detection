@@ -1,0 +1,272 @@
+{
+ "n": 78,
+ "candidates_per_text": 6.0,
+ "levels": {
+  "1.0": 36,
+  "0.5": 33,
+  "0.0": 9
+ },
+ "gate_reasons": [
+  [],
+  [
+   "style: ['same_register']"
+  ],
+  [
+   "style: ['same_person_and_tense']"
+  ],
+  [],
+  [],
+  [
+   "style: ['same_register']"
+  ],
+  [],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [],
+  [],
+  [
+   "naturalness: flags=['artifacts', 'broken_sentences'] worse=False"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [
+   "naturalness: flags=['broken_sentences'] worse=False"
+  ],
+  [
+   "style: ['same_register', 'same_person_and_tense']"
+  ],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [
+   "meaning: 1 sentences add new specific content"
+  ],
+  [
+   "naturalness: flags=['introduced_errors'] worse=False"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [],
+  [],
+  [
+   "style: ['same_register']",
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [],
+  [
+   "style: ['same_register']"
+  ],
+  [],
+  [
+   "style: ['same_register']",
+   "naturalness: flags=['introduced_errors', 'odd_word_choice'] worse=True"
+  ],
+  [
+   "style: ['same_register']",
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "meaning: 1 contradicted",
+   "style: ['same_register', 'same_person_and_tense']"
+  ],
+  [],
+  [
+   "naturalness: flags=['introduced_errors'] worse=False"
+  ],
+  [
+   "naturalness: flags=['introduced_errors'] worse=True"
+  ],
+  [
+   "style: ['same_person_and_tense', 'same_register']"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [
+   "style: ['same_person_and_tense']",
+   "naturalness: flags=['introduced_errors'] worse=False"
+  ],
+  [],
+  [],
+  [
+   "style: ['same_register']",
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [
+   "style: ['same_register', 'same_format', 'same_person_and_tense', 'same_genre']",
+   "naturalness: flags=['broken_sentences', 'introduced_errors', 'odd_word_choice'] worse=True"
+  ],
+  [
+   "style: ['same_register']",
+   "naturalness: flags=['broken_sentences', 'introduced_errors', 'odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['broken_sentences', 'introduced_errors'] worse=False"
+  ],
+  [
+   "style: ['same_register']",
+   "naturalness: flags=['broken_sentences', 'introduced_errors'] worse=False"
+  ],
+  [],
+  [
+   "style: ['same_register']"
+  ],
+  [
+   "style: ['same_register']",
+   "naturalness: flags=['broken_sentences', 'introduced_errors', 'odd_word_choice'] worse=True"
+  ],
+  [
+   "style: ['same_register']",
+   "naturalness: flags=['introduced_errors', 'odd_word_choice'] worse=False"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [],
+  [
+   "style: ['same_register', 'same_person_and_tense']"
+  ],
+  [
+   "style: ['same_format']",
+   "naturalness: flags=['broken_sentences'] worse=False"
+  ],
+  [
+   "style: ['same_format']",
+   "naturalness: flags=[] worse=True"
+  ],
+  [
+   "style: ['same_register']"
+  ],
+  [
+   "meaning: 2 contradicted",
+   "style: ['same_register']",
+   "naturalness: flags=['introduced_errors'] worse=False"
+  ],
+  [],
+  [],
+  [
+   "style: ['same_register']"
+  ],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [
+   "style: ['same_register']"
+  ],
+  [],
+  [],
+  [],
+  [],
+  [
+   "style: ['same_person_and_tense']"
+  ],
+  [],
+  [],
+  []
+ ],
+ "detectors": {
+  "its_ai": {
+   "identity": {
+    "S": 0.008655514754758323,
+    "auroc": 0.9999999999999999,
+    "p_human": 0.017311029509516424,
+    "mean_score": 0.9826889704904835
+   },
+   "ref_v1": {
+    "S": 0.049744051915120845,
+    "auroc": 0.9999999999999999,
+    "p_human": 0.09948810383024147,
+    "mean_score": 0.8440144641045857
+   },
+   "ref_v1_no_gates": {
+    "S": 0.07799276794770728,
+    "auroc": 0.9999999999999999,
+    "p_human": 0.15598553589541433,
+    "mean_score": 0.8440144641045857
+   }
+  },
+  "gptzero": {
+   "identity": {
+    "S": 1.1102230246251565e-16,
+    "auroc": 0.9999999999999999,
+    "p_human": 0.0,
+    "mean_score": 1.0
+   },
+   "ref_v1": {
+    "S": 1.1137814317553654e-16,
+    "auroc": 0.9999999999999999,
+    "p_human": 7.11681426041767e-19,
+    "mean_score": 1.0
+   },
+   "ref_v1_no_gates": {
+    "S": 1.1173398388855742e-16,
+    "auroc": 0.9999999999999999,
+    "p_human": 1.423362852083534e-18,
+    "mean_score": 1.0
+   }
+  },
+  "zerogpt": {
+   "identity": {
+    "S": 0.21317948717948748,
+    "auroc": 0.9666666666666665,
+    "p_human": 0.35969230769230787,
+    "mean_score": 0.6403076923076925
+   },
+   "ref_v1": {
+    "S": 0.1697928876678878,
+    "auroc": 0.9730692918192917,
+    "p_human": 0.285724358974359,
+    "mean_score": 0.552935064935065
+   },
+   "ref_v1_no_gates": {
+    "S": 0.26598107448107466,
+    "auroc": 0.954685592185592,
+    "p_human": 0.4413333333333334,
+    "mean_score": 0.552935064935065
+   }
+  }
+ },
+ "ledger": {
+  "gptzero": {
+   "cap": 20.0,
+   "spent": 18.10140000000001,
+   "reserved": 0.0
+  },
+  "its_ai": {
+   "cap": Infinity,
+   "spent": 0.0,
+   "reserved": 0.0
+  },
+  "openrouter": {
+   "cap": 140.0,
+   "spent": 20.341929517000054,
+   "reserved": 0.0
+  },
+  "zerogpt": {
+   "cap": 10.0,
+   "spent": 8.355555000000004,
+   "reserved": 0.0
+  }
+ }
+}

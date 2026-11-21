@@ -1,0 +1,89 @@
+{
+  "comment": "Starting hypothesis (spec D-53, D-55, Q-2). Generator weights ~75% closed / 25% open; only models with an allow-listed provider (HIDDEN routing) are used. Per-model `reasoning`/`max_tokens` overrides were found by a live probe (providers differ).",
+  "generators": [
+    {
+      "model": "openai/gpt-5.4",
+      "weight": 20
+    },
+    {
+      "model": "openai/gpt-5.4-mini",
+      "weight": 10
+    },
+    {
+      "model": "openai/gpt-6-sol",
+      "weight": 10
+    },
+    {
+      "model": "google/gemini-3.6-flash",
+      "weight": 10
+    },
+    {
+      "model": "google/gemini-3.5-flash",
+      "weight": 5
+    },
+    {
+      "model": "anthropic/claude-sonnet-5.5",
+      "weight": 8
+    },
+    {
+      "model": "anthropic/claude-haiku-5.5",
+      "weight": 4
+    },
+    {
+      "model": "x-ai/grok-4.7",
+      "weight": 3
+    },
+    {
+      "model": "mistralai/mistral-large-4-0",
+      "weight": 5,
+      "reasoning": {
+        "effort": "low"
+      },
+      "max_tokens": 6000
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "weight": 12,
+      "reasoning": {
+        "enabled": false
+      }
+    },
+    {
+      "model": "qwen/qwen3.8-27b",
+      "weight": 8,
+      "reasoning": {
+        "enabled": false
+      }
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "weight": 5,
+      "reasoning": {
+        "enabled": false
+      }
+    }
+  ],
+  "genre_proportions": {
+    "academic": 39,
+    "essay": 15,
+    "business_marketing": 7,
+    "forum_qa": 6,
+    "homework_answer": 6,
+    "article_blog": 4.5,
+    "creative": 2.2,
+    "review": 0.9,
+    "news": 0.7
+  },
+  "length_words": {
+    "min": 150,
+    "max": 350,
+    "mean": 230
+  },
+  "topic_model": "anthropic/claude-haiku-5.5",
+  "facts_model": "anthropic/claude-haiku-5.5",
+  "max_tokens": 4000,
+  "fact_validators": [
+    "openai/gpt-6-luna",
+    "google/gemini-3.8-flash"
+  ]
+}

@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up the evaluation state (balances, queue, king, spend ledger)
+
+[Service]
+Type=oneshot
+User=humeval
+WorkingDirectory=/srv/humeval/humanizer_eval
+EnvironmentFile=/etc/humeval/humeval.env
+ExecStart=/srv/humeval/humanizer_eval/.venv/bin/python scripts/backup_state.py \
+    --var /srv/humeval/var --out /srv/humeval/backups --keep 72

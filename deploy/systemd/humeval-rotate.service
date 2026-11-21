@@ -1,0 +1,21 @@
+[Unit]
+Description=SN32 humanizer: period rotation pass (commitment, build, switch, reveal)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=humeval
+Group=humeval
+WorkingDirectory=/srv/humeval/humanizer_eval
+EnvironmentFile=/etc/humeval/humeval.env
+Environment=HUMEVAL_ENV_FILE=/etc/humeval/humeval.env
+# $HUMEVAL_ROTATE_ARGS: e.g. --hf-repo <org>/<repo> (a public copy of commitments and reveals)
+ExecStart=/srv/humeval/humanizer_eval/.venv/bin/python scripts/rotate_period.py \
+    --state /srv/humeval/var/intake $HUMEVAL_ROTATE_ARGS
+TimeoutStartSec=4h
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/humeval/var

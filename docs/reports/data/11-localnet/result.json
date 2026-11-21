@@ -1,0 +1,433 @@
+{
+ "steps": [
+  {
+   "step": "freeze_window_0",
+   "ok": true,
+   "msg": "Success",
+   "t": 3.5,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "network_rate_limit_0",
+   "ok": true,
+   "msg": "Success",
+   "t": 4.8,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "register_subnet",
+   "ok": true,
+   "msg": "Success",
+   "t": 7.5
+  },
+  {
+   "step": "start_call",
+   "ok": true,
+   "msg": "Success",
+   "t": 7.8
+  },
+  {
+   "step": "tempo_20",
+   "ok": true,
+   "msg": "Success",
+   "t": 10.2,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "cr_off",
+   "ok": true,
+   "msg": "Success",
+   "t": 11.5,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "rate_limit_100",
+   "ok": true,
+   "msg": "Success",
+   "t": 14.2,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "mech_count_2_at_default_uids",
+   "ok": false,
+   "msg": "Success",
+   "t": 15.5,
+   "sudo_result": "{'sudo_result': {'Err': {'Module': {'index': 7, 'error': '0x7d000000'}}}}"
+  },
+  {
+   "step": "max_uids_128",
+   "ok": true,
+   "msg": "Success",
+   "t": 18.2,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "mech_count_2_at_128_uids",
+   "ok": true,
+   "msg": "Success",
+   "t": 19.5,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "mech_split_90_10",
+   "ok": true,
+   "msg": "Success",
+   "t": 22.2,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "register_val",
+   "ok": true,
+   "msg": "Success",
+   "t": 23.5
+  },
+  {
+   "step": "register_m1",
+   "ok": true,
+   "msg": "Success",
+   "t": 26.2
+  },
+  {
+   "step": "register_m2",
+   "ok": true,
+   "msg": "Success",
+   "t": 27.5
+  },
+  {
+   "step": "stake_val",
+   "ok": true,
+   "msg": "Success",
+   "t": 30.2
+  },
+  {
+   "step": "validator_permit",
+   "ok": null,
+   "msg": null,
+   "t": 33.3,
+   "permit": true
+  },
+  {
+   "step": "A_info",
+   "ok": null,
+   "msg": null,
+   "t": 64.5,
+   "info": "humanizer weights (mechanism 1): {0: 11565, 3: 65535}"
+  },
+  {
+   "step": "A_info",
+   "ok": null,
+   "msg": null,
+   "t": 64.5,
+   "info": "humanizer set_weights on chain successfully!"
+  },
+  {
+   "step": "A_mech1_via_validator_code",
+   "ok": true,
+   "msg": "",
+   "t": 64.5
+  },
+  {
+   "step": "A_mech0_right_after",
+   "ok": true,
+   "msg": "Success",
+   "t": 64.5
+  },
+  {
+   "step": "C_mech0_first",
+   "ok": true,
+   "msg": "Success",
+   "t": 110.5
+  },
+  {
+   "step": "C_mech1_right_after_mech0",
+   "ok": false,
+   "msg": "None",
+   "t": 110.5,
+   "sudo_result": "n/a (AttributeError)"
+  },
+  {
+   "step": "cr_on",
+   "ok": true,
+   "msg": "Success",
+   "t": 113.0,
+   "sudo_result": "{'sudo_result': {'Ok': ()}}"
+  },
+  {
+   "step": "B_info",
+   "ok": null,
+   "msg": null,
+   "t": 143.9,
+   "info": "humanizer weights (mechanism 1): {2: 65535, 3: 43690}"
+  },
+  {
+   "step": "B_info",
+   "ok": null,
+   "msg": null,
+   "t": 143.9,
+   "info": "humanizer set_weights on chain successfully!"
+  },
+  {
+   "step": "B_mech1_via_validator_code",
+   "ok": true,
+   "msg": "",
+   "t": 143.9
+  },
+  {
+   "step": "B_mech0_right_after",
+   "ok": true,
+   "msg": "Success",
+   "t": 144.0
+  },
+  {
+   "step": "D_info",
+   "ok": null,
+   "msg": null,
+   "t": 194.8,
+   "info": "humanizer weights (mechanism 1): {0: 11565, 3: 65535}"
+  },
+  {
+   "step": "D_info",
+   "ok": null,
+   "msg": null,
+   "t": 194.8,
+   "info": "humanizer set_weights on chain successfully!"
+  },
+  {
+   "step": "D_mech1_via_validator_code",
+   "ok": true,
+   "msg": "",
+   "t": 194.8
+  },
+  {
+   "step": "D_mech0_right_after",
+   "ok": true,
+   "msg": "Success",
+   "t": 195.0
+  },
+  {
+   "step": "done",
+   "ok": null,
+   "msg": null,
+   "t": 245.0
+  }
+ ],
+ "chain_block0": 206,
+ "netuid": 2,
+ "owner_is_alice_hotkey": true,
+ "state_after_admin": {
+  "tempo": 20,
+  "weights_rate_limit": 100,
+  "commit_reveal": false,
+  "commit_reveal_period": 1,
+  "admin_freeze_window": 0,
+  "mechanisms": 1
+ },
+ "max_uids_default": 256,
+ "mechanism_count_at_default_uids": 1,
+ "max_uids_after": 128,
+ "mechanism_count": 2,
+ "mechanism_split": [
+  90,
+  10
+ ],
+ "uids": {
+  "owner": 0,
+  "val": 1,
+  "m1": 2,
+  "m2": 3
+ },
+ "validator_permit": true,
+ "state_phase_a": {
+  "tempo": 20,
+  "weights_rate_limit": 100,
+  "commit_reveal": false,
+  "commit_reveal_period": 1,
+  "admin_freeze_window": 0,
+  "mechanisms": 2
+ },
+ "A_weights_mech0": [
+  [
+   1,
+   [
+    [
+     2,
+     65535
+    ]
+   ]
+  ]
+ ],
+ "A_weights_mech1": [
+  [
+   1,
+   [
+    [
+     0,
+     11565
+    ],
+    [
+     3,
+     65535
+    ]
+   ]
+  ]
+ ],
+ "A_mech0": {
+  "incentive": [
+   0.0,
+   0.0,
+   1.0,
+   0.0
+  ],
+  "emission": [
+   0.012302,
+   6.723938,
+   6.641924,
+   0.069711
+  ],
+  "weights": [
+   [
+    1,
+    [
+     [
+      2,
+      65535
+     ]
+    ]
+   ]
+  ]
+ },
+ "A_mech1": {
+  "incentive": [
+   0.0,
+   0.0,
+   1.0,
+   0.0
+  ],
+  "emission": [
+   0.012302,
+   6.723938,
+   6.641924,
+   0.069711
+  ],
+  "weights": [
+   [
+    1,
+    [
+     [
+      0,
+      11565
+     ],
+     [
+      3,
+      65535
+     ]
+    ]
+   ]
+  ]
+ },
+ "C_weights_mech1": [
+  [
+   1,
+   [
+    [
+     0,
+     11565
+    ],
+    [
+     3,
+     65535
+    ]
+   ]
+  ]
+ ],
+ "cr_enabled": true,
+ "state_phase_b": {
+  "tempo": 20,
+  "weights_rate_limit": 100,
+  "commit_reveal": true,
+  "commit_reveal_period": 1,
+  "admin_freeze_window": 0,
+  "mechanisms": 2
+ },
+ "B_revealed": true,
+ "B_seconds_to_reveal": 6.0,
+ "B_weights_mech1": [
+  [
+   1,
+   [
+    [
+     2,
+     65535
+    ],
+    [
+     3,
+     43690
+    ]
+   ]
+  ]
+ ],
+ "B_weights_mech0": [
+  [
+   1,
+   [
+    [
+     2,
+     65535
+    ]
+   ]
+  ]
+ ],
+ "B_mech1": {
+  "incentive": [
+   0.0,
+   0.0,
+   1.0,
+   0.0
+  ],
+  "emission": [
+   0.0,
+   6.723938,
+   6.691132,
+   0.032805
+  ],
+  "weights": [
+   [
+    1,
+    [
+     [
+      2,
+      65535
+     ],
+     [
+      3,
+      43690
+     ]
+    ]
+   ]
+  ]
+ },
+ "D_weights_mech1": [
+  [
+   1,
+   [
+    [
+     0,
+     11565
+    ],
+    [
+     3,
+     65535
+    ]
+   ]
+  ]
+ ],
+ "D_blocks": 105,
+ "D_stake_delta": {
+  "owner": 17.999542,
+  "val": 41.000229,
+  "m1": 36.899893,
+  "m2": 3.485285
+ },
+ "D_m2_over_m1": 0.0945,
+ "D_expected_m2_over_m1": 0.0944
+}

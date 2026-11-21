@@ -1,0 +1,107 @@
+{
+ "public": {
+  "submission_id": "pilot-ref-v2-crown3",
+  "hotkey": "5Fpilot-miner",
+  "stage": "done",
+  "updated_at": 1794918113.0820715,
+  "period_id": "pilot-1",
+  "S": 0.0,
+  "crowned": false,
+  "bundle_ran": true,
+  "levels": {
+   "1": 36,
+   "0.5": 37,
+   "0": 5
+  },
+  "gates": {
+   "G1": {
+    "1": 69,
+    "0.5": 6,
+    "0": 3
+   },
+   "G2": {
+    "1": 72,
+    "0.5": 6,
+    "0": 0
+   },
+   "G3": {
+    "1": 41,
+    "0.5": 35,
+    "0": 2
+   }
+  },
+  "judge_errors": 0,
+  "detectors": {
+   "gptzero": {
+    "E": 0.0,
+    "auroc": 1.0,
+    "p_human": 0.0
+   },
+   "pangram": {
+    "E": 0.0045,
+    "auroc": 1.0,
+    "p_human": 0.009
+   },
+   "zerogpt": {
+    "E": 0.0108,
+    "auroc": 0.9968,
+    "p_human": 0.0153
+   }
+  },
+  "S_king": 0.0,
+  "delta": 0.0,
+  "lower_bound": -0.0,
+  "alpha": 0.05
+ },
+ "statement": null,
+ "settlement": null,
+ "levels": {
+  "1.0": 36,
+  "0.5": 37,
+  "0.0": 5
+ },
+ "score": {
+  "S": 1.4939175613516924e-16,
+  "auroc": {
+   "gptzero": 0.9999999999999999,
+   "pangram": 0.9999999999999999,
+   "zerogpt": 0.9967948717948717
+  },
+  "p_human": {
+   "gptzero": 4.981769982292369e-18,
+   "pangram": 0.009004197799233086,
+   "zerogpt": 0.015282051282051281
+  },
+  "evasion": {
+   "gptzero": 1.1351318745366183e-16,
+   "pangram": 0.004502098899616654,
+   "zerogpt": 0.010846153846153946
+  },
+  "severe_rate": 0.0641025641025641,
+  "minor_rate": 0.47435897435897434,
+  "excluded_strata": []
+ },
+ "crown": {
+  "crown": false,
+  "delta": 2.6525381316402665e-17,
+  "lower": -1.1818324766719388e-16,
+  "se": 3.707182949527083e-17,
+  "s_king": 1.2286637481876658e-16,
+  "s_challenger": 1.4939175613516924e-16
+ },
+ "run": {
+  "status": "ok",
+  "reason": "",
+  "pod_seconds": 0.0,
+  "cost_usd": null
+ },
+ "judge_tokens": {},
+ "seconds": 112.1,
+ "n_human": 71,
+ "missing_human": 7,
+ "owner_spent": {
+  "gptzero": 2.848,
+  "pangram": 12.25,
+  "zerogpt": 1.35
+ }
+}
