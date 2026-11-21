@@ -87,3 +87,22 @@ def test_deregistered_kings_drop_out_of_the_signed_weights():
     p = verify(sign(build_payload(st, now=T0, is_registered=reg), KEY), PUB, netuid=32, now=T0)
     assert p["weights"] == {"5Fa": 1.0} and p["king"]["submission_id"] == "s1"
     assert [h["submission_id"] for h in p["history"]] == ["s1", "baseline"]
+
+
+def test_launch_ramp_pays_a_quarter_for_three_days_after_the_first_miner_crown():
+    t = datetime(2026, 12, 1, tzinfo=UTC)
+    st = KingState.initial("baseline", "owner", t)
+    assert build_payload(st, now=t.timestamp() + 86400)["weights"] == {BURN_KEY: 1.0}  # baseline: all burned
+    first = t + timedelta(days=2)
+    st.apply_crown("s1", "5Fa", first, 0.02)
+    p = verify(sign(build_payload(st, now=first.timestamp() + 3600), KEY), PUB, netuid=32,
+               now=first.timestamp() + 3600)  # fmt: skip
+    assert p["weights"] == pytest.approx({"5Fa": 0.25, BURN_KEY: 0.75})
+    assert p["launch_ramp"]["until"] == first.timestamp() + 3 * 86400
+    # a second crown inside the window: the usual proportions, still scaled to a quarter
+    st.apply_crown("s2", "5Fb", first + timedelta(days=1), 0.01)
+    p = build_payload(st, now=(first + timedelta(days=1, hours=1)).timestamp())
+    assert p["weights"] == pytest.approx({"5Fb": 0.25 * 0.90, "5Fa": 0.25 * 0.10, BURN_KEY: 0.75})
+    # the window is counted from the FIRST miner crown, not from the latest one
+    p = build_payload(st, now=first.timestamp() + 3 * 86400 + 1)
+    assert p["weights"] == pytest.approx({"5Fb": 0.90, "5Fa": 0.10}) and p["launch_ramp"] is None
