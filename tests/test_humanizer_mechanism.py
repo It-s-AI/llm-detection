@@ -1,4 +1,4 @@
-"""Mechanism-1 weights from the signed humanizer leaderboard.
+"""The humanizer competition's share of the weights, from the signed leaderboard (v4: one weight vector).
 
 Loads detection/validator/humanizer_mechanism.py by path, so these tests need only pynacl and numpy
 (plus bittensor for the weight conversion), not the detection models.
@@ -128,33 +128,31 @@ def test_no_public_key_burns():
     assert b.weights(HOTKEYS, "5Fowner") == ([0], [1.0])
 
 
-class FakeSubtensor:
-    def __init__(self, mechanisms):
-        self.mechanisms = mechanisms
-        self.calls = []
-
-    def get_mechanism_count(self, netuid):
-        return self.mechanisms
-
-    def get_subnet_owner_hotkey(self, netuid):
-        return "5Fowner"
-
-    def set_weights(self, **kw):
-        self.calls.append(kw)
-        return True, "ok"
+def test_dense_vector_per_uid():
+    b = board({"https://a": envelope({"5Fb": 0.85, "5Fa": 0.10, "5Fgone": 0.05})})
+    assert b.dense(HOTKEYS, "5Fowner") == pytest.approx([0.05, 0.10, 0.85, 0.0])
 
 
-class Meta:
-    hotkeys = HOTKEYS
+def test_blend_keeps_detection_at_ninety_percent():
+    det = [0.0, 2.0, 1.0, 1.0]  # validator scores, not normalized
+    hum = [0.05, 0.10, 0.85, 0.0]
+    out = hm.blend(det, hum)
+    assert sum(out) == pytest.approx(1.0)
+    assert out == pytest.approx([0.005, 0.45 + 0.01, 0.225 + 0.085, 0.225])
+    # the humanizer part is exactly the share, the detection part keeps its proportions
+    assert sum(o - 0.9 * d / 4 for o, d in zip(out, det)) == pytest.approx(hm.HUMANIZER_SHARE)
 
 
-def test_set_mechanism_weights_only_when_the_mechanism_exists():
-    pytest.importorskip("bittensor")
-    b = board({"https://a": envelope({"5Fb": 0.9, "5Fa": 0.1})})
-    one = FakeSubtensor(1)
-    assert hm.set_mechanism_weights(b, one, "wallet", Meta(), 32, 1000) is False and not one.calls
-    two = FakeSubtensor(2)
-    assert hm.set_mechanism_weights(b, two, "wallet", Meta(), 32, 1000) is True
-    call = two.calls[0]
-    assert call["mechid"] == 1 and call["netuid"] == 32 and list(call["uids"]) == [1, 2]
-    assert call["weights"][1] == 65535 and 7000 < call["weights"][0] < 7400  # u16, max-normalized
+def test_blend_before_launch_or_disabled_changes_nothing():
+    assert hm.blend([0.2, 0.3, 0.5], None) == [0.2, 0.3, 0.5]
+
+
+def test_blend_with_no_detection_scores_and_misaligned_lengths():
+    assert hm.blend([0.0, 0.0, 0.0], [0.0, 1.0]) == pytest.approx([0.0, 0.1, 0.0])
+    assert hm.blend([1.0, 1.0], [0.0, 0.5, 0.5]) == pytest.approx([0.45, 0.5])  # UID 2 not known yet
+
+
+def test_no_valid_leaderboard_burns_only_the_share():
+    det = [0.0, 1.0, 1.0, 0.0]
+    out = hm.blend(det, board({}).dense(HOTKEYS, "5Fowner"))
+    assert out == pytest.approx([0.1, 0.45, 0.45, 0.0])  # owner UID 0 = burn

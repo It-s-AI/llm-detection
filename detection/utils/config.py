@@ -110,7 +110,8 @@ def add_args(cls, parser):
         parser.add_argument(
             "--humanizer.disable",
             action="store_true",
-            help="Do not set mechanism-1 (humanizer competition) weights.",
+            help="Leave the humanizer competition out of the weights (not recommended: your weights then "
+            "differ from the other validators').",
             default=False,
         )
 

@@ -28,7 +28,7 @@ from traceback import print_exception
 
 from detection.base.neuron import BaseNeuron
 from detection.validator.humanizer_mechanism import (
-    DEFAULT_PUBLIC_KEY, DEFAULT_URLS, HumanizerLeaderboard, set_mechanism_weights
+    DEFAULT_PUBLIC_KEY, DEFAULT_URLS, HUMANIZER_SHARE, HumanizerLeaderboard, blend
 )
 from detection import (
     __version__, WANDB_PROJECT,
@@ -246,11 +246,6 @@ class BaseValidatorNeuron(BaseNeuron):
         """
         Sets the validator weights to the metagraph hotkeys based on the scores it has received from the miners. The weights determine the trust and incentive level the validator assigns to miner nodes on the network.
         """
-        # Mechanism 1 first: bittensor's set_weights skips sending when the blocks since mechanism 0's
-        # last update are within the rate limit, whatever the mechid; the chain itself rate-limits each
-        # mechanism separately. Right after a mechanism-0 update, mechanism 1 would never be sent.
-        self.set_humanizer_weights()
-
         # Check if self.scores contains any NaN values and log a warning if it does.
         if torch.isnan(self.scores).any():
             bt.logging.warning(
@@ -262,6 +257,8 @@ class BaseValidatorNeuron(BaseNeuron):
         # m = torch.nn.Softmax()
         # raw_weights = m(self.scores * 4)
         raw_weights = torch.nn.functional.normalize(self.scores, p=1, dim=0)
+        # v4: the humanizer competition's share, from the owner's signed leaderboard (one weight vector)
+        raw_weights = self.add_humanizer_share(raw_weights)
 
         bt.logging.info("raw_weights", raw_weights)
         bt.logging.info("raw_weight_uids", self.metagraph.uids)
@@ -305,26 +302,35 @@ class BaseValidatorNeuron(BaseNeuron):
         else:
             bt.logging.error(f"set_weights failed {msg}")
 
-    def set_humanizer_weights(self):
-        """Mechanism 1 (humanizer competition): weights from the owner's signed leaderboard.
-
-        Does nothing until the subnet has a second mechanism; any failure leaves mechanism 0 untouched.
-        """
-        if self.config.humanizer.disable:
-            return
-        if getattr(self, "humanizer", None) is None:
-            urls = [u.strip() for u in (self.config.humanizer.urls or "").split(",") if u.strip()]
-            self.humanizer = HumanizerLeaderboard(
-                urls or list(DEFAULT_URLS),
-                self.config.humanizer.public_key or DEFAULT_PUBLIC_KEY,
-                self.config.netuid,
-                state_path=os.path.join(self.config.neuron.full_path, "humanizer_leaderboard.json"),
-                log=bt.logging.warning,
-            )
-        set_mechanism_weights(
-            self.humanizer, self.subtensor, self.wallet, self.metagraph, self.config.netuid,
-            self.spec_version, info=bt.logging.info, error=bt.logging.error,
+    def add_humanizer_share(self, detection: torch.FloatTensor) -> torch.FloatTensor:
+        """Both competitions in one weight vector: detection keeps ``1 - HUMANIZER_SHARE``, the humanizer
+        competition gets ``HUMANIZER_SHARE`` from the owner's signed leaderboard (its kings; burn to the
+        owner's UID when no valid leaderboard). Before the launch (no public key built in or given) and with
+        --humanizer.disable the detection weights are returned unchanged; so is any failure here."""
+        key = self.config.humanizer.public_key or DEFAULT_PUBLIC_KEY
+        if self.config.humanizer.disable or not key:
+            return detection
+        try:
+            if getattr(self, "humanizer", None) is None:
+                urls = [u.strip() for u in (self.config.humanizer.urls or "").split(",") if u.strip()]
+                self.humanizer = HumanizerLeaderboard(
+                    urls or list(DEFAULT_URLS),
+                    key,
+                    self.config.netuid,
+                    state_path=os.path.join(self.config.neuron.full_path, "humanizer_leaderboard.json"),
+                    log=bt.logging.warning,
+                )
+            owner = self.subtensor.get_subnet_owner_hotkey(self.config.netuid)
+            hum = self.humanizer.dense(list(self.metagraph.hotkeys), owner)
+            out = blend(detection.cpu().tolist(), hum, HUMANIZER_SHARE)
+        except Exception as e:  # never block the detection weights
+            bt.logging.error(f"humanizer share not applied: {e}")
+            return detection
+        bt.logging.info(
+            "humanizer share",
+            {uid: round(w * HUMANIZER_SHARE, 6) for uid, w in enumerate(hum) if w > 0},
         )
+        return torch.tensor(out, dtype=detection.dtype)
 
     def update_has_enough_stake(self):
         self.has_enough_stake = torch.zeros(len(self.hotkeys), dtype=torch.float32)

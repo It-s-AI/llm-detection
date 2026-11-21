@@ -18,7 +18,7 @@
 # Define the version of the template module.
 # 3.15.0 introduces end-to-end encryption of miner -> validator predictions.
 # 3.15.1 updates wandb so validator logs reach the current W&B API.
-__version__ = "3.15.1"
+__version__ = "4.0.0"
 __least_acceptable_version__ = "3.8.0"
 version_split = __version__.split(".")
 __spec_version__ = (

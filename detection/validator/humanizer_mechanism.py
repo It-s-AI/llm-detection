@@ -1,20 +1,26 @@
 # The MIT License (MIT)
 # Copyright © 2026 It's AI
-"""Mechanism 1 (humanizer competition): weights from the subnet owner's signed leaderboard.
+"""The humanizer competition's share of the validator's weights (v4: one weight vector, no second mechanism).
 
-The evaluator (github.com/ChervovNikita/humanizer_eval) runs miners' humanizers against paid AI
-detectors and keeps one king; payouts are 85/10/5 to the current king and the two previous distinct
-kings. It publishes those weights signed with a dedicated ed25519 key. A validator:
+SN32 runs two competitions on one set of weights. Detection miners are scored by the validators as before
+and get ``1 - HUMANIZER_SHARE`` of the weights. The humanizer competition gets ``HUMANIZER_SHARE``: the
+subnet owner's evaluator runs miners' humanizers against paid AI detectors, keeps one king and publishes
+the payouts (85/10/5 to the current king and the two previous distinct kings) as a leaderboard signed with
+a dedicated ed25519 key. A validator:
 
 1. fetches the envelope from the configured URLs (any of them; first valid wins),
-2. checks the signature against the pinned public key, the schema, netuid, mechanism, the expiry and
+2. checks the signature against the pinned public key, the schema, netuid, competition id, the expiry and
    that the sequence number never goes back (a replayed older leaderboard is refused),
 3. maps hotkeys to UIDs; shares of hotkeys not registered and the "__burn__" share go to the subnet
    owner's UID (burn),
-4. with nothing valid (owner server down past the expiry, bad signature): everything to burn.
+4. with nothing valid (owner server down past the expiry, bad signature): the whole share goes to burn,
+   so nobody gains from an outage,
+5. blends: ``(1 - HUMANIZER_SHARE) * detection + HUMANIZER_SHARE * humanizer``.
 
-The validator keeps the last valid envelope on disk, so a short outage of the owner's server changes
-nothing until that envelope expires.
+The share is fixed here, not in the signed payload: even a stolen leaderboard key can move at most this
+share. The validator keeps the last valid envelope on disk, so a short outage of the owner's server
+changes nothing until that envelope expires. Until a release builds in the public key (or a validator
+passes one), the share is not applied and the detection weights stay exactly as in v3.
 """
 
 from __future__ import annotations
@@ -27,7 +33,10 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 SCHEMA = "sn32-humanizer-leaderboard/1"
 BURN_KEY = "__burn__"
+#: competition id in the signed payload ("mechid": 1 = the humanizer competition); not a chain mechanism
 MECHID = 1
+#: share of the weights that goes to the humanizer competition (D-14); the rest stays with detection
+HUMANIZER_SHARE = 0.10
 # Filled in at launch (the public key of the owner's leaderboard signing key and its URLs).
 DEFAULT_PUBLIC_KEY = ""
 DEFAULT_URLS: Tuple[str, ...] = ()
@@ -140,7 +149,7 @@ class HumanizerLeaderboard:
     def refresh(self) -> Optional[Dict[str, Any]]:
         """Fetch a newer valid leaderboard if any URL has one; the current valid payload or None."""
         if not self.public_key_hex:
-            self._log("humanizer leaderboard: no public key configured; burning mechanism 1")
+            self._log("humanizer leaderboard: no public key configured; burning its share")
             return None
         for url in self.urls:
             try:
@@ -155,14 +164,14 @@ class HumanizerLeaderboard:
                 self._save()
             break
         if self.payload is not None and self._now() >= self.payload["expires_at"]:
-            self._log("humanizer leaderboard expired; burning mechanism 1")
+            self._log("humanizer leaderboard expired; burning its share")
             self.payload = None
         return self.payload
 
     # --- weights ---------------------------------------------------------------------------------
     def weights(self, hotkeys: Sequence[str], owner_hotkey: str) -> Tuple[List[int], List[float]]:
-        """``(uids, weights)`` for mechanism 1; burn = the subnet owner's UID. Raises if the owner's
-        hotkey is not registered (no safe place to send the burn)."""
+        """``(uids, weights)`` of the humanizer competition, summing to 1; burn = the subnet owner's UID.
+        Raises if the owner's hotkey is not registered (no safe place to send the burn)."""
         if owner_hotkey not in hotkeys:
             raise LeaderboardError("subnet owner hotkey is not in the metagraph")
         burn_uid = list(hotkeys).index(owner_hotkey)
@@ -177,53 +186,26 @@ class HumanizerLeaderboard:
         return uids, [out[u] for u in uids]
 
 
-def set_mechanism_weights(
-    board: HumanizerLeaderboard,
-    subtensor: Any,
-    wallet: Any,
-    metagraph: Any,
-    netuid: int,
-    version_key: int,
-    *,
-    mechid: int = MECHID,
-    block_time: float = 12.0,
-    info: Callable[[str], None] = print,
-    error: Callable[[str], None] = print,
-) -> bool:
-    """Set mechanism-1 weights from the leaderboard; False (and nothing sent) when the subnet has no
-    such mechanism yet or anything fails. Mechanism 0 is never touched here.
+    def dense(self, hotkeys: Sequence[str], owner_hotkey: str) -> List[float]:
+        """The same weights as one value per UID (``len(hotkeys)`` values summing to 1)."""
+        out = [0.0] * len(hotkeys)
+        for uid, w in zip(*self.weights(hotkeys, owner_hotkey)):
+            out[uid] += w
+        return out
 
-    Call it BEFORE setting mechanism-0 weights in the same cycle: bittensor's ``set_weights`` checks the
-    rate limit against mechanism 0's last update (whatever the mechid) and silently sends nothing if it
-    was just updated, while the chain limits each mechanism on its own (localnet, report 11).
-    ``block_time`` only matters with commit-reveal (12 s on finney, 0.25 s on a fast-block localnet)."""
-    try:
-        if subtensor.get_mechanism_count(netuid) <= mechid:
-            return False
-        from bittensor.utils.weight_utils import convert_weights_and_uids_for_emit
-        import numpy as np
 
-        owner = subtensor.get_subnet_owner_hotkey(netuid)
-        uids, weights = board.weights(list(metagraph.hotkeys), owner)
-        uint_uids, uint_weights = convert_weights_and_uids_for_emit(
-            uids=np.array(uids, dtype=np.int64), weights=np.array(weights, dtype=np.float32)
-        )
-        info(f"humanizer weights (mechanism {mechid}): {dict(zip(uint_uids, uint_weights))}")
-        result, msg = subtensor.set_weights(
-            wallet=wallet,
-            netuid=netuid,
-            uids=uint_uids,
-            weights=uint_weights,
-            mechid=mechid,
-            block_time=block_time,
-            wait_for_finalization=False,
-            wait_for_inclusion=False,
-            version_key=version_key,
-        )
-        if result is True:
-            info("humanizer set_weights on chain successfully!")
-            return True
-        error(f"humanizer set_weights failed {msg}")
-    except Exception as e:
-        error(f"humanizer weights not set: {e}")
-    return False
+def blend(
+    detection: Sequence[float], humanizer: Optional[Sequence[float]], share: float = HUMANIZER_SHARE
+) -> List[float]:
+    """One weight vector for both competitions: ``(1 - share) * detection + share * humanizer``.
+
+    ``detection`` is normalized here (all zero: the detection part is empty and only the humanizer share
+    is set). ``humanizer`` None (not launched, or disabled) leaves the detection weights unchanged. The
+    humanizer vector is aligned to the detection one by UID: missing UIDs count as 0, extra ones are cut."""
+    det = [max(0.0, float(x)) for x in detection]
+    if humanizer is None:
+        return det
+    total = sum(det)
+    det = [x / total for x in det] if total > 0 else det
+    hum = [float(humanizer[i]) if i < len(humanizer) else 0.0 for i in range(len(det))]
+    return [(1.0 - share) * d + share * h for d, h in zip(det, hum)]
