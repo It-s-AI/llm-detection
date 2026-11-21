@@ -63,6 +63,15 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
   a gain in S of 17–47% relative to the king (report 05, "power under D-20/D-22"); as the king's S grows,
   we can move to 750. False crowns are controlled by the test itself (A/A 5.5% ± 0.4%); σ and φ are refined after launch.
 - **D-25 ⏳** δ_min (the minimum margin for the crown, against a lottery) — after the first periods.
+- **D-26 ✅** Identical conditions for the king and every challenger (owner's decision 2026-11-21; no
+  asymmetry even with a small probability): no output is ever finished without every gate verdict and
+  every detector score (retries, then a pause; never level 0 or +inf for our failure); each judge model
+  pinned to one provider without fallback; a scoring fingerprint (scoring code, gate config, detector
+  set, crown parameters) on every record and king run, with the king rescored from his saved outputs
+  when it changes and runs with different fingerprints never compared; detector models checked by the
+  reported version on every text and by two mid-range H texts per detector (canaries) at period load and
+  before each evaluation, with a pause until H and the king are rescored when they differ; every pod an
+  NVIDIA H100 80GB HBM3 (`evaluation/conditions.py`, `evaluation/runners.py:EVAL_MACHINE`).
 
 ## Detectors
 
@@ -264,6 +273,7 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
 | 2026-11-13 | D-14, D-92 | Localnet: two mechanisms can be enabled only when `max_allowed_uids × 2 ≤ 256` (SN32 currently has 256 UIDs); the validator sets mechanism 1 before mechanism 0 (the SDK checks the rate limit against mechanism 0); the 90/10 split and burn via the owner's UID confirmed with money | report 11 |
 | 2026-11-13 | D-14, D-58, D-66, Q-13 | Owner's decisions: 128 UIDs × 2 mechanisms; one submission per hotkey registration, rollback when a king is deregistered; before the reveal the miner sees the level distribution (overall and per gate) and each detector's contribution (E, AUROC, P_human), but not the texts of the judges' reasons | owner's decisions 2026-11-13 |
 | 2026-11-20 | D-43 | G3 calibration: severity on a single scale of impact on the reader (not tied to the defect type), only findings shared by both judges count (the milder rating), "gross" — by agreement of both or by the arbiter; no exception lists tailored to the samples | calibration 24×15, $3.7; Q-12 samples |
+| 2026-11-21 | D-26 | Identical conditions for king and challenger: zero tolerance for missing verdicts/scores (retries, pause), judges pinned to one provider, scoring fingerprint with king rescoring, detector-model checks (versions, canaries from H), one GPU model | owner's requirement |
 | 2026-11-21 | D-13 | Launch window: 3 days after the first miner crown the kings get 25% of the competition's share, 75% is burned; everything is burned while the baseline is king | owner's decision |
 | 2026-11-21 | D-10, D-14, D-92 | 50/50 share (detection and humanizer); when the leaderboard is unavailable, the last kings are paid rather than burn; the evaluator code is the `humanizer/` folder in It-s-AI/llm-detection, branch `v4` | owner's decisions |
 | 2026-11-21 | D-10, D-14, D-92, Q-13 | No second mechanism: validator v4 sets one weight vector, 90% detection and 10% humanizer from the signed leaderboard; without the embedded key, v4 sets weights like v3. Q-13 (128 UIDs × 2 mechanisms) withdrawn. Verified on the testnet 87 metagraph with a live leaderboard: after weight processing the humanizer share is 10%; the SN32 owner is registered (UID 129), so there is somewhere to send the burn | owner's decision |

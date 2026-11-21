@@ -89,3 +89,75 @@ def test_human_scores_are_kept_for_the_next_load(tmp_path):
     ctx = load_period(tmp_path, KEY, human_texts=texts, detectors={"flaky": det, "other": other},
                       human_cache=cache)  # fmt: skip
     assert len(det.calls) == 1 and len(other.calls) == 1 and set(ctx.human_scores) == {"flaky", "other"}
+
+
+class Versioned:
+    """Scores 0.1 and reports model ``version`` (a list: one per call, to simulate a change mid-way)."""
+
+    def __init__(self, name, versions):
+        self.name, self.versions, self.calls = name, list(versions), 0
+
+    def score(self, texts):
+        v = self.versions[min(self.calls, len(self.versions) - 1)]
+        self.calls += 1
+        out = []
+        for i in range(len(texts)):
+            ver = v[i % len(v)] if isinstance(v, tuple) else v
+            out.append(DetectorScore(self.name, "x", 0.1, version=ver))
+        return out
+
+
+def test_the_detector_models_of_h_are_kept_with_its_scores(tmp_path):
+    texts = _period(tmp_path)
+    cache = tmp_path / "human_scores.enc"
+    ctx = load_period(
+        tmp_path, KEY, human_texts=texts, detectors={"gz": Versioned("gz", ["m-1"])}, human_cache=cache
+    )
+    assert ctx.meta["detector_baseline"] == {"gz": {"versions": ["m-1"]}}
+    again = Versioned("gz", ["m-2"])  # not asked: the scores and their baseline come from the file
+    ctx = load_period(tmp_path, KEY, human_texts=texts, detectors={"gz": again}, human_cache=cache)
+    assert again.calls == 0 and ctx.meta["detector_baseline"]["gz"]["versions"] == ["m-1"]
+
+
+def test_h_scored_across_a_model_change_is_refused(tmp_path):
+    texts = _period(tmp_path)
+    from humanizer_eval.evaluation import conditions
+
+    ctx = load_period(tmp_path, KEY, human_texts=texts, detectors={"gz": Versioned("gz", [("m-1", "m-2")])})
+    assert (
+        "across a model change" in conditions.check(ctx.meta["detector_baseline"], None)[0]
+    )  # held, not compared
+
+
+class Graded:
+    """Deterministic scores in (0, 1) by text; ``shift`` simulates a vendor that changed its model."""
+
+    def __init__(self, name, shift=0.0):
+        self.name, self.shift, self.calls = name, shift, []
+
+    def score(self, texts):
+        self.calls.append(list(texts))
+        return [
+            DetectorScore(self.name, "x", min(1.0, 0.2 + 0.1 * int(t.split()[-1]) + self.shift))
+            for t in texts
+        ]
+
+
+def test_canaries_are_mid_range_h_texts_checked_without_the_cache(tmp_path):
+    texts = _period(tmp_path)  # human text 0..3 -> scores 0.2, 0.3, 0.4, 0.5
+    ctx = load_period(tmp_path, KEY, human_texts=texts, detectors={"zg": Graded("zg")},
+                      watch={"zg": Graded("zg")})  # fmt: skip
+    can = ctx.meta["detector_baseline"]["zg"]["canary"]
+    assert can["texts"] == ["human text 3", "human text 2"] and can["scores"] == pytest.approx([0.5, 0.4])
+    # H's scores came from a cache filled by an older model: the fresh canaries do not match -> refused
+    from humanizer_eval.evaluation import conditions
+
+    ctx = load_period(tmp_path, KEY, human_texts=texts, detectors={"zg": Graded("zg")},
+                      watch={"zg": Graded("zg", shift=0.01)})  # fmt: skip
+    assert (
+        "differ from the vendor's current model" in conditions.check(ctx.meta["detector_baseline"], None)[0]
+    )
+    # numeric noise far below a model change is not a change
+    ctx = load_period(tmp_path, KEY, human_texts=texts, detectors={"zg": Graded("zg")},
+                      watch={"zg": Graded("zg", shift=4e-5)})  # fmt: skip
+    assert conditions.check(ctx.meta["detector_baseline"], None) == []

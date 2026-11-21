@@ -27,6 +27,7 @@ from humanizer_eval.budget import SpendLedger
 from humanizer_eval.config import get_settings
 from humanizer_eval.detectors.registry import CROWN_DETECTORS, build_detector
 from humanizer_eval.evaluation import EvalConfig, LiumRunner, ReplayRunner, SubmissionStore, load_period
+from humanizer_eval.evaluation.conditions import scoring_fingerprint
 from humanizer_eval.gates.judges import GateRunner
 from humanizer_eval.intake import (
     CurrentPeriod,
@@ -115,6 +116,8 @@ def main() -> int:
     llm = CachedLLM(base, var_dir() / "calibration" / "llm_cache.sqlite", key=key, cache_all=True)
     dets = [d for d in args.detectors.split(",") if d]
     detectors = {d: build_detector(d, ledger=led) for d in dets}
+    # the same detectors without a cache: canaries that catch a silent vendor model change (conditions.py)
+    watch = {d: build_detector(d, ledger=led, use_cache=False) for d in dets}
     tag = "-".join(sorted(dets))
     pools = [PoolStore.load(var_dir() / p) for p in args.pool.split(",")]
 
@@ -124,7 +127,7 @@ def main() -> int:
         texts = {r["text_id"]: r["text"] for p in pools for r in p.rows if r["text_id"] in want}
         return load_period(pdir, key, human_texts=texts, detectors=detectors, facts_llm=llm,
                            workers=args.workers, allow_missing_human=args.allow_missing_human,
-                           human_cache=pdir / f"human_scores.{tag}.enc")  # fmt: skip
+                           human_cache=pdir / f"human_scores.{tag}.enc", watch=watch)  # fmt: skip
 
     periods = var_dir() / "periods"
     if args.period:
@@ -211,7 +214,12 @@ def main() -> int:
         king_run_path=lambda ctx: state / "periods" / ctx.period_id / f"king_run.{tag}.enc",
         king_state_path=state / f"king_state.{tag}.json",
         key=key,
-        cfg=EvalConfig(workers=args.workers, crown_kw={"n_boot": args.n_boot}),
+        cfg=EvalConfig(
+            workers=args.workers,
+            crown_kw={"n_boot": args.n_boot},
+            fingerprint=scoring_fingerprint(gates_cfg, detectors, {"n_boot": args.n_boot}),
+        ),
+        detector_watch=watch,
         is_registered=is_registered,
         hub=hub,
         archive=archive,

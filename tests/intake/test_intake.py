@@ -83,7 +83,7 @@ class World:
             king_run_path=lambda ctx: tmp_path / f"king_run.{ctx.period_id}.enc",
             king_state_path=tmp_path / "king_state.json",
             key=KEY,
-            cfg=EvalConfig(workers=4, crown_kw={"n_boot": 300}),
+            cfg=EvalConfig(workers=4, crown_kw={"n_boot": 300}, retry_wait_s=0),
             is_registered=self.is_registered,
         )
         self.worker = QueueWorker(self.queue, self.svc, self.billing, self.env, now=now, pause_base_s=60)
@@ -689,3 +689,21 @@ def test_period_schedule_and_reveal_files_are_public(tmp_path):
     assert http.get("/v1/periods/p1/../secret.key").status_code == 404
     assert http.get("/v1/periods/p1/%2e%2e/secret.key").status_code == 404
     assert http.get("/v1/periods/..%2fsecret.key/x").status_code == 404
+
+
+def test_the_king_is_rescored_from_his_saved_outputs_when_conditions_change(tmp_path):
+    w = World(tmp_path)
+    m = SeedSigner(b"\x05" * 32).ss58_address
+    w.pay(m)
+    sid = w.svc.submit(m, bundle_url=URL, bundle_sha256=_sha(m), bundle_bytes=10)["submission_id"]
+    assert w.worker.run_once()["crowned"]
+    path = tmp_path / f"king_run.{w.ctx.period_id}.enc"
+    assert KingRun.load(path, KEY).fingerprint is None
+    # a deploy changes the scoring code or config: the stored king run no longer matches
+    w.env.cfg = replace(w.env.cfg, fingerprint="fp-new")
+    CountingReplay.calls = 0
+    kr = w.worker.ensure_king(w.ctx)
+    assert kr.submission_id == sid and kr.fingerprint == "fp-new"
+    assert CountingReplay.calls == 0  # his saved outputs, no new pod
+    assert KingRun.load(path, KEY).fingerprint == "fp-new"
+    assert w.store_for(w.ctx.period_id).status(sid)["stage"] == "done"  # the miner's own record untouched
