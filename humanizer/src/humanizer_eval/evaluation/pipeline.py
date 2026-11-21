@@ -3,7 +3,7 @@
     quote -> hold                      (billing: the balance must cover the quote; the result waits for it)
     run the bundle                     (fresh Lium pod; outputs saved encrypted right away)
     G0 normalize + length cap          (D-40)
-    G1-G3 -> level 1 / 0.5 / 0         (judge tokens metered per model; cache hits are free)
+    G1-G3 -> level 1 / 0.75 / 0.5 / 0 (judge tokens metered per model; cache hits are free)
     crown detectors                    (outputs at level 0 count as caught anyway and are not sent)
     S, crown test against the king     (paired bootstrap, seed from the period seed)
     statement -> settle                (metered words, tokens, pod hours x the public card; <= hold)
@@ -12,9 +12,14 @@ Failure rules (docs/billing-policy.md):
 * our side fails (no pod, setup, lost pod): the hold is released, nothing is charged, status ``failed``;
 * the miner's bundle fails (bad bundle, crash, no outputs): the run is scored as it is (missing outputs
   are level 0) and the pod time used is charged;
-* judges or detectors unavailable (more than ``max_error_frac`` of the calls fail after a retry, or a
-  spend cap is hit): the evaluation **pauses** (D-90) with the hold kept and the outputs saved;
-  calling again resumes from the saved outputs (cached verdicts and scores are not paid twice).
+* judges or detectors unavailable (ANY output still without a verdict or a score after
+  ``retry_rounds`` retries, or a spend cap is hit): the evaluation **pauses** (D-90) with the hold kept
+  and the outputs saved; calling again resumes from the saved outputs (cached verdicts and scores are
+  not paid twice). An output is never given level 0 or a "caught" score because OUR judge or detector
+  failed: the king and every challenger are judged and scored completely, or not compared at all;
+* the scoring conditions changed (``evaluation/conditions.py``: a different scoring fingerprint than
+  the king's run, or a detector model that is not the one H was scored by): paused as well, never
+  compared.
 
 What the miner sees before the period is disclosed (D-58): the stage, the decision, rounded aggregate
 scores and the statement. Never text produced by its code at run time (an error message could carry
@@ -61,7 +66,13 @@ __all__ = [
 @dataclass
 class EvalConfig:
     workers: int = 8
-    max_error_frac: float = 0.05  # judge / detector failures above this pause the evaluation
+    #: judge / detector calls that failed are retried this many rounds (waiting retry_wait_s x round)
+    #: before the evaluation pauses; no output is ever left without a verdict or a score
+    retry_rounds: int = 3
+    retry_wait_s: float = 15.0
+    #: scoring fingerprint (evaluation/conditions.py), stamped on every record and king run; runs with
+    #: different fingerprints are never compared
+    fingerprint: str | None = None
     skip_severe: bool = True  # level-0 outputs count as caught by every detector: not sent, not paid
     public_digits: int = 4
     update_king: bool = True  # False: decide, but leave the king and the king state untouched
@@ -75,6 +86,10 @@ class EvaluationPaused(RuntimeError):
     def __init__(self, stage: str, reason: str):
         super().__init__(f"paused at {stage}: {reason}")
         self.stage, self.reason = stage, reason
+
+
+class ConditionsChanged(EvaluationPaused):
+    """The run would not be scored under the conditions of the period's H and the king's run."""
 
 
 class InsufficientBalance(RuntimeError):
@@ -169,30 +184,42 @@ def _g0(outputs: Mapping[str, str], ctx: PeriodContext) -> tuple[list[str], list
     return outs, notes
 
 
-def _gate_all(gates: Any, ctx: PeriodContext, outs: list[str], workers: int) -> list[GateResult]:
+def _gate_all(gates: Any, ctx: PeriodContext, outs: list[str], cfg: EvalConfig) -> list[GateResult]:
+    """Every output judged; outputs whose judges failed are asked again, ``cfg.retry_rounds`` times."""
+
     def one(i: int) -> GateResult:
         return gates.check(ctx.items[i]["text"], outs[i], ctx.items[i].get("facts") or [])
 
-    with ThreadPoolExecutor(max_workers=workers) as ex:
+    with ThreadPoolExecutor(max_workers=cfg.workers) as ex:
         res = list(ex.map(one, range(len(outs))))
-        retry = [i for i, r in enumerate(res) if r.status == "error"]
-        for i, r in zip(retry, ex.map(one, retry), strict=True):
-            res[i] = r
+        for k in range(cfg.retry_rounds):
+            retry = [i for i, r in enumerate(res) if r.status == "error"]
+            if not retry:
+                break
+            time.sleep(cfg.retry_wait_s * k)
+            for i, r in zip(retry, ex.map(one, retry), strict=True):
+                res[i] = r
     return res
 
 
-def _score_detector(det: Detector, texts: list[str]) -> tuple[list[float], list[int], list[str | None], bool]:
-    """Scores (+inf where it failed), metered words (sent and not cached), errors, budget hit."""
+def _score_detector(
+    det: Detector, texts: list[str], cfg: EvalConfig
+) -> tuple[list[float], list[int], list[str | None], bool, list[str]]:
+    """Scores, metered words (sent and not cached), errors, budget hit, model versions seen. Failed texts
+    are sent again ``cfg.retry_rounds`` times; the caller pauses if any is still unscored."""
     res = det.score(texts)
-    retry = [i for i, r in enumerate(res) if not r.ok and not (r.error or "").startswith("budget")]
-    if retry:
+    for k in range(cfg.retry_rounds):
+        retry = [i for i, r in enumerate(res) if not r.ok and not (r.error or "").startswith("budget")]
+        if not retry:
+            break
+        time.sleep(cfg.retry_wait_s * k)
         for i, r in zip(retry, det.score([texts[i] for i in retry]), strict=True):
             res[i] = r
-    scores = [r.score if r.ok else math.inf for r in res]
+    scores = [r.score if r.ok else math.nan for r in res]
     words = [word_count(t) for t, r in zip(texts, res, strict=True) if r.ok and not r.cached]
     errors = [None if r.ok else (r.error or "error")[:200] for r in res]
     budget = any((e or "").startswith("budget") for e in errors)
-    return scores, words, errors, budget
+    return scores, words, errors, budget, sorted({r.version for r in res if r.ok and r.version})
 
 
 def _r(x: float, digits: int) -> float | None:
@@ -223,14 +250,21 @@ def evaluate_submission(
     king_state_path: Path | None = None,
     king_run_path: Path | None = None,
     cfg: EvalConfig | None = None,
+    watch: Mapping[str, Detector] | None = None,  # the same detectors uncached: canaries (conditions.py)
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> EvalResult:
+    from humanizer_eval.evaluation import conditions
+
     cfg = cfg or EvalConfig()
     sid, hk = sub.submission_id, sub.hotkey
     if set(detectors) != set(ctx.detectors):
         raise ValueError(f"detectors {sorted(detectors)} differ from the period's H scores {ctx.detectors}")
     if king is not None and set(king.scores) != set(ctx.detectors):
         raise ValueError("the king run was scored with other detectors")
+    if king is not None and king.fingerprint != cfg.fingerprint:
+        raise ValueError(
+            "the king's run was scored under other conditions; rescore it first (worker.ensure_king)"
+        )
     t_start = time.time()
 
     # 0. quote and hold (the result is held until the payment is confirmed: no hold, no run)
@@ -273,12 +307,20 @@ def evaluate_submission(
     store.set_stage(sid, hk, "gating")
     outs, g0 = _g0(run.outputs, ctx)
     meter = MeteringLLM(llm)
-    gres = _gate_all(gate_factory(meter), ctx, outs, cfg.workers)
+    gres = _gate_all(gate_factory(meter), ctx, outs, cfg)
     n_err = sum(r.status == "error" for r in gres)
-    if n_err > cfg.max_error_frac * ctx.n:
+    if n_err:  # never a level for an output our judges did not finish: everyone is judged completely
         store.set_stage(sid, hk, "paused", reason="quality judges unavailable; the run resumes automatically")
         raise EvaluationPaused("gating", f"{n_err} of {ctx.n} outputs could not be judged")
-    levels = np.array([0.0 if r.status == "error" else r.level for r in gres])
+    levels = np.array([r.level for r in gres])
+
+    # 3b. the detector models are still the ones H and the king were scored by (canaries, uncached)
+    problems = conditions.check(ctx.meta.get("detector_baseline"), watch)
+    if problems:
+        store.set_stage(
+            sid, hk, "paused", reason="a detector changed during the period; the run waits for the owner"
+        )
+        raise ConditionsChanged("detecting", "; ".join(problems))
 
     # 4. crown detectors on the outputs that can still count
     store.set_stage(sid, hk, "detecting")
@@ -286,10 +328,12 @@ def evaluate_submission(
     scores: dict[str, list[float]] = {}
     det_words: dict[str, list[int]] = {}
     det_errors: dict[str, dict[int, str]] = {}
+    det_versions: dict[str, list[str]] = {}
     for name in ctx.detectors:
-        s, words, errs, budget = _score_detector(detectors[name], [outs[i] for i in send])
+        s, words, errs, budget, vers = _score_detector(detectors[name], [outs[i] for i in send], cfg)
+        det_versions[name] = vers
         bad = sum(e is not None for e in errs)
-        if budget or bad > cfg.max_error_frac * max(1, len(send)):
+        if budget or bad:  # never a "caught" score for a text our detector did not score
             store.set_stage(
                 sid, hk, "paused", reason="a detector is unavailable; the run resumes automatically"
             )
@@ -302,6 +346,12 @@ def evaluate_submission(
         scores[name] = full
         det_words[name] = words
         det_errors[name] = {send[k]: e for k, e in enumerate(errs) if e is not None}
+    problems = conditions.check(ctx.meta.get("detector_baseline"), None, det_versions)
+    if problems:
+        store.set_stage(
+            sid, hk, "paused", reason="a detector changed during the period; the run waits for the owner"
+        )
+        raise ConditionsChanged("detecting", "; ".join(problems))
 
     # 5. score and the crown test
     store.set_stage(sid, hk, "scoring")
@@ -343,7 +393,7 @@ def evaluate_submission(
     pending = crowned and cfg.defer_crown
     if crowned and cfg.update_king and not pending:
         king_entry = apply_crown(
-            KingRun(sid, hk, ctx.input_ids, levels.tolist(), scores),
+            KingRun(sid, hk, ctx.input_ids, levels.tolist(), scores, fingerprint=cfg.fingerprint),
             decision.delta,
             king,
             reg_block=sub.reg_block,
@@ -418,6 +468,8 @@ def evaluate_submission(
         ],
         "scores": {k: [None if not math.isfinite(x) else x for x in v] for k, v in scores.items()},
         "detector_errors": det_errors,
+        "detector_versions": det_versions,
+        "fingerprint": cfg.fingerprint,
         "score": {
             "S": sc.s,
             "auroc": sc.auroc,

@@ -23,7 +23,7 @@ from humanizer_eval.config import get_settings
 MODULE = Path(__file__).resolve().parents[1] / "space" / "humanizer_tab.py"
 IMPORT_ANCHOR = "load_dotenv()\n"
 IMPORT_HOOK = """
-try:  # the humanizer section (mechanism 1) lives in its own module; the detection leaderboard never depends on it
+try:  # the humanizer section lives in its own module; the detection leaderboard never depends on it
     import humanizer_tab
 except Exception as _e:
     humanizer_tab = None
@@ -81,7 +81,7 @@ def main() -> int:
         repo_id=args.space,
         repo_type="space",
         operations=ops,
-        commit_message="Humanizer competition (mechanism 1): a separate section",
+        commit_message="Humanizer competition: a separate section",
         commit_description=(
             "Adds humanizer_tab.py (reads the evaluator's public API from the Space variable HUMANIZER_API) "
             "and two guarded hooks in app.py. The detection leaderboard is untouched: if the module fails to "

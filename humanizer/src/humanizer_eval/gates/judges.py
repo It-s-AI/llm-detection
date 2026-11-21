@@ -401,11 +401,16 @@ class GateRunner:
     def from_config(cls, llm: LLM, cfg: dict[str, Any]) -> GateRunner:
         """Build from ``configs/gates.json``: judges, arbiter, per-model overrides, G1 thresholds."""
         from humanizer_eval.gates.meaning import G1Config
+        from humanizer_eval.llm.openrouter import HIDDEN, pinned
 
         over = cfg.get("judge_overrides", {})
+        providers = {k: v for k, v in cfg.get("providers", {}).items() if k != "comment"}
 
         def judge(m: str) -> Judge:
-            return Judge(m, **over.get(m, {}))
+            # one provider per judge model, no fallback: identical conditions for everyone (pause if down)
+            if m not in providers:
+                raise ValueError(f"no provider pinned for judge {m} (configs/gates.json 'providers')")
+            return Judge(m, **{"policy": pinned(HIDDEN, (providers[m],)), **over.get(m, {})})
 
         a, b = cfg["judges"]
         if a.split("/")[0] == b.split("/")[0]:

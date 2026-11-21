@@ -180,8 +180,13 @@ def test_from_config_reads_repo_config():
     r = GateRunner.from_config(FakeLLM(), cfg)
     assert r.arbiter is not None and r.config.g1.max_contradicted == 0
     assert len({j.model.split("/")[0] for j in (*r.judges, r.arbiter)}) == 3
+    # every judge on exactly one provider, no fallback (the same infrastructure for everyone)
+    assert all(j.policy.order and len(j.policy.order) == 1 and not j.policy.allow_fallbacks
+               for j in (*r.judges, r.arbiter))  # fmt: skip
     with pytest.raises(ValueError):
         GateRunner.from_config(FakeLLM(), {**cfg, "judges": ["openai/a", "openai/b"]})
+    with pytest.raises(ValueError, match="no provider pinned"):
+        GateRunner.from_config(FakeLLM(), {**cfg, "providers": {}})
 
 
 # --- quality levels (D-22) and G2/G3 consensus ------------------------------------------------------

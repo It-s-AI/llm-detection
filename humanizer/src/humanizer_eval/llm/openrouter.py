@@ -82,7 +82,8 @@ def pinned(policy: RoutingPolicy, providers: tuple[str, ...]) -> RoutingPolicy:
     if not allowed:
         raise ValueError("pinned providers are not allowed by the base policy")
     return RoutingPolicy(
-        f"{policy.name}+pinned",
+        # the providers are part of the name, so the judge cache never reuses a verdict from another one
+        f"{policy.name}+pinned:{','.join(allowed)}",
         only=allowed,
         allow_fallbacks=False,
         data_collection=policy.data_collection,

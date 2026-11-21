@@ -5,6 +5,12 @@
     "google/gemini-3.8-flash"
   ],
   "arbiter": "anthropic/claude-sonnet-5.5",
+  "providers": {
+    "comment": "one provider per judge model, no fallback: the king and every challenger are judged on the same infrastructure; if it is down, evaluations pause (owner's requirement 2026-11-21). Slugs checked live 2026-11-21.",
+    "openai/gpt-6-luna": "openai",
+    "google/gemini-3.8-flash": "google-vertex",
+    "anthropic/claude-sonnet-5.5": "google-vertex"
+  },
   "judge_overrides": {
     "qwen/qwen3.8-flash": {
       "max_tokens": 12000

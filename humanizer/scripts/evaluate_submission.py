@@ -111,18 +111,24 @@ def main() -> int:
     def gate_factory(m):
         return GateRunner.from_config(m, gates_cfg)
 
-    cfg = EvalConfig(
-        workers=args.workers, update_king=not args.no_update_king, crown_kw={"n_boot": args.n_boot}
-    )
+    from humanizer_eval.evaluation.conditions import scoring_fingerprint
+
+    fp = scoring_fingerprint(gates_cfg, detectors, {"n_boot": args.n_boot})
+    cfg = EvalConfig(workers=args.workers, update_king=not args.no_update_king, crown_kw={"n_boot": args.n_boot},
+                     fingerprint=fp)  # fmt: skip
     common = {"llm": llm, "gate_factory": gate_factory, "detectors": detectors, "store": store, "cfg": cfg}
 
     king = KingRun.load(king_run_path, key)
+    if king is not None and king.fingerprint != fp:
+        if not king.submission_id.startswith("baseline"):
+            raise SystemExit("the king's run was scored under other conditions: rescore it first")
+        king = None  # the baseline is rescored below, under the current conditions
     if king is None:  # the owner's baseline: inputs unchanged (D-13), scored like any submission, owner pays
         bsid = f"baseline-identity-{tag}"
         r = evaluate_submission(Submission(bsid, OWNER_HOTKEY, name="identity"), ctx,
                                 runner=ReplayRunner([it["text"] for it in ctx.items]), **common)  # fmt: skip
         sc = {d: [float("inf") if x is None else x for x in v] for d, v in r.private["scores"].items()}
-        king = KingRun(bsid, OWNER_HOTKEY, ctx.input_ids, r.private["levels"], sc)
+        king = KingRun(bsid, OWNER_HOTKEY, ctx.input_ids, r.private["levels"], sc, fingerprint=fp)
         king.save(king_run_path, key)
         print("baseline king:", json.dumps(r.public))
     if args.king_only:

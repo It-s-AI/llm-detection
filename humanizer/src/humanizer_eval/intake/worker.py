@@ -26,6 +26,7 @@ from typing import Any
 
 from humanizer_eval.evaluation.context import KingRun, PeriodContext
 from humanizer_eval.evaluation.pipeline import (
+    ConditionsChanged,
     EvalConfig,
     EvaluationPaused,
     InsufficientBalance,
@@ -62,6 +63,9 @@ class WorkerEnv:
     archive: Any = None  # intake.archive.Archive: with it, a crown counts once the bundle is archived
     secret_key: bytes | None = None  # decrypts miners' read tokens for private repos
     max_bundle_bytes: int = MAX_BUNDLE_BYTES
+    #: the crown detectors again WITHOUT a cache: canaries for vendors that report no model version
+    #: (evaluation/conditions.py); passed to every evaluation, the king's and the challengers' alike
+    detector_watch: Mapping[str, Any] | None = None
 
 
 class KingUnavailable(RuntimeError):
@@ -113,6 +117,11 @@ class QueueWorker:
         The current king is the latest coronation whose hotkey still holds the registration it
         submitted from; if a king lost its registration, the crown returns to the previous one and
         that king is run on this period (D-66).
+
+        The stored run is used only if it was scored under the current scoring fingerprint
+        (evaluation/conditions.py). Otherwise the king is rescored from his saved outputs (no pod, the
+        same outputs) before anyone is compared with him: king and challenger always under identical
+        conditions.
         """
         env = self.env
         path = env.king_run_path(ctx)
@@ -120,9 +129,12 @@ class QueueWorker:
         cur = KingState.from_json(sp.read_text()).current_active(env.is_registered) if sp.exists() else None
         want = cur.submission_id if cur else BASELINE_ID
         kr = KingRun.load(path, env.key)
-        if kr is not None and kr.submission_id == want:
+        if kr is not None and kr.submission_id == want and kr.fingerprint == env.cfg.fingerprint:
             return kr
-        if kr is not None:
+        if kr is not None and kr.submission_id == want:
+            log.warning("king %s was scored under other conditions (%s != %s); rescoring his saved outputs",
+                        want, kr.fingerprint, env.cfg.fingerprint)  # fmt: skip
+        elif kr is not None:
             log.warning("king %s lost its registration; the crown returns to %s", kr.submission_id, want)
         store = env.store_for(ctx.period_id)
         cfg = replace(env.cfg, update_king=False)
@@ -132,6 +144,7 @@ class QueueWorker:
             "detectors": env.detectors,
             "store": store,
             "cfg": cfg,
+            "watch": env.detector_watch,
         }
         if cur is None or cur.is_baseline:
             sid = cur.submission_id if cur else BASELINE_ID
@@ -146,7 +159,8 @@ class QueueWorker:
             # its own record in this period stays as the miner saw it; the owner's run has its own id
             sub = Submission(f"{sid}-kingrun", hk, bundle_url=row.bundle_url, bundle_sha256=row.bundle_sha256,
                              name=row.name or "", reg_block=row.reg_block)  # fmt: skip
-            saved = store.load_run(sid)  # evaluated in this very period: same seed, same outputs, no pod
+            # evaluated in this very period (or rescored): same seed, same outputs, no pod
+            saved = store.load_run(f"{sid}-kingrun") or store.load_run(sid)
             if saved is None and env.archive is not None and env.archive.has(sid):
                 sub = replace(sub, bundle=env.archive.path(sid), bundle_url=None, bundle_sha256=None)
             elif saved is None and row.secret is None and row.hf_repo and env.archive is not None:
@@ -159,7 +173,7 @@ class QueueWorker:
         if r.status != "done":
             raise KingUnavailable(f"king re-run failed: {r.private.get('run_reason')}")
         scores = {d: [float("inf") if x is None else x for x in v] for d, v in r.private["scores"].items()}
-        kr = KingRun(sid, hk, ctx.input_ids, r.private["levels"], scores)
+        kr = KingRun(sid, hk, ctx.input_ids, r.private["levels"], scores, fingerprint=env.cfg.fingerprint)
         kr.save(path, env.key)
         log.info("king %s scored on %s: S=%s", sid, ctx.period_id, r.public.get("S"))
         return kr
@@ -232,6 +246,7 @@ class QueueWorker:
                 king_state_path=env.king_state_path,
                 king_run_path=env.king_run_path(ctx),
                 cfg=cfg,
+                watch=env.detector_watch,
             )
         except EvaluationPaused as e:
             pauses = row.pauses + 1
@@ -243,7 +258,11 @@ class QueueWorker:
             wait = min(self.pause_max_s, self.pause_base_s * 2 ** (pauses - 1))
             self.queue.update(row.id, state="paused", pauses=pauses, retry_at=self._now() + wait)
             self.queue.note(row.id, paused=str(e))
-            if pauses >= 3:
+            if isinstance(
+                e, ConditionsChanged
+            ):  # needs the owner: rescore H and the king (rescore_period.py)
+                self._alert(f"scoring conditions changed, evaluations wait: {e.reason}", dedupe="conditions")
+            elif pauses >= 3:
                 self._alert(f"evaluation {row.id} paused {pauses} times: {e}", dedupe=f"paused-{row.id}")
             return {"submission_id": row.id, "state": "paused"}
         except InsufficientBalance:  # no hold: should not happen for a queued row
@@ -312,6 +331,8 @@ class QueueWorker:
         from humanizer_eval.scoring.crown import crown_decision
         from humanizer_eval.scoring.metric import SubmissionRun
 
+        if king.fingerprint != rec.get("fingerprint"):  # never compare runs scored under other conditions
+            raise RuntimeError(f"{row.id}: the king's run and the record differ in scoring conditions")
         scores = {d: [float("inf") if x is None else x for x in v] for d, v in rec["scores"].items()}
         run = SubmissionRun(scores, np.asarray(rec["levels"], dtype=float), ctx.strata, ctx.input_ids)
         dec = crown_decision(king.to_run(ctx.strata), run, ctx.human_reference(), seed=ctx.crown_seed(row.id),

@@ -127,19 +127,26 @@ def _usable(e: dict[str, Any], max_price: float, min_reliability: float) -> bool
     )
 
 
+#: every evaluation (the king's re-runs and every challenger) runs on exactly this GPU model: Lium also
+#: offers "NVIDIA H100 PCIe", noticeably slower, and with one time limit for everyone a run near the limit
+#: must not depend on which variant it drew (identical conditions, 2026-11-21)
+EVAL_MACHINE = "NVIDIA H100 80GB HBM3"
+
+
 def rank_executors(
     executors: list[dict[str, Any]],
     max_price: float,
     gpus: tuple[str, ...] = ("H100",),
     min_reliability: float = 90,
+    exact: tuple[str, ...] | None = None,
 ) -> list[dict[str, Any]]:
-    """Usable executors whose name has one of ``gpus``: single-GPU nodes first (a multi-GPU node may rent
-    whole only), then by price."""
-    ok = [
-        e
-        for e in executors
-        if any(g in e.get("machine_name", "") for g in gpus) and _usable(e, max_price, min_reliability)
-    ]
+    """Usable executors whose name has one of ``gpus`` (or, with ``exact``, is exactly one of those
+    machine names): single-GPU nodes first (a multi-GPU node may rent whole only), then by price."""
+
+    def match(name: str) -> bool:
+        return name in exact if exact is not None else any(g in name for g in gpus)
+
+    ok = [e for e in executors if match(e.get("machine_name", "")) and _usable(e, max_price, min_reliability)]
     return sorted(ok, key=lambda e: (e.get("gpu_count", 1) != 1, float(e["price_per_gpu"])))
 
 
@@ -167,7 +174,7 @@ class LiumRunner:
         self.max_price = max_price
         self.time_limit_s = time_limit_s
         self.max_hours = max_hours
-        self.rank = rank or (lambda ex: rank_executors(ex, self.max_price))
+        self.rank = rank or (lambda ex: rank_executors(ex, self.max_price, exact=(EVAL_MACHINE,)))
         self.rent_attempts = rent_attempts
         self.gpus = gpus
 

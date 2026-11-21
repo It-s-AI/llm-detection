@@ -113,7 +113,7 @@ def _eval(tmp_path, runner, *, billing=None, gates=FakeGates, dets=None, king="i
         billing=billing,
         king_state_path=tmp_path / "king_state.json",
         king_run_path=tmp_path / "king_run.enc",
-        cfg=cfg or EvalConfig(workers=4, crown_kw={"n_boot": 400}),
+        cfg=cfg or EvalConfig(workers=4, crown_kw={"n_boot": 400}, retry_wait_s=0),
     )
     return res, store, ctx
 
@@ -317,7 +317,7 @@ def test_lium_runner_moves_on_after_a_refused_rent(tmp_path, monkeypatch):
     exs = [
         {
             "id": "big",
-            "machine_name": "H100",
+            "machine_name": "NVIDIA H100 80GB HBM3",
             "price_per_gpu": 1.0,
             "gpu_count": 8,
             "available_gpu_count": 8,
@@ -326,7 +326,7 @@ def test_lium_runner_moves_on_after_a_refused_rent(tmp_path, monkeypatch):
         },
         {
             "id": "one",
-            "machine_name": "H100",
+            "machine_name": "NVIDIA H100 80GB HBM3",
             "price_per_gpu": 2.0,
             "gpu_count": 1,
             "available_gpu_count": 1,
@@ -335,7 +335,7 @@ def test_lium_runner_moves_on_after_a_refused_rent(tmp_path, monkeypatch):
         },
         {
             "id": "flaky",
-            "machine_name": "H100",
+            "machine_name": "NVIDIA H100 80GB HBM3",
             "price_per_gpu": 0.5,
             "gpu_count": 1,
             "available_gpu_count": 1,
@@ -345,6 +345,12 @@ def test_lium_runner_moves_on_after_a_refused_rent(tmp_path, monkeypatch):
         },
     ]
     assert [e["id"] for e in rank_executors(exs, 2.6)] == ["one", "big"]  # single-GPU first, flaky out
+    # evaluations: exactly one GPU model, never the slower PCIe variant (identical conditions)
+    from humanizer_eval.evaluation.runners import EVAL_MACHINE
+
+    variants = [{**exs[0], "id": "sxm", "machine_name": EVAL_MACHINE},
+                {**exs[0], "id": "pcie", "machine_name": "NVIDIA H100 PCIe"}]  # fmt: skip
+    assert [e["id"] for e in rank_executors(variants, 2.6, exact=(EVAL_MACHINE,))] == ["sxm"]
     seen = []
 
     def fake_job(items, *, executor, **kw):
@@ -362,3 +368,109 @@ def test_lium_runner_moves_on_after_a_refused_rent(tmp_path, monkeypatch):
     out = LiumRunner(Client(), tmp_path / "k").run(Submission("s1", "hk"), [], 0, tmp_path)
     assert seen == ["one", "big"] and out.status == "ok" and out.pod_seconds == 600.0
     assert [a["status"] for a in out.meta["attempts"]] == ["infra_error", "ok"]
+
+
+# --- identical conditions for king and challenger (owner's requirement 2026-11-21) -----------------
+class FlakyGates(FakeGates):
+    """The judge fails on output ``bad`` the first ``fails`` times it is asked."""
+
+    def __init__(self, llm, bad=5, fails=1):
+        super().__init__(llm)
+        self.bad, self.left = bad, fails
+
+    def check(self, source, output, facts):
+        if f"topic {self.bad}." in output and self.left > 0:
+            self.left -= 1
+            return GateResult("error", reasons=["judge timeout"])
+        return super().check(source, output, facts)
+
+
+def test_a_judge_failure_is_retried_never_scored_as_level_zero(tmp_path):
+    ctx = _ctx()
+    res, _, _ = _eval(tmp_path, ReplayRunner(_outputs(ctx)), gates=lambda llm: FlakyGates(llm, fails=2))
+    assert res.status == "done" and res.private["levels"][5] == 1.0  # retried, judged like every other
+
+
+def test_one_output_without_a_verdict_pauses_the_whole_evaluation(tmp_path):
+    from humanizer_eval.evaluation import EvaluationPaused
+
+    ctx = _ctx()
+    with pytest.raises(EvaluationPaused, match="1 of 40 outputs could not be judged"):
+        _eval(tmp_path, ReplayRunner(_outputs(ctx)), gates=lambda llm: FlakyGates(llm, fails=99))
+
+
+class FlakyDetector(FakeDetector):
+    def __init__(self, name, bad_text, fails, **kw):
+        super().__init__(name, **kw)
+        self.bad_text, self.left = bad_text, fails
+
+    def score(self, texts):
+        out = super().score(texts)
+        for i, t in enumerate(texts):
+            if t == self.bad_text and self.left > 0:
+                self.left -= 1
+                out[i] = DetectorScore(self.name, text_hash(t), 0.0, error="code=500 try again")
+        return out
+
+
+def test_one_unscored_text_pauses_never_counts_as_caught(tmp_path):
+    from humanizer_eval.evaluation import EvaluationPaused
+
+    ctx = _ctx()
+    outs = _outputs(ctx)
+    bad = outs[ctx.items[7]["id"]]
+    rules = [(lambda t: "human" in t, 0.05)]
+    dets = {**_detectors(), "zerogpt": FlakyDetector("zerogpt", bad, 2, rules=rules, lo=0.9, hi=1.0)}
+    res, _, _ = _eval(tmp_path, ReplayRunner(outs), dets=dets)
+    assert res.status == "done" and res.private["scores"]["zerogpt"][7] == 0.05  # retried, really scored
+    dets["zerogpt"] = FlakyDetector("zerogpt", bad, 99, rules=rules, lo=0.9, hi=1.0)
+    with pytest.raises(EvaluationPaused, match="zerogpt: 1 of 40 texts failed"):
+        _eval(tmp_path / "b", ReplayRunner(outs), dets=dets, sid="s2")
+
+
+def test_runs_scored_under_other_conditions_are_never_compared(tmp_path):
+    ctx = _ctx()
+    king = _identity_king(ctx)
+    king.fingerprint = "old"
+    with pytest.raises(ValueError, match="other conditions"):
+        _eval(tmp_path, ReplayRunner(_outputs(ctx)), king=king,
+              cfg=EvalConfig(workers=4, crown_kw={"n_boot": 400}, retry_wait_s=0, fingerprint="new"))  # fmt: skip
+
+
+def test_a_detector_model_change_pauses_with_conditions_changed(tmp_path, monkeypatch):
+    from humanizer_eval.evaluation import conditions
+    from humanizer_eval.evaluation.pipeline import ConditionsChanged
+
+    ctx = _ctx()
+    store = SubmissionStore(tmp_path / "subs", KEY)
+    common = dict(runner=ReplayRunner(_outputs(ctx)), llm=FakeLLM(), gate_factory=FakeGates, store=store,
+                  king=_identity_king(ctx), cfg=EvalConfig(workers=4, crown_kw={"n_boot": 200}, retry_wait_s=0))  # fmt: skip
+    # a vendor that reports versions: H was scored by "fake-1", this run sees "fake-2"
+    ctx.meta["detector_baseline"] = {"gptzero": {"versions": ["fake-1"]}}
+    dets = {**_detectors(), "gptzero": FakeDetector("gptzero", lo=0.9, hi=1.0, version="fake-2")}
+    with pytest.raises(ConditionsChanged, match="gptzero: model version"):
+        evaluate_submission(Submission("s1", "hk1"), ctx, detectors=dets, **common)
+    # a vendor without versions: its canaries moved since H was scored
+    ctx.meta["detector_baseline"] = {"zerogpt": {"versions": [], "canary": {"texts": ["t"], "scores": [0.5]}}}
+    monkeypatch.setattr(conditions, "_score_texts", lambda det, texts: [0.51])
+    with pytest.raises(ConditionsChanged, match="canary scores moved"):
+        evaluate_submission(
+            Submission("s2", "hk1"), ctx, detectors=_detectors(), watch={"zerogpt": object()}, **common
+        )
+    monkeypatch.setattr(conditions, "_score_texts", lambda det, texts: [0.5])  # unchanged: evaluated normally
+    res = evaluate_submission(
+        Submission("s3", "hk1"), ctx, detectors=_detectors(), watch={"zerogpt": object()}, **common
+    )
+    assert res.status == "done"
+
+
+def test_fingerprint_covers_code_config_and_detectors():
+    from humanizer_eval.evaluation.conditions import scoring_fingerprint
+
+    cfg = {"judges": ["openai/a", "google/b"], "g3": {"minor_base": 3}}
+    dets = _detectors()
+    fp = scoring_fingerprint(cfg, dets, {"n_boot": 2000})
+    assert fp == scoring_fingerprint(dict(cfg), dict(dets), {"n_boot": 2000})
+    assert fp != scoring_fingerprint({**cfg, "g3": {"minor_base": 4}}, dets, {"n_boot": 2000})
+    assert fp != scoring_fingerprint(cfg, dets, {"n_boot": 1000})
+    assert fp != scoring_fingerprint(cfg, {k: v for k, v in dets.items() if k != "zerogpt"}, {"n_boot": 2000})

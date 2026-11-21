@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import time
 from collections.abc import Mapping, Sequence
@@ -22,6 +23,8 @@ from humanizer_eval.detectors.base import Detector
 from humanizer_eval.period.crypto import decrypt_at_rest, encrypt_at_rest
 from humanizer_eval.period.seed import derive_seed, subseed
 from humanizer_eval.scoring.metric import HumanReference, SubmissionRun
+
+log = logging.getLogger(__name__)
 
 
 def stratum(slot: Mapping[str, Any]) -> str:
@@ -96,6 +99,7 @@ def load_period(
     human_retries: int = 3,
     retry_wait_s: float = 20.0,
     human_cache: Path | str | None = None,
+    watch: Mapping[str, Detector] | None = None,
 ) -> PeriodContext:
     """Load an encrypted period and score H with the crown detectors (owner's cost, cached).
 
@@ -103,7 +107,11 @@ def load_period(
     is retried ``human_retries`` times with a growing pause; only texts that still fail stop the load.
     Scores already obtained are cached, so a retry pays only for the failed texts. With ``human_cache``
     the scores of H are kept there (encrypted) once complete: a restart, the reveal and the next load of the
-    same period read them instead of asking the detectors again."""
+    same period read them instead of asking the detectors again. The detector models H was scored by
+    (versions; canary scores through ``watch``, the same detectors uncached, for vendors without a
+    version) are kept with them: every later run of the period must be scored by the same models
+    (evaluation/conditions.py)."""
+    from humanizer_eval.evaluation import conditions
     from humanizer_eval.gates.judges import Judge
     from humanizer_eval.gates.meaning import prepare_facts
 
@@ -133,7 +141,10 @@ def load_period(
     ids = [h["id"] for h in human]
     cached = load_human_scores(human_cache, key) if human_cache else None
     scores: dict[str, list[float]] = {}
-    if cached and cached["ids"] == ids:
+    same = bool(cached) and cached["ids"] == ids
+    base_cached: dict[str, Any] = dict((cached or {}).get("baseline") or {}) if same else {}
+    hvers: dict[str, list[str]] = {}
+    if same:
         scores = {d: v for d, v in cached["scores"].items() if d in detectors}
     for name, det in detectors.items():
         if name in scores:
@@ -150,9 +161,21 @@ def load_period(
         if bad:
             raise RuntimeError(f"{name}: {len(bad)} human texts could not be scored ({bad[0].error})")
         scores[name] = [r.score for r in res]
-    same = bool(cached) and cached["ids"] == ids
-    if human_cache and (not same or set(scores) - set(cached["scores"])):
-        save_human_scores(human_cache, key, ids, {**(cached["scores"] if same else {}), **scores})
+        hvers[name] = conditions.versions(res)
+    for name, det in detectors.items():  # scores from the file of an older load without a baseline
+        if name not in hvers and name not in base_cached:
+            hvers[name] = conditions.versions(det.score(texts))  # the detector cache answers: free
+    try:
+        new = conditions.take_baseline(hvers, watch, texts, {d: scores[d] for d in hvers if d in scores})
+    except RuntimeError as e:  # H's detector models are not the vendors' current ones: hold every evaluation
+        log.error("period %s: %s", manifest["period_id"], e)
+        new = {"_problem": str(e)}
+    baseline = {k: v for k, v in {**base_cached, **new}.items() if k in detectors or k == "_problem"}
+    changed = not same or set(scores) - set(cached["scores"]) or baseline != base_cached
+    if (
+        human_cache and changed and "_problem" not in baseline
+    ):  # a problem is never stored: rescore looks again
+        save_human_scores(human_cache, key, ids, {**(cached["scores"] if same else {}), **scores}, baseline)
     return PeriodContext(
         period_id=manifest["period_id"],
         seed=seed,
@@ -161,16 +184,23 @@ def load_period(
         human_strata=[stratum(h) for h in human],
         human_scores=scores,
         dir=pdir,
-        meta={"merkle_root": manifest.get("merkle_root"), "n_human": len(human), "missing_human": missing},
+        meta={
+            "merkle_root": manifest.get("merkle_root"),
+            "n_human": len(human),
+            "missing_human": missing,
+            "detector_baseline": baseline,
+        },
     )
 
 
 def save_human_scores(
-    path: Path | str, key: bytes, ids: list[str], scores: Mapping[str, list[float]]
-) -> None:
+    path: Path | str, key: bytes, ids: list[str], scores: Mapping[str, list[float]],
+    baseline: Mapping[str, Any] | None = None,
+) -> None:  # fmt: skip
     p = Path(path)
     tmp = p.with_name(p.name + ".tmp")
-    tmp.write_bytes(encrypt_at_rest(key, json.dumps({"ids": ids, "scores": dict(scores)}).encode()))
+    body = {"ids": ids, "scores": dict(scores), "baseline": dict(baseline or {})}
+    tmp.write_bytes(encrypt_at_rest(key, json.dumps(body).encode()))
     tmp.replace(p)
 
 
@@ -198,6 +228,8 @@ class KingRun:
     input_ids: list[str]
     quality: list[float]
     scores: dict[str, list[float]]  # +inf where the output was not sent (level 0)
+    #: scoring fingerprint the run was scored under (evaluation/conditions.py); None: before 2026-11-21
+    fingerprint: str | None = None
 
     def to_run(self, strata: Sequence[str]) -> SubmissionRun:
         return SubmissionRun(self.scores, self.quality, list(strata), self.input_ids)
@@ -209,6 +241,7 @@ class KingRun:
             "input_ids": self.input_ids,
             "quality": self.quality,
             "scores": {d: [_enc(x) for x in v] for d, v in self.scores.items()},
+            "fingerprint": self.fingerprint,
         }
 
     @classmethod
@@ -219,6 +252,7 @@ class KingRun:
             list(d["input_ids"]),
             [float(q) for q in d["quality"]],
             {k: [_dec(x) for x in v] for k, v in d["scores"].items()},
+            d.get("fingerprint"),
         )
 
     def save(self, path: Path | str, key: bytes) -> None:

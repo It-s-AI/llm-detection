@@ -120,6 +120,24 @@ is above `δ_min` (0 at launch; it may be raised after the first periods, with n
 **Crown detectors: GPTZero, ZeroGPT and Pangram.** It's AI's own detector is used for tests only and
 never decides a crown.
 
+**Identical conditions.** You and the king are always judged and scored the same way:
+* **Every output is judged and scored completely.** If a judge or a detector fails on even one output, it is
+  asked again; if it keeps failing, your evaluation pauses and resumes later. An output never gets level
+  0 or a "caught" score because our judge or detector failed.
+* **The same judges on the same infrastructure.** Each judge model is pinned to one provider, with no
+  fallback to another; if it is down, evaluations wait.
+* **The same scoring code and settings.** The king's run carries a fingerprint of the scoring code, the
+  gate settings and the detector set. If any of them changes, the king is rescored from his saved outputs
+  before anyone is compared with him.
+* **The same detector models.** If a detector vendor changes its model during a period (a new version
+  string, or two control texts from H scoring differently), evaluations pause until H and the king are
+  rescored by the new model.
+* **The same GPU model:** every run, the king's included, uses an NVIDIA H100 80GB HBM3 (SXM) pod, never the
+  slower PCIe variant.
+
+LLM judges are not deterministic across different texts, but the same text always gets the same verdict
+(verdicts are cached), and the king's outputs and yours go through exactly the same steps.
+
 ## 7. After a crown
 
 * The crown counts only after we have copied your bundle from the pinned commit into our archive (keep
