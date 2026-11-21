@@ -13,6 +13,7 @@ committed on the checked-out branch of --repo (never pushed: the owner merges it
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -42,6 +43,8 @@ def main() -> int:
     ap.add_argument("--public-key", default=None, help="hex ed25519 key (default: this evaluator's)")
     ap.add_argument("--netuid", type=int, default=32)
     ap.add_argument("--commit", action="store_true")
+    ap.add_argument("--pre-launch", action="store_true",
+                    help="the server still signs for another netuid (test mode): check the signature and the key only")  # fmt: skip
     args = ap.parse_args()
     key = args.public_key
     if key is None:
@@ -55,7 +58,13 @@ def main() -> int:
         if not u.startswith("https://"):
             raise SystemExit(f"{u}: validators fetch over https only")
         try:
-            p = verify(httpx.get(u, timeout=20).json(), key, netuid=args.netuid)
+            env = httpx.get(u, timeout=20).json()
+            netuid = args.netuid
+            if args.pre_launch:  # the payload's own netuid: the signature and the key are what is checked
+                netuid = json.loads(env["payload"])["netuid"]
+                if netuid != args.netuid:
+                    print(f"note {u}: signs for netuid {netuid} now; must be {args.netuid} at launch")
+            p = verify(env, key, netuid=netuid)
         except (httpx.HTTPError, ValueError, LeaderboardError) as e:
             raise SystemExit(
                 f"{u}: not a valid leaderboard for this key and netuid {args.netuid}: {e}"

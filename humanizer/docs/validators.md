@@ -52,11 +52,12 @@ and v4 sets exactly the v3 weights, so it is safe to deploy early. A failure whi
 
 ## Timeline
 
-1. **Test launch**: the code and the rules are public, no submissions yet. The `v4` branch is public, so
-   you can review it; without a built-in key it changes nothing.
-2. **Production launch**, about half a week later: a release fills in the leaderboard's URL and public
-   key, and validators update to it. Until you update, your validator sets the v3 weights; updated
-   validators give the humanizer competition its half.
+1. **Now**: the code and the rules are public in the `v4` branch (version 4.0.1, with the leaderboard's
+   URL and public key built in); no submissions yet. **Update now:** `git fetch origin && git checkout v4
+   && pip install -e .`, then restart your validator; `run.sh` follows the branch you are on. Until the
+   start v4 sets exactly the v3 weights and does not even fetch the leaderboard.
+2. **Monday, 2026-11-23, 12:00 UTC**: submissions open, and every validator on v4 switches to 50/50 at
+   that moment by itself. A validator still on v3 keeps setting the v3 weights.
 
 ## Check it yourself
 
