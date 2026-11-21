@@ -69,6 +69,13 @@ decisions behind them are in [`spec.md`](spec.md) (`D-xx`). How to build and sub
 
 Two LLM judges from different vendors check each output; a third model decides when they disagree.
 
+* **Injection screen, before everything else.** A dedicated judge looks only for text aimed at an AI, a
+  reviewer or a grader instead of a human reader: instructions, notes about the rewrite's quality or
+  authorship, fake markup (roles, chat tokens, closing tags, JSON verdicts), hidden text. If it quotes such a
+  passage from your output (a quote that is really in your output and not in the input), that output is
+  level **0** and the quality judges never see it. Text that is also in the input never counts. A flagged
+  output is not sent to the detectors, so it costs you only the screen's tokens.
+
 * **G1 meaning.** The input's facts (extracted and verified when the period is built) must be kept:
   no distortions, no additions, at most max(1, 10%) facts missing, limited filler.
 * **G2 style.** Same language and same genre. Register (formality), format (paragraphs, lists) and
