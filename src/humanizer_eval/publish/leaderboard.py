@@ -16,7 +16,13 @@ Payload::
     {"schema": "sn32-humanizer-leaderboard/1", "netuid": 32, "mechid": 1, "seq": <ms>,
      "issued_at": <unix s>, "expires_at": <unix s>,
      "weights": {"<hotkey>": 0.85, ..., "__burn__": 0.15},
-     "king": {...current king entry...}, "history": [...last coronations, newest first...]}
+     "king": {...current king entry...}, "history": [...last coronations, newest first...],
+     "launch_ramp": {"until": <unix s>, "paid_share": 0.25} | null}
+
+Launch ramp (D-13, owner's decision 2026-11-21): while the owner's baseline is king, everything is burned.
+For the first ``LAUNCH_RAMP_S`` after the first miner coronation the miners get only ``LAUNCH_RAMP_PAID`` of
+the competition's weights (in the usual 85/10/5 proportions) and the rest is burned, so that an exploit
+that slipped through at launch can be found and stopped before it earns the full share.
 """
 
 from __future__ import annotations
@@ -33,6 +39,8 @@ from nacl.signing import SigningKey, VerifyKey
 from humanizer_eval.scoring.crown import BURN_KEY, IsRegistered, KingState
 
 SCHEMA = "sn32-humanizer-leaderboard/1"
+LAUNCH_RAMP_S = 3 * 86400.0
+LAUNCH_RAMP_PAID = 0.25
 
 
 class LeaderboardError(ValueError):
@@ -59,13 +67,23 @@ def build_payload(
     history: int = 10,
     now: float | None = None,
     is_registered: IsRegistered | None = None,
+    ramp_s: float = LAUNCH_RAMP_S,
+    ramp_paid: float = LAUNCH_RAMP_PAID,
 ) -> dict[str, Any]:
     """Payout weights of the kings that still hold their registration (a deregistered king drops out
-    and the others close ranks, D-66); everything to burn without a miner king."""
+    and the others close ranks, D-66); everything to burn without a miner king; during the launch ramp
+    the miners' part is scaled to ``ramp_paid`` and the rest goes to burn."""
     now = time.time() if now is None else now
     active = state.active_history(is_registered) if state is not None else []
     weights = state.payout_weights(is_registered) if state is not None and active else {BURN_KEY: 1.0}
     cur = active[-1] if active else None
+    first = next((e for e in state.history if not e.is_baseline), None) if state is not None else None
+    ramp = None
+    if first is not None and now < first.crowned_at.timestamp() + ramp_s:
+        ramp = {"until": first.crowned_at.timestamp() + ramp_s, "paid_share": ramp_paid}
+        paid = {k: v * ramp_paid for k, v in weights.items() if k != BURN_KEY}
+        burn = 1.0 - sum(paid.values())
+        weights = {**paid, BURN_KEY: burn} if burn > 1e-12 else paid
     return {
         "schema": SCHEMA,
         "netuid": netuid,
@@ -76,6 +94,7 @@ def build_payload(
         "weights": weights,
         "king": None if cur is None else cur.to_dict(),
         "history": [e.to_dict() for e in reversed(active[-history:])],
+        "launch_ramp": ramp,
     }
 
 

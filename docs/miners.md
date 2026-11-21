@@ -115,5 +115,6 @@ The card processor's fee is not refundable. See [`billing-policy.md`](billing-po
 ## 6. Payouts
 
 The competition's half of the miners' emission pays 85% to the current king and 10% / 5% to the
-two previous kings with different hotkeys; shares with no owner are burned. Validators add these weights
+two previous kings with different hotkeys; shares with no owner are burned. For the first 3 days after the
+first miner crown the kings get a quarter of that and the rest is burned (launch window). Validators add these weights
 from a leaderboard signed by the subnet owner to their detection weights (SN32 v4, one weight vector).

@@ -25,7 +25,7 @@ from humanizer_eval.intake import (
 )
 from humanizer_eval.intake.api import create_app
 from humanizer_eval.intake.client import MinerClient, SeedSigner
-from humanizer_eval.scoring.crown import KingState
+from humanizer_eval.scoring.crown import BURN_KEY, KingState
 
 URL = "https://huggingface.co/miner/bundle/resolve/main/b.tar"
 SHA = "ab" * 32
@@ -371,7 +371,8 @@ def test_leaderboard_endpoint_serves_a_verifiable_envelope(tmp_path):
 
     http = TestClient(create_app(w.svc, w.verifier, leaderboard=board))
     p = verify(http.get("/v1/leaderboard").json(), key.verify_key.encode().hex(), netuid=32)
-    assert p["weights"] == {m: 1.0} and p["king"]["hotkey"] == m
+    # the first miner king, crowned just now: inside the 3-day launch ramp, a quarter paid, the rest burned
+    assert p["weights"] == {m: 0.25, BURN_KEY: 0.75} and p["king"]["hotkey"] == m
     assert TestClient(create_app(w.svc, w.verifier)).get("/v1/leaderboard").status_code == 404
 
 

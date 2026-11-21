@@ -13,6 +13,10 @@ decisions behind them are in [`spec.md`](spec.md) (`D-xx`). How to build and sub
 * The competition pays **85%** to the current king and **10% / 5%** to the two previous kings with
   **different hotkeys**. If there is no previous king (or it is the owner's baseline), its share goes to
   the current king. While the owner's baseline is king, its share is burned.
+* **Launch window:** for the first **3 days** after the first miner is crowned, the kings get only
+  **25%** of the competition's share (in the same 85/10/5 proportions) and the rest is burned. This gives
+  time to find and stop an exploit that slipped through at launch before it earns the full share; after
+  the 3 days payouts are full.
 * The competition gets **half** of the miners' emission: from v4 every validator gives it 50% of its
   weights (detection keeps the other 50%), taken from a leaderboard signed by the subnet owner. If the
   owner's server is down, validators keep paying the kings of the last valid leaderboard.

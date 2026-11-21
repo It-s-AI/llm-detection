@@ -29,7 +29,8 @@ INTRO = """<p>The humanizer competition gets half of SN32's miner emission: mine
 rewrites AI text so the crown detectors take it for human writing while the meaning and quality are kept. Each
 submission is scored on the period's hidden texts; a challenger is crowned when its score <b>S</b>
 beats the king's on the same texts with confidence. The king gets 85%, the two previous kings 10% and
-5%. Bundles become public 48 hours after the coronation.</p>"""
+5%. For the first 3 days after the first miner crown the kings get a quarter of that (the rest is
+burned). Bundles become public 48 hours after the coronation.</p>"""
 
 
 TEST_BANNER = """<div style="border:2px solid #d97706;border-radius:8px;padding:10px 14px;margin:6px 0">

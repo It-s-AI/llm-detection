@@ -355,8 +355,8 @@ class GateConfig:
     the input with a quote, a kind and a severity on one reader-impact scale. Any severe defect (meaning
     lost, junk) -> 0; any major defect (reading or tone disrupted, meaning clear), or more minor ones than
     ``g3_minor_allowed(words)`` -> 0.5; only a few minor slips (or a rewrite both orders call less readable)
-    -> 0.75; none -> 1. When the two judges' levels differ, the arbiter's level decides, kept between the
-    two (the median of the three).
+    -> 0.75; none -> 1. A defect counts only when both judges quote the same spot (the milder severity);
+    severe and incoherent need both judges, or the arbiter when they split (``_consensus_natural``).
     """
 
     g1: Any = None  # meaning.G1Config; None -> defaults

@@ -31,6 +31,9 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
   its share goes entirely to the current king (as in SN34). The share of a current king that is the baseline is burned (D-13).
 - **D-13 🟡** The starting king is the owner's baseline; its share is burned. There is no growing burn during a long
   reign.
+  Launch window (owner's decision 2026-11-21): for 3 days after the first miner coronation the kings get
+  25% of the competition's share (85/10/5 proportions kept) and 75% is burned, so that a launch-time
+  exploit can be debugged before it earns the full share (`publish/leaderboard.py`, `LAUNCH_RAMP_*`).
 - **D-14 ✅** The humanizer share is **50%** of the validator's weights from launch (owner's decision 2026-11-21; previously: 10% →
   25% → 50%). The share is a constant in the validator code: all validators on v4 set the same split; it can be
   changed only by different code.
@@ -261,6 +264,7 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
 | 2026-11-13 | D-14, D-92 | Localnet: two mechanisms can be enabled only when `max_allowed_uids × 2 ≤ 256` (SN32 currently has 256 UIDs); the validator sets mechanism 1 before mechanism 0 (the SDK checks the rate limit against mechanism 0); the 90/10 split and burn via the owner's UID confirmed with money | report 11 |
 | 2026-11-13 | D-14, D-58, D-66, Q-13 | Owner's decisions: 128 UIDs × 2 mechanisms; one submission per hotkey registration, rollback when a king is deregistered; before the reveal the miner sees the level distribution (overall and per gate) and each detector's contribution (E, AUROC, P_human), but not the texts of the judges' reasons | owner's decisions 2026-11-13 |
 | 2026-11-20 | D-43 | G3 calibration: severity on a single scale of impact on the reader (not tied to the defect type), only findings shared by both judges count (the milder rating), "gross" — by agreement of both or by the arbiter; no exception lists tailored to the samples | calibration 24×15, $3.7; Q-12 samples |
+| 2026-11-21 | D-13 | Launch window: 3 days after the first miner crown the kings get 25% of the competition's share, 75% is burned; everything is burned while the baseline is king | owner's decision |
 | 2026-11-21 | D-10, D-14, D-92 | 50/50 share (detection and humanizer); when the leaderboard is unavailable, the last kings are paid rather than burn; the evaluator code is the `humanizer/` folder in It-s-AI/llm-detection, branch `v4` | owner's decisions |
 | 2026-11-21 | D-10, D-14, D-92, Q-13 | No second mechanism: validator v4 sets one weight vector, 90% detection and 10% humanizer from the signed leaderboard; without the embedded key, v4 sets weights like v3. Q-13 (128 UIDs × 2 mechanisms) withdrawn. Verified on the testnet 87 metagraph with a live leaderboard: after weight processing the humanizer share is 10%; the SN32 owner is registered (UID 129), so there is somewhere to send the burn | owner's decision |
 | 2026-11-20 | D-57 | The commitment and the Merkle root are written on chain as a `remark` record from the notary wallet; `verify_period.py` checks that the commitment landed before block B, and the Merkle root before the first evaluation | owner's decision; verified on testnet |
