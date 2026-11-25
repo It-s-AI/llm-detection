@@ -132,27 +132,31 @@ pm2 start run.sh --name llm_detection_validators_autoupdate -- --wallet.name YOU
 
 ## Humanizer competition (v4)
 
-From v4 the subnet runs two competitions on **one** set of weights, **half each**; there is no second
-mechanism.
+From v4 the subnet runs two competitions on **one** set of weights; there is no second mechanism.
 
-* **Detection** (unchanged): your validator scores the detection miners as before. They get **50%** of
+* **Detection** (unchanged): your validator scores the detection miners as before. They get **80%** of
   your weights, in the same proportions as in v3.
-* **Humanizer competition**: the other **50%**. The subnet owner's evaluator (its code is in
-  [`humanizer/`](../humanizer)) runs the miners' humanizers against paid AI detectors and publishes the
-  payouts (85/10/5 to the current king and the two previous distinct kings) as a **signed leaderboard**.
-  Your validator fetches it, checks the ed25519 signature against the key built into the release, the
-  subnet, the expiry and that the sequence number never goes back, and maps the hotkeys to UIDs. You run
-  no extra evaluation, need no new API key and pay nothing extra.
+* **Humanizer competition**: the other **20%**, split 85% / 10% / 5% between the current king and the two
+  previous kings with distinct hotkeys. The subnet owner's evaluator (its code is in
+  [`humanizer/`](../humanizer)) runs the miners' humanizers against paid AI detectors and publishes **who
+  the kings are** (their hotkeys, newest first) as a **signed leaderboard**. Your validator fetches it,
+  checks the ed25519 signature against the key built into the release, the subnet, the expiry and that
+  the sequence number never goes back, drops kings that are not in the metagraph (the rest close ranks)
+  and gives the shares of missing slots to the current king. You run no extra evaluation, need no new API
+  key and pay nothing extra.
 
-The split is a constant of this code, so every validator on v4 sets it the same way.
+The split and the 85/10/5 shares are constants of this code (`HUMANIZER_SHARE`, `KING_SHARES` in
+`detection/validator/humanizer_mechanism.py`), so every validator on the same release sets them the same
+way.
 
 If no fresh leaderboard can be had (the owner's server is down, a bad signature), the kings of the last
-valid leaderboard keep their share; it is kept on disk and survives restarts. Only a validator that has
-never received a valid leaderboard sends the humanizer half to the subnet owner's UID (burn).
+valid leaderboard keep their share; it is kept on disk and survives restarts. When there is no king to pay
+(the owner's baseline is king, none of the kings is registered, or the validator has never received a
+valid leaderboard), the validator uses the detection weights alone: the humanizer 20% goes to detection.
+Nothing is burned.
 
-**Start: Monday, 2026-11-23, 12:00 UTC.** Before that moment v4 sets exactly the v3 weights and does not
-even fetch the leaderboard, so you can update now; every validator on v4 switches to 50/50 at the same
-moment, by the clock, with nothing to do on your side.
+An older v4 validator (leaderboard schema `sn32-humanizer-leaderboard/1`) refuses the new leaderboard and
+keeps paying the kings of the last `/1` leaderboard it had until it is updated.
 
 **Updating.** The code is the `v4` branch. `run.sh` follows the branch you are on, so switch once and the
 auto-update keeps you current:

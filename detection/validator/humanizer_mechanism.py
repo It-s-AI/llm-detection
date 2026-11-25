@@ -1,49 +1,42 @@
 # The MIT License (MIT)
 # Copyright © 2026 It's AI
-"""The humanizer competition's share of the validator's weights (v4: one weight vector, no second mechanism).
+"""The humanizer competition's share of the validator's weights (one weight vector for both competitions).
 
-SN32 runs two competitions on one set of weights, half each. Detection miners are scored by the validators
-as before and get ``1 - HUMANIZER_SHARE`` of the weights. The humanizer competition gets ``HUMANIZER_SHARE``:
-the subnet owner's evaluator runs miners' humanizers against paid AI detectors, keeps one king and publishes
-the payouts (85/10/5 to the current king and the two previous distinct kings) as a leaderboard signed with
-a dedicated ed25519 key. A validator:
+SN32 runs two competitions on one set of weights. The split is a constant of this code, the same for every
+validator running it: detection ``1 - HUMANIZER_SHARE`` (80%), humanizer ``HUMANIZER_SHARE`` (20%). Inside the
+humanizer part the current king gets 85%, the two previous kings with distinct hotkeys 10% and 5%
+(``KING_SHARES``); the share of a missing slot goes to the current king. Nothing is burned.
+
+The only thing a validator learns from outside is WHO the kings are: the subnet owner's evaluator runs the
+miners' humanizers against paid AI detectors and publishes the kings' hotkeys, newest first, in a
+leaderboard signed with a dedicated ed25519 key. A validator:
 
 1. fetches the envelope from the configured URLs (any of them; first valid wins),
 2. checks the signature against the pinned public key, the schema, netuid, competition id, the expiry and
    that the sequence number never goes back (a replayed older leaderboard is refused),
-3. maps hotkeys to UIDs; shares of hotkeys not registered and the "__burn__" share go to the subnet
-   owner's UID (burn),
+3. drops kings whose hotkeys are not in the metagraph and gives the rest 85/10/5 by their order,
 4. blends: ``(1 - HUMANIZER_SHARE) * detection + HUMANIZER_SHARE * humanizer``.
 
 The validator keeps the last valid envelope on disk. When no fresh one can be had (the owner's server is
-down, a bad signature), the kings of the last valid leaderboard keep their share, even past its expiry;
-only a validator that has never seen a valid leaderboard burns the share (the subnet owner's UID). The
-share is a constant of this code, so every validator running it sets the same split. Before
-``HUMANIZER_START`` (and without a public key) the share is not applied and the detection weights stay
-exactly as in v3, so validators can update early and all switch at the same moment.
+down, a bad signature), the kings of the last valid leaderboard keep their share, even past its expiry.
+With no king (the owner's baseline reigns, or none of the kings is registered) or no valid leaderboard ever
+received, the detection weights are used alone: the humanizer part goes to detection.
 """
 
 from __future__ import annotations
 
 import json
-import math
 import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-SCHEMA = "sn32-humanizer-leaderboard/1"
-BURN_KEY = "__burn__"
+SCHEMA = "sn32-humanizer-leaderboard/2"
 #: competition id in the signed payload ("mechid": 1 = the humanizer competition); not a chain mechanism
 MECHID = 1
-#: share of the weights that goes to the humanizer competition (D-14); the rest stays with detection
-HUMANIZER_SHARE = 0.5
-#: the humanizer competition starts for every validator at the same moment: 2026-11-23 12:00 UTC.
-#: Before it, v4 sets exactly the v3 weights and does not even fetch the leaderboard.
-HUMANIZER_START = 1795435200
-
-
-def humanizer_started(now: Optional[float] = None) -> bool:
-    return (time.time() if now is None else now) >= HUMANIZER_START
+#: share of the weights that goes to the humanizer competition; the rest stays with detection
+HUMANIZER_SHARE = 0.2
+#: the current king, the previous distinct king, the one before; a missing slot goes to the current king
+KING_SHARES: Tuple[float, ...] = (0.85, 0.10, 0.05)
 # the public key of the subnet owner's leaderboard signing key and where the leaderboard is served
 DEFAULT_PUBLIC_KEY = "68e3af98273b94279c06381deaaef3811723304f238478e489d7f95fc7d880cf"
 DEFAULT_URLS: Tuple[str, ...] = ("https://188.245.168.78/v1/leaderboard",)
@@ -81,15 +74,29 @@ def verify_envelope(
         raise LeaderboardError("leaderboard expired or not yet valid")
     if int(p["seq"]) < min_seq:
         raise LeaderboardError("leaderboard is older than one already accepted")
-    w = p.get("weights")
-    if not isinstance(w, dict) or not w:
-        raise LeaderboardError("no weights")
-    vals = list(w.values())
-    if any(not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0 for v in vals):
-        raise LeaderboardError("weights must be non-negative numbers")
-    if not math.isclose(sum(vals), 1.0, abs_tol=1e-6):
-        raise LeaderboardError("weights must sum to 1")
+    k = p.get("kings")
+    if (
+        not isinstance(k, list)
+        or len(k) > len(KING_SHARES)
+        or any(not isinstance(h, str) or not h for h in k)
+        or len(set(k)) != len(k)
+    ):
+        raise LeaderboardError("kings must be at most 3 distinct hotkeys")
     return p
+
+
+def king_shares(kings: Sequence[str], hotkeys: Sequence[str]) -> Optional[List[float]]:
+    """One value per UID summing to 1: ``KING_SHARES`` over the kings that are in the metagraph, in their
+    order, the shares of missing slots to the first of them. None when no king is registered."""
+    index = {hk: uid for uid, hk in enumerate(hotkeys)}
+    present = [hk for hk in dict.fromkeys(kings) if hk in index][: len(KING_SHARES)]
+    if not present:
+        return None
+    out = [0.0] * len(hotkeys)
+    for i, hk in enumerate(present):
+        out[index[hk]] += KING_SHARES[i]
+    out[index[present[0]]] += sum(KING_SHARES[len(present):])
+    return out
 
 
 def _http_get_json(url: str, timeout: float) -> Dict[str, Any]:
@@ -176,33 +183,16 @@ class HumanizerLeaderboard:
         if self.payload is not None and self._now() >= self.payload["expires_at"]:
             self._log("humanizer leaderboard: no fresh one; the kings of the last valid one keep their share")
         elif self.payload is None:
-            self._log("humanizer leaderboard: none received yet; its share goes to burn")
+            self._log("humanizer leaderboard: none received yet; its share goes to detection")
         return self.payload
 
     # --- weights ---------------------------------------------------------------------------------
-    def weights(self, hotkeys: Sequence[str], owner_hotkey: str) -> Tuple[List[int], List[float]]:
-        """``(uids, weights)`` of the humanizer competition, summing to 1; burn = the subnet owner's UID.
-        Raises if the owner's hotkey is not registered (no safe place to send the burn)."""
-        if owner_hotkey not in hotkeys:
-            raise LeaderboardError("subnet owner hotkey is not in the metagraph")
-        burn_uid = list(hotkeys).index(owner_hotkey)
+    def dense(self, hotkeys: Sequence[str]) -> Optional[List[float]]:
+        """The humanizer part as one value per UID (``len(hotkeys)`` values summing to 1), or None when
+        there is no king to pay (no valid leaderboard ever, the owner's baseline reigns, or no king is
+        registered): then the detection weights are used alone."""
         p = self.refresh()
-        index = {hk: uid for uid, hk in enumerate(hotkeys)}
-        out: Dict[int, float] = {}
-        shares = {BURN_KEY: 1.0} if p is None else p["weights"]
-        for hk, w in shares.items():
-            uid = index.get(hk, burn_uid) if hk != BURN_KEY else burn_uid
-            out[uid] = out.get(uid, 0.0) + float(w)
-        uids = sorted(out)
-        return uids, [out[u] for u in uids]
-
-
-    def dense(self, hotkeys: Sequence[str], owner_hotkey: str) -> List[float]:
-        """The same weights as one value per UID (``len(hotkeys)`` values summing to 1)."""
-        out = [0.0] * len(hotkeys)
-        for uid, w in zip(*self.weights(hotkeys, owner_hotkey)):
-            out[uid] += w
-        return out
+        return None if p is None else king_shares(p["kings"], hotkeys)
 
 
 def blend(
@@ -211,7 +201,7 @@ def blend(
     """One weight vector for both competitions: ``(1 - share) * detection + share * humanizer``.
 
     ``detection`` is normalized here (all zero: the detection part is empty and only the humanizer share
-    is set). ``humanizer`` None (not launched, or disabled) leaves the detection weights unchanged. The
+    is set). ``humanizer`` None (no king, or disabled) leaves the detection weights unchanged. The
     humanizer vector is aligned to the detection one by UID: missing UIDs count as 0, extra ones are cut."""
     det = [max(0.0, float(x)) for x in detection]
     if humanizer is None:

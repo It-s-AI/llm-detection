@@ -1,4 +1,4 @@
-"""The humanizer competition's share of the weights, from the signed leaderboard (v4: one weight vector).
+"""The humanizer competition's share of the weights: split and 85/10/5 in code, the kings from the signed leaderboard.
 
 Loads detection/validator/humanizer_mechanism.py by path, so these tests need only pynacl and numpy
 (plus bittensor for the weight conversion), not the detection models.
@@ -20,9 +20,10 @@ T0 = 1_800_000_000.0
 KEY = SigningKey(b"\x03" * 32)
 PUB = KEY.verify_key.encode().hex()
 HOTKEYS = ["5Fowner", "5Fa", "5Fb", "5Fc"]
+NONE = [0.0, 0.0, 0.0, 0.0]
 
 
-def envelope(weights, *, now=T0, ttl=3 * 3600, netuid=32, mechid=1, key=KEY, seq=None):
+def envelope(kings, *, now=T0, ttl=3 * 3600, netuid=32, mechid=1, key=KEY, seq=None):
     p = {
         "schema": hm.SCHEMA,
         "netuid": netuid,
@@ -30,7 +31,7 @@ def envelope(weights, *, now=T0, ttl=3 * 3600, netuid=32, mechid=1, key=KEY, seq
         "seq": int(now * 1000) if seq is None else seq,
         "issued_at": now,
         "expires_at": now + ttl,
-        "weights": weights,
+        "kings": kings,
         "king": None,
         "history": [],
     }
@@ -63,116 +64,116 @@ def board(served, tmp_path=None, clock=None, urls=("https://a", "https://b")):
     )
 
 
-def test_weights_map_hotkeys_and_burn_to_owner_uid():
-    env = envelope({"5Fb": 0.85, "5Fa": 0.10, "5Fgone": 0.05})
-    uids, w = board({"https://a": env}).weights(HOTKEYS, "5Fowner")
-    assert dict(zip(uids, w)) == pytest.approx({2: 0.85, 1: 0.10, 0: 0.05})  # deregistered -> burn
+def vec(**by_uid):
+    out = [0.0] * len(HOTKEYS)
+    for k, v in by_uid.items():
+        out[int(k[1:])] = v
+    return out
 
 
-def test_never_a_valid_leaderboard_burns_everything():
-    bad = envelope({"5Fa": 1.0}, key=SigningKey(b"\x09" * 32))
-    for served in ({}, {"https://a": bad}, {"https://a": envelope({"5Fa": 1.0}, netuid=33)}):
-        uids, w = board(served).weights(HOTKEYS, "5Fowner")
-        assert (uids, w) == ([0], [1.0])
+def test_shares_are_constants_of_the_code():
+    assert hm.HUMANIZER_SHARE == 0.2 and hm.KING_SHARES == (0.85, 0.10, 0.05)
+    assert not hasattr(hm, "BURN_KEY")
+
+
+def test_kings_get_85_10_5_in_their_order():
+    d = board({"https://a": envelope(["5Fb", "5Fa", "5Fc"])}).dense(HOTKEYS)
+    assert d == pytest.approx(vec(u2=0.85, u1=0.10, u3=0.05))
+
+
+def test_missing_and_deregistered_slots_go_to_the_current_king():
+    assert board({"https://a": envelope(["5Fb"])}).dense(HOTKEYS) == pytest.approx(vec(u2=1.0))
+    assert board({"https://a": envelope(["5Fb", "5Fa"])}).dense(HOTKEYS) == pytest.approx(vec(u2=0.90, u1=0.10))
+    # the current king left the metagraph: the next one moves up
+    d = board({"https://a": envelope(["5Fgone", "5Fa", "5Fc"])}).dense(HOTKEYS)
+    assert d == pytest.approx(vec(u1=0.90, u3=0.10))
+
+
+def test_no_king_means_detection_only():
+    assert board({"https://a": envelope([])}).dense(HOTKEYS) is None  # the owner's baseline reigns
+    assert board({"https://a": envelope(["5Fgone"])}).dense(HOTKEYS) is None
+    assert hm.blend([0.0, 1.0, 1.0, 0.0], None) == [0.0, 1.0, 1.0, 0.0]
+
+
+def test_never_a_valid_leaderboard_means_detection_only():
+    bad = envelope(["5Fa"], key=SigningKey(b"\x09" * 32))
+    for served in ({}, {"https://a": bad}, {"https://a": envelope(["5Fa"], netuid=33)}):
+        assert board(served).dense(HOTKEYS) is None
+
+
+def test_no_public_key_means_detection_only():
+    b = hm.HumanizerLeaderboard(["https://a"], "", 32, fetch=lambda u, t: envelope(["5Fa"]), now=Clock())
+    assert b.dense(HOTKEYS) is None
 
 
 def test_second_url_used_when_first_is_down():
-    uids, w = board({"https://a": ConnectionError("x"), "https://b": envelope({"5Fc": 1.0})}).weights(
-        HOTKEYS, "5Fowner"
-    )
-    assert (uids, w) == ([3], [1.0])
+    d = board({"https://a": ConnectionError("x"), "https://b": envelope(["5Fc"])}).dense(HOTKEYS)
+    assert d == vec(u3=1.0)
 
 
 def test_last_kings_keep_their_share_through_an_outage(tmp_path):
     clock = Clock()
-    served = {"https://a": envelope({"5Fa": 1.0})}
+    served = {"https://a": envelope(["5Fa"])}
     b = board(served, tmp_path, clock)
-    assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
+    assert b.dense(HOTKEYS) == vec(u1=1.0)
     served.clear()  # the owner's server goes down
     clock.t += 3600
-    assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
-    clock.t += 30 * 86400  # long past the expiry: still the last king, no burn
-    assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
+    assert b.dense(HOTKEYS) == vec(u1=1.0)
+    clock.t += 30 * 86400  # long past the expiry: still the last king
+    assert b.dense(HOTKEYS) == vec(u1=1.0)
     b2 = board(served, tmp_path, clock)  # a validator restart reloads the saved (expired) envelope
-    assert b2.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
+    assert b2.dense(HOTKEYS) == vec(u1=1.0)
 
 
 def test_an_expired_envelope_is_never_accepted_as_new(tmp_path):
     clock = Clock()
-    b = board({"https://a": envelope({"5Fa": 1.0})}, tmp_path, clock)
-    assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
+    b = board({"https://a": envelope(["5Fa"])}, tmp_path, clock)
+    assert b.dense(HOTKEYS) == vec(u1=1.0)
     clock.t += 10 * 3600
-    stale_newer = envelope({"5Fc": 1.0}, now=T0 + 3600)  # newer seq, but already expired when fetched
+    stale_newer = envelope(["5Fc"], now=T0 + 3600)  # newer seq, but already expired when fetched
     b.urls, b._fetch = ["https://a"], lambda url, timeout: stale_newer
-    assert b.weights(HOTKEYS, "5Fowner") == ([1], [1.0])
+    assert b.dense(HOTKEYS) == vec(u1=1.0)
     with pytest.raises(hm.LeaderboardError, match="expired"):
         hm.verify_envelope(stale_newer, PUB, netuid=32, now=clock.t)
 
 
 def test_replayed_older_leaderboard_refused(tmp_path):
     clock = Clock()
-    new = envelope({"5Fb": 1.0}, now=T0)
-    old = envelope({"5Fa": 1.0}, now=T0 - 600)  # still within its validity
+    new = envelope(["5Fb"], now=T0)
+    old = envelope(["5Fa"], now=T0 - 600)  # still within its validity
     served = {"https://a": new}
     b = board(served, tmp_path, clock)
-    assert b.weights(HOTKEYS, "5Fowner") == ([2], [1.0])
+    assert b.dense(HOTKEYS) == vec(u2=1.0)
     served["https://a"] = old
-    assert b.weights(HOTKEYS, "5Fowner") == ([2], [1.0])  # kept the newer one
+    assert b.dense(HOTKEYS) == vec(u2=1.0)  # kept the newer one
     b2 = board({"https://a": old}, tmp_path, clock)  # even after a restart
-    assert b2.weights(HOTKEYS, "5Fowner") == ([2], [1.0])
+    assert b2.dense(HOTKEYS) == vec(u2=1.0)
 
 
-def test_bad_weight_sums_refused():
-    with pytest.raises(hm.LeaderboardError, match="sum to 1"):
-        hm.verify_envelope(envelope({"5Fa": 0.6}), PUB, netuid=32, now=T0)
-    with pytest.raises(hm.LeaderboardError):
-        hm.verify_envelope(envelope({"5Fa": -0.5, "5Fb": 1.5}), PUB, netuid=32, now=T0)
+@pytest.mark.parametrize("kings", [None, "5Fa", ["5Fa", "5Fa"], ["a", "b", "c", "d"], [""], [3]])
+def test_malformed_kings_refused(kings):
+    with pytest.raises(hm.LeaderboardError, match="kings"):
+        hm.verify_envelope(envelope(kings), PUB, netuid=32, now=T0)
 
 
-def test_owner_not_registered_raises():
-    with pytest.raises(hm.LeaderboardError, match="owner"):
-        board({"https://a": envelope({"5Fa": 1.0})}).weights(["5Fa"], "5Fowner")
+def test_an_old_schema_with_weights_is_refused():
+    p = json.loads(envelope(["5Fa"])["payload"])
+    p["schema"] = "sn32-humanizer-leaderboard/1"
+    body = json.dumps(p, sort_keys=True, separators=(",", ":"))
+    env = {"payload": body, "signature": KEY.sign(body.encode()).signature.hex(), "public_key": PUB}
+    with pytest.raises(hm.LeaderboardError, match="schema"):
+        hm.verify_envelope(env, PUB, netuid=32, now=T0)
 
 
-def test_no_public_key_burns():
-    b = hm.HumanizerLeaderboard(["https://a"], "", 32, fetch=lambda u, t: envelope({"5Fa": 1.0}), now=Clock())
-    assert b.weights(HOTKEYS, "5Fowner") == ([0], [1.0])
-
-
-def test_dense_vector_per_uid():
-    b = board({"https://a": envelope({"5Fb": 0.85, "5Fa": 0.10, "5Fgone": 0.05})})
-    assert b.dense(HOTKEYS, "5Fowner") == pytest.approx([0.05, 0.10, 0.85, 0.0])
-
-
-def test_blend_is_half_and_half():
-    assert hm.HUMANIZER_SHARE == 0.5
+def test_blend_is_80_20():
     det = [0.0, 2.0, 1.0, 1.0]  # validator scores, not normalized
-    hum = [0.05, 0.10, 0.85, 0.0]
+    hum = [0.0, 0.10, 0.85, 0.05]
     out = hm.blend(det, hum)
     assert sum(out) == pytest.approx(1.0)
-    assert out == pytest.approx([0.025, 0.25 + 0.05, 0.125 + 0.425, 0.125])
-    # the humanizer part is exactly the share, the detection part keeps its proportions
-    assert sum(o - 0.5 * d / 4 for o, d in zip(out, det)) == pytest.approx(hm.HUMANIZER_SHARE)
-
-
-def test_blend_before_launch_or_disabled_changes_nothing():
-    assert hm.blend([0.2, 0.3, 0.5], None) == [0.2, 0.3, 0.5]
+    assert out == pytest.approx([0.0, 0.4 + 0.02, 0.2 + 0.17, 0.2 + 0.01])
+    assert sum(o - 0.8 * d / 4 for o, d in zip(out, det)) == pytest.approx(hm.HUMANIZER_SHARE)
 
 
 def test_blend_with_no_detection_scores_and_misaligned_lengths():
-    assert hm.blend([0.0, 0.0, 0.0], [0.0, 1.0]) == pytest.approx([0.0, 0.5, 0.0])
-    assert hm.blend([1.0, 1.0], [0.0, 0.5, 0.5]) == pytest.approx([0.25, 0.5])  # UID 2 not known yet
-
-
-def test_without_any_leaderboard_only_the_share_is_burned():
-    det = [0.0, 1.0, 1.0, 0.0]
-    out = hm.blend(det, board({}).dense(HOTKEYS, "5Fowner"))
-    assert out == pytest.approx([0.5, 0.25, 0.25, 0.0])  # owner UID 0 = burn
-
-
-def test_the_humanizer_share_starts_for_everyone_at_the_same_moment():
-    assert not hm.humanizer_started(hm.HUMANIZER_START - 1)
-    assert hm.humanizer_started(hm.HUMANIZER_START)
-    import datetime as dt
-
-    assert dt.datetime.fromtimestamp(hm.HUMANIZER_START, dt.timezone.utc).isoformat() == "2026-11-23T12:00:00+00:00"
+    assert hm.blend([0.0, 0.0, 0.0], [0.0, 1.0]) == pytest.approx([0.0, 0.2, 0.0])
+    assert hm.blend([1.0, 1.0], [0.0, 0.5, 0.5]) == pytest.approx([0.4, 0.5])  # UID 2 not known yet

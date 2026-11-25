@@ -28,7 +28,7 @@ from traceback import print_exception
 
 from detection.base.neuron import BaseNeuron
 from detection.validator.humanizer_mechanism import (
-    DEFAULT_PUBLIC_KEY, DEFAULT_URLS, HUMANIZER_SHARE, HumanizerLeaderboard, blend, humanizer_started
+    DEFAULT_PUBLIC_KEY, DEFAULT_URLS, HUMANIZER_SHARE, HumanizerLeaderboard, blend
 )
 from detection import (
     __version__, WANDB_PROJECT,
@@ -303,14 +303,14 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.error(f"set_weights failed {msg}")
 
     def add_humanizer_share(self, detection: torch.FloatTensor) -> torch.FloatTensor:
-        """Both competitions in one weight vector, half each: detection keeps ``1 - HUMANIZER_SHARE``, the
-        humanizer competition gets ``HUMANIZER_SHARE`` from the owner's signed leaderboard (its kings; the
-        last valid leaderboard's kings through an outage; burn only if none was ever received). Before the
-        launch (no public key built in or given) and with --humanizer.disable the detection weights are
-        returned unchanged. If this round's computation fails, the previous humanizer vector is reused."""
+        """Both competitions in one weight vector, with the split fixed in code: detection keeps
+        ``1 - HUMANIZER_SHARE`` (80%), the humanizer competition gets ``HUMANIZER_SHARE`` (20%), 85/10/5 to
+        its kings named by the owner's signed leaderboard (the last valid one's through an outage). With
+        no king to pay, no valid leaderboard ever, or --humanizer.disable, the detection weights are used
+        alone. If this round's computation fails, the previous humanizer vector is reused."""
         key = self.config.humanizer.public_key or DEFAULT_PUBLIC_KEY
-        if self.config.humanizer.disable or not key or not humanizer_started():
-            return detection  # before 2026-11-23 12:00 UTC: exactly the v3 weights
+        if self.config.humanizer.disable or not key:
+            return detection
         try:
             if getattr(self, "humanizer", None) is None:
                 urls = [u.strip() for u in (self.config.humanizer.urls or "").split(",") if u.strip()]
@@ -321,19 +321,17 @@ class BaseValidatorNeuron(BaseNeuron):
                     state_path=os.path.join(self.config.neuron.full_path, "humanizer_leaderboard.json"),
                     log=bt.logging.warning,
                 )
-            try:
-                self._subnet_owner = self.subtensor.get_subnet_owner_hotkey(self.config.netuid)
-            except Exception as e:  # an RPC hiccup: the owner hotkey does not change
-                if getattr(self, "_subnet_owner", None) is None:
-                    raise
-                bt.logging.warning(f"subnet owner lookup failed, using the cached one: {e}")
-            self._humanizer_vector = self.humanizer.dense(list(self.metagraph.hotkeys), self._subnet_owner)
+            self._humanizer_vector = self.humanizer.dense(list(self.metagraph.hotkeys))
+            self._humanizer_ok = True
         except Exception as e:
-            if getattr(self, "_humanizer_vector", None) is None:
+            if not getattr(self, "_humanizer_ok", False):
                 bt.logging.error(f"humanizer share not applied: {e}")
                 return detection
             bt.logging.error(f"humanizer share: reusing the previous vector ({e})")
         hum = self._humanizer_vector
+        if hum is None:
+            bt.logging.info("humanizer share: no king to pay; detection gets all the weights")
+            return detection
         out = blend(detection.cpu().tolist(), hum, HUMANIZER_SHARE)
         bt.logging.info(
             "humanizer share",
