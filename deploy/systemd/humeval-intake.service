@@ -11,7 +11,7 @@ EnvironmentFile=/etc/humeval/humeval.env
 Environment=HUMEVAL_ENV_FILE=/etc/humeval/humeval.env
 # network, subnet, mode and address come from the env file (HUMEVAL_*); $HUMEVAL_EXTRA_ARGS is split into words
 ExecStart=/srv/humeval/humanizer_eval/.venv/bin/python scripts/intake_server.py \
-    --host 127.0.0.1 --port 8032 --public-url ${HUMEVAL_PUBLIC_URL} \
+    --host 127.0.0.1 --port 8032 \
     --metagraph /srv/humeval/var/intake/metagraph.json --lium --state-dir /srv/humeval/var/intake \
     --mode ${HUMEVAL_MODE} --network ${HUMEVAL_NETWORK} --netuid ${HUMEVAL_NETUID} $HUMEVAL_EXTRA_ARGS
 Restart=on-failure

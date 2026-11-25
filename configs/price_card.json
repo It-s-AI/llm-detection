@@ -1,7 +1,7 @@
 {
-  "version": "2026-11-09",
-  "currency": "usd",
-  "comment": "Public price card (D-80). Miners pay quantity x rate per line item. Detector prices are the vendors' list prices; judge prices are OpenRouter list prices at card time; Lium is the hourly price of an H100 CVM pod incl. setup. Changing any rate means a new version (its sha256 is pinned in every quote and statement).",
+  "version": "2026-11-25",
+  "currency": "usdc",
+  "comment": "Public price card (D-80). Miners pay quantity x rate per line item, in USDC (1 USDC = 1 USD on this card; payments arrive in TAO and are kept as USDC, billing/tao.py). Detector prices are the vendors' list prices; judge prices are OpenRouter list prices at card time; Lium is the hourly price of an H100 CVM pod incl. setup. Changing any rate means a new version (its sha256 is pinned in every quote and statement).",
   "detectors": {
     "pangram": {
       "rate_usd": 0.05,
@@ -37,11 +37,6 @@
   "lium": {
     "rate_per_hour_usd": 2.5,
     "quote_hours": 1.5
-  },
-  "payment_fee_estimate": {
-    "pct": 0.06,
-    "fixed_usd": 0.35,
-    "note": "Stripe account settles in AED: card processing 3.9% + AED 1, currency conversion 1%, VAT 5% on fees (test payment 2026-11-09: $0.64 on $6.83); estimate with margin"
   },
   "quote_ttl_seconds": 3600
 }

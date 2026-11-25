@@ -5,7 +5,7 @@
 
     c = MinerClient("https://eval.example", Wallet(name="miner", hotkey="default").hotkey)
     sub = c.submit("https://huggingface.co/.../resolve/main/bundle.tar", sha256, size)
-    # pay sub["payment"]["url"] if the balance is short, then:
+    # if the balance is short: send sub["payment"]["amount_tao"] TAO to sub["payment"]["address"], then:
     print(c.wait(sub["submission_id"]))
 
 Any object with ``ss58_address`` and ``sign(bytes) -> bytes`` works as the signer (a bittensor_wallet
@@ -96,16 +96,13 @@ class MinerClient:
     def submit(
         self, bundle_url: str, bundle_sha256: str, bundle_bytes: int, name: str = ""
     ) -> dict[str, Any]:
-        return self._req(
-            "POST",
-            "/v1/submissions",
-            {
-                "bundle_url": bundle_url,
-                "bundle_sha256": bundle_sha256,
-                "bundle_bytes": bundle_bytes,
-                "name": name,
-            },
-        )
+        d = {
+            "bundle_url": bundle_url,
+            "bundle_sha256": bundle_sha256,
+            "bundle_bytes": bundle_bytes,
+            "name": name,
+        }
+        return self._req("POST", "/v1/submissions", d)
 
     def submit_hf(self, commitment: str | None = None, hf_token: str | None = None, name: str = "") -> dict:
         """Submit the bundle pinned by this hotkey's on-chain commitment ``<repo>@<commit>``."""
@@ -123,7 +120,7 @@ class MinerClient:
         return self._req("GET", f"/v1/submissions/{sid}/statement")
 
     def paid(self, sid: str) -> dict[str, Any]:
-        """Tell the evaluator the Checkout link is paid; it asks Stripe and queues the submission."""
+        """Tell the evaluator the TAO is sent: it checks the deposit, queues the submission once covered."""
         return self._req("POST", f"/v1/submissions/{sid}/paid")
 
     def cancel(self, sid: str) -> dict[str, Any]:
@@ -132,11 +129,25 @@ class MinerClient:
     def balance(self) -> dict[str, Any]:
         return self._req("GET", "/v1/balance")
 
-    def refund(self, key: str, amount_cents: int | None = None) -> dict[str, Any]:
-        d: dict[str, Any] = {"key": key}
-        if amount_cents is not None:
-            d["amount_cents"] = amount_cents
+    def deposit(self) -> dict[str, Any]:
+        """This hotkey's TAO deposit address, the rate and the balance."""
+        return self._req("GET", "/v1/deposit")
+
+    def refund_quote(self, to: str, amount_usdc: float | None = None) -> dict[str, Any]:
+        d: dict[str, Any] = {"to": to}
+        if amount_usdc is not None:
+            d["amount_usdc"] = amount_usdc
+        return self._req("POST", "/v1/refunds/quote", d)
+
+    def refund(self, key: str, to: str, amount_usdc: float | None = None) -> dict[str, Any]:
+        """USDC of the balance (default: all available) back in TAO to ``to`` (any ss58 address)."""
+        d: dict[str, Any] = {"key": key, "to": to}
+        if amount_usdc is not None:
+            d["amount_usdc"] = amount_usdc
         return self._req("POST", "/v1/refunds", d)
+
+    def refund_status(self, key: str) -> dict[str, Any]:
+        return self._req("GET", f"/v1/refunds/{key}")
 
     def wait(self, sid: str, poll_s: float = 30.0, timeout_s: float = 6 * 3600) -> dict[str, Any]:
         t0 = time.time()

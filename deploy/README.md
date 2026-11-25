@@ -16,7 +16,7 @@ One server: the API for miners, the queue and the worker (`scripts/intake_server
 1. **User and directories.** Create the user `humeval` and the directory `/srv/humeval/{humanizer_eval,var,backups}`, owned by `humeval`.
 2. **Code.** Clone the `integration` branch of the `ChervovNikita/humanizer_eval` repository (the working one; the public copy is the `humanizer/` folder of the `v4` branch in It-s-AI/llm-detection) into `/srv/humeval/humanizer_eval`, then:
    ```
-   uv venv .venv && uv pip install -e '.[api,pool]'
+   uv venv .venv && uv pip install -e '.[api,pool,tao]'
    ```
 3. **bittensor** is needed only for the metagraph snapshot. We install it into a separate environment:
    ```
@@ -28,16 +28,13 @@ One server: the API for miners, the queue and the worker (`scripts/intake_server
    - Move `var/keys/` from the development machine: `period.key`, `leaderboard_ed25519.key`, `intake_secrets.key`.
    - Write the public key and the leaderboard URL into the validator (the `v4` branch in It-s-AI/llm-detection) with the `release_validator.py` script.
 5. **Period data.** You need `var/periods/<id>/` and the file `var/periods/CURRENT` with the id of the current period, as well as the pools `var/pool-full-v2` for human texts.
-6. **systemd.** Copy `deploy/systemd/*` to `/etc/systemd/system/`, set your domain in `humeval-intake.service`, then:
+6. **systemd.** Copy `deploy/systemd/*` to `/etc/systemd/system/` (network, subnet and mode come from the env file), then:
    ```
    systemctl daemon-reload
    systemctl enable --now humeval-metagraph.timer humeval-backup.timer humeval-intake.service
    ```
 7. **Caddy.** Install Caddy, put `deploy/Caddyfile` with your domain into `/etc/caddy/Caddyfile` and restart it: `systemctl reload caddy`. Caddy obtains the Let's Encrypt certificate by itself.
-8. **Stripe.**
-   - The webhook is optional: the miner confirms payment with the `paid` command, and the server also queries Stripe on its own.
-   - If you want a webhook for speed, create an endpoint `https://<domain>/v1/stripe/webhook` in the dashboard for the `checkout.session.completed` event and put the signing secret into `STRIPE_WEBHOOK_SECRET`.
-   - Set the live key `sk_live_` only at launch; the server refuses to work with it without the `--live-stripe` flag.
+8. **Payments.** On first start the server creates the payment keys; put ~0.02 ETH on the treasury on Base (see "Payments in TAO" below).
 9. **Check.**
    - `curl https://<domain>/v1/info` shows the period and the queue.
    - `curl https://<domain>/v1/leaderboard` returns signed weights.
@@ -65,7 +62,7 @@ One server: the API for miners, the queue and the worker (`scripts/intake_server
   - `humeval-intake` — API and worker on `127.0.0.1:8032`;
   - `humeval-caddy` — HTTPS by IP, a Let's Encrypt certificate for ~6 days, renewed automatically;
   - timers `humeval-metagraph` (testnet 87 snapshot every 3 minutes) and `humeval-backup` (every hour).
-- **Mode:** `test`. Network `test`, subnet 87, period `pilot-1`, It's AI only, test Stripe only, 10 evaluations per day. The `HUMEVAL_*` variables are in `etc/humeval.env`.
+- **Mode:** `test`. Network `test`, subnet 87, period `pilot-1`, It's AI only, 10 evaluations per day. The `HUMEVAL_*` variables are in `etc/humeval.env`.
 - **Code update** without a token on the server: `git bundle create he.bundle integration`, then `scp` into `tmp/` and on the server `git -C humanizer_eval pull tmp/he.bundle integration`. After that, `systemctl restart humeval-intake`.
 - **Check:**
   - `curl https://188.245.168.78/v1/info`;
@@ -94,6 +91,16 @@ One server: the API for miners, the queue and the worker (`scripts/intake_server
 ## Moving to the production server
 - **What to move:** `var/keys/` (the period key, the submission secrets key, the leaderboard signing key — its public part is hard-coded in validators), `var/intake/` (queue, balances, king, archive), `var/periods/`, `var/detector_cache.sqlite`, `var/calibration/llm_cache.sqlite`, `spend_ledger.sqlite`. The easiest way is from a fresh backup (`scripts/backup_state.py`).
 - **Validators:** `python scripts/release_validator.py --repo ../llm-detection --url https://<prod>/v1/leaderboard --commit` checks the live leaderboard with the key and writes the URL and the key into the validator branch. No push: the owner merges into llm-detection.
+
+## Payments in TAO (D-80, D-82)
+Miners pay only in TAO; balances, holds and charges are USDC. Each hotkey has its own deposit address; each deposit is bridged from Bittensor EVM to Base (ForeverMoney bridge over Chainlink CCIP) and swapped TAO → WETH → USDC on Uniswap V3. Refunds go back the same way, on request, to any address the miner names. Details: `docs/billing-policy.md`, `docs/spec.md` D-82.
+- **Install:** the extra `tao` (`pip install -e '.[api,pool,tao]'`). Payments are always on; there is no flag.
+- **Keys:** on first start the server creates `var/keys/tao_treasury.key` (the treasury: one EVM account, the same address on Bittensor EVM and Base) and `var/keys/tao_deposits.key` (the master secret every deposit address derives from). Both are money: back them up with `var/keys/`. Losing the deposit key strands TAO sent to the deposit addresses; losing the treasury key loses its USDC.
+- **ETH on Base:** the treasury pays each refund's bridge fee in ETH (~0.0023 ETH; the miner is charged it in USDC) and the Base gas. Keep ~0.02 ETH on it on Base. The server prints the treasury address on start.
+- **Status:** `python scripts/tao_treasury.py` (read-only) shows the treasury's balances (Base ETH, USDC and TAO), the rates, whether the bridge is ready, what miners are owed, the free USDC, and the deposits and refunds under way or stuck. A stuck CCIP message also raises a Telegram alert.
+- **Cashing out:** `python scripts/tao_treasury.py --withdraw-usdc <amount> --to 0x<Base address>` sends free USDC (above what miners are owed) on Base, e.g. straight to Coinbase (native Circle USDC).
+- **Options:** `--tao-buffer` (default 0.05: extra TAO asked over what is missing; the rest stays on the balance), `--tao-max-slippage` (0.02: a worse swap waits; alerts go to Telegram).
+- **RPC:** public endpoints by default; others via `TAO_RPC` (Bittensor EVM) and `BASE_RPC` (Base) in env, both optional.
 
 ## What is not automated
 - **HF repository for king copies.** After 48 h the server shows the miner's repository. If it has been closed, our copy is needed: a public repository `<organization>/sn32-kings`, the flag `--mirror-repo <organization>/sn32-kings` in `humeval-intake.service`, and `HF_MIRROR_TOKEN` (write access only to that repository) in env. Without them such a king is marked `unavailable`.

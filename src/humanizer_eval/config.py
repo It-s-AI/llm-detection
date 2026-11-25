@@ -10,7 +10,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _SECRET_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "URL")
@@ -34,19 +34,14 @@ class Settings(BaseSettings):
     # external reference humanizer (pilots only)
     phrasly_api_key: str = ""
 
-    # miner billing (D-80); test keys until launch
-    stripe_secret_key: str = ""
-    stripe_publishable_key: str = Field(
-        default="", validation_alias=AliasChoices("stripe_publishable_key", "stripe_pushishable_key")
-    )
-    stripe_webhook_secret: str = ""
-
     # llm gateway / data / execution
     openrouter_api_key: str = ""
     hf_api_key: str = ""
     hf_mirror_token: str = ""  # write token of our HF org: public copies of king bundles (D-70)
     alarmer_key: str = ""  # Telegram alerts via @alarmer_bot (ops/alerts.py)
     lium_api_key: str = ""
+    tao_rpc: str = ""  # Bittensor EVM JSON-RPC for payments (default: billing/evm.py RouteConfig)
+    base_rpc: str = ""  # Base JSON-RPC (default: billing/evm.py RouteConfig)
     lium_enabled: bool = False
 
     # hard spending caps, USD

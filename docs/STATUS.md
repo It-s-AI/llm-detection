@@ -12,17 +12,18 @@ Branch `integration` = all phases together, offline tests green. PRs by phase: #
 | Gates G0–G3, levels 1 / 0.75 / 0.5 / 0 | ✅ G1 v2; G2 — language and genre only; G3 v3: integrity of the whole text, only defects found by both judges count; calibration 89%; injection protection 45/45 | reports 04b, 04c, `reports/data/13b-*` |
 | Metric D-20/D-22, bootstrap, crown | ✅ power recomputed (A/A 5.5% ± 0.4%) | report 05 |
 | Lium + harness | ✅ regular nodes (no CVM) | reports 06, 06b |
-| Billing (Stripe, test mode) | ✅ quote → payment → hold → charge → refund | report 08 |
+| Billing | ✅ quote → payment → hold → charge → refund, in USDC; Stripe removed 2026-11-25 (owner's decision; was tested in test mode, report 08) | report 08, `billing/` |
+| Payment in TAO, balances in USDC (D-82, 2026-11-25) | ✅ offline tests (fake chain): one deposit address per hotkey, each deposit bridged to Base (ForeverMoney, Chainlink CCIP) and swapped TAO→WETH→USDC on Uniswap V3, USDC credit; refunds on request, USDC→TAO bridged back to any address the miner names; bridge and swap quotes checked live. **Not yet run with real money** | `billing/tao.py`, `billing/evm.py`, `scripts/tao_treasury.py` |
 | Reference humanizer v2 (submission format) | ✅ trained on Lium ($0.60), levels 36/37/5 | `examples/ref_humanizer`, report 07 |
 | Full-cycle orchestrator | ✅ quote → hold → pod → gates → detectors → crown → statement; pause on failures | report 09 |
-| Submission intake: API for miners, queue, worker | ✅ hotkey signature, SN32 hotkeys only, Stripe Checkout, king on a new period; e2e over HTTP | report 10 |
-| Humanizer weights in the validator | ✅ v4: a single weight vector, detection 50% + humanizer 50% from the signed leaderboard (on failure — the last kings); branch `v4` in It-s-AI/llm-detection; previously — branch `llm-detection-mechanism1`; localnet: weights, commit-reveal, 90/10 split, burn ✅ | report 11 |
+| Submission intake: API for miners, queue, worker | ✅ hotkey signature, SN32 hotkeys only, payment (then Stripe Checkout, now TAO), king on a new period; e2e over HTTP | report 10 |
+| Humanizer weights in the validator | ✅ v4: a single weight vector, detection 80% + humanizer 20% (85/10/5 fixed in the validator code; the signed leaderboard lists only the kings; on failure — the last kings; no burn, owner's decision 2026-11-25); branch `v4` in It-s-AI/llm-detection; previously — branch `llm-detection-mechanism1`; localnet: weights, commit-reveal, 90/10 split, burn ✅ | report 11 |
 | Bundles on the miner's HF + on-chain commitment; crown after copying into our archive; one submission per registration | ✅ | report 12 |
 | King publication after 48 h: the miner's repository, otherwise our copy on HF (`GET /v1/kings`) | ✅ tests; copy to our HF mirror verified live (report 14) | `publish/kings.py`, report 12 |
 | Humanizer section in the Space `sergak0/ai-detection-leaderboard`: payouts, period results, kings; public `GET /v1/results` | ✅ PR #1 merged 2026-11-17, Space running, both parts in place; data will appear after `HUMANIZER_API` | `space/humanizer_tab.py`, `scripts/publish_space.py` |
-| Live check of the miner path on testnet 325: HF (public and private), commitment, signed submission, Stripe link + `paid`, Lium pod, gates, It's AI, statement | ✅ two submissions passed | report 13 |
-| Test launch: `test` mode (flag in `/v1/info` and banner in the Space, test Stripe only, cap on evaluations per day), `deploy/` via env variables (testnet 87 / finney 32), HTTPS by IP; English READMEs, rules, validator guide, draft announcement | ✅ | `docs/rules.md`, `docs/validators.md`, `docs/announcements/` |
-| Test server at `188.245.168.78` (volume, no apt): HTTPS by IP (Let's Encrypt), testnet 87, pilot-1, It's AI, test Stripe, 10 evaluations/day; Space section connected (`HUMANIZER_API`) | ✅ running | `deploy/README.md` |
+| Live check of the miner path on testnet 325: HF (public and private), commitment, signed submission, Stripe link + `paid` (since replaced by TAO), Lium pod, gates, It's AI, statement | ✅ two submissions passed | report 13 |
+| Test launch: `test` mode (flag in `/v1/info` and banner in the Space, cap on evaluations per day), `deploy/` via env variables (testnet 87 / finney 32), HTTPS by IP; English READMEs, rules, validator guide, draft announcement | ✅ | `docs/rules.md`, `docs/validators.md`, `docs/announcements/` |
+| Test server at `188.245.168.78` (volume, no apt): HTTPS by IP (Let's Encrypt), testnet 87, pilot-1, It's AI, 10 evaluations/day; Space section connected (`HUMANIZER_API`) | ✅ running | `deploy/README.md` |
 | Miner guide, deployment kit (systemd, Caddy, env template), state backups | ✅ verified locally | `docs/miners.md`, `deploy/` |
 | Telegram alerts (@alarmer_bot, key in env) and a watchdog every 10 minutes: API, TLS, metagraph, disk, stuck evaluations, backups, caps, OpenRouter, Lium | ✅ running on the test server | `ops/alerts.py`, `scripts/watchdog.py` |
 | Parallel evaluations (N pods), the crown is decided one at a time against the current king | ✅ tests; rehearsal: two submissions on two pods simultaneously | `intake/worker.py`, report 14 |
@@ -32,13 +33,14 @@ Branch `integration` = all phases together, offline tests green. PRs by phase: #
 
 ## Remaining
 Waiting for the owner:
-- company accounts (Lium, OpenRouter, detectors, Stripe live) and top-ups;
+- company accounts (Lium, OpenRouter, detectors) and top-ups;
+- the first payment and refund with real TAO; ~0.02 ETH on the treasury on Base;
 - production server; state migration — per `deploy/README.md`, section "Moving to the production server";
 - launch on finney: a second mechanism is not needed (v4 — a single weight vector); the owner releases v4 with the leaderboard key and URL built in (`release_validator.py`), validators update;
 - merge the validator branch into llm-detection, after first writing in the URL and key with the `release_validator.py` script;
 - open the repository, publish the announcement.
 
-Switching to production (together with the owner): `--mode prod`, finney 32, live Stripe, three detectors, `--parallel N`, `--mirror-repo`, top up the notary wallet (~τ0.1) and enable the `humeval-rotate` timer (manually: every period costs money).
+Switching to production (together with the owner): `--mode prod`, finney 32, three detectors, `--parallel N`, `--mirror-repo`, top up the notary wallet (~τ0.1) and enable the `humeval-rotate` timer (manually: every period costs money).
 
 The public copy of the evaluator code is the `humanizer/` folder in branch `v4` of It-s-AI/llm-detection (squashed subtree). Work happens here; after changes: `git subtree pull --prefix=humanizer <this repository> integration --squash` in llm-detection on `v4`, then push.
 

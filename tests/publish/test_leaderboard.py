@@ -4,8 +4,15 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from nacl.signing import SigningKey
 
-from humanizer_eval.publish import LeaderboardError, build_payload, load_or_create_signing_key, sign, verify
-from humanizer_eval.scoring.crown import BURN_KEY, KingState
+from humanizer_eval.publish import (
+    LeaderboardError,
+    build_payload,
+    load_or_create_signing_key,
+    shares,
+    sign,
+    verify,
+)
+from humanizer_eval.scoring.crown import KingState
 
 T0 = 1_800_000_000.0
 KEY = SigningKey(b"\x03" * 32)
@@ -23,7 +30,9 @@ def _state():
 def test_round_trip_and_payout_shares():
     env = sign(build_payload(_state(), now=T0), KEY)
     p = verify(env, PUB, netuid=32, now=T0 + 10)
-    assert p["weights"] == {"5Fb": 0.85 + 0.05, "5Fa": 0.10}  # the missing third slot rolls to the king
+    assert p["kings"] == ["5Fb", "5Fa"]  # newest first, the baseline left out
+    assert shares(p) == {"5Fb": 0.85 + 0.05, "5Fa": 0.10}  # the missing third slot rolls to the king
+    assert "weights" not in p and "launch_ramp" not in p
     assert p["king"]["hotkey"] == "5Fb" and [h["submission_id"] for h in p["history"]] == [
         "s2",
         "s1",
@@ -31,11 +40,11 @@ def test_round_trip_and_payout_shares():
     ]
 
 
-def test_baseline_king_burns_everything():
+def test_baseline_king_has_no_kings_nothing_burned():
     st = KingState.initial("baseline", "owner", datetime(2026, 11, 1, tzinfo=UTC))
     for s in (st, None):
         p = verify(sign(build_payload(s, now=T0), KEY), PUB, netuid=32, now=T0)
-        assert p["weights"] == {BURN_KEY: 1.0}
+        assert p["kings"] == [] and p["king"] is None and shares(p) == {}
 
 
 @pytest.mark.parametrize(
@@ -46,7 +55,7 @@ def test_invalid_envelopes_rejected(case):
     kw = {"netuid": 32, "now": T0 + 10, "public_key_hex": PUB}
     if case == "payload":
         p = json.loads(env["payload"])
-        p["weights"] = {"5Fevil": 1.0}
+        p["kings"] = ["5Fevil"]
         env["payload"] = json.dumps(p, sort_keys=True, separators=(",", ":"))
     if case == "signature":
         env["signature"] = "00" * 64
@@ -64,10 +73,11 @@ def test_invalid_envelopes_rejected(case):
         verify(env, **kw)
 
 
-def test_signed_weights_must_sum_to_one():
+@pytest.mark.parametrize("kings", [None, "5Fa", ["5Fa", "5Fa"], ["a", "b", "c", "d"], [""], [3]])
+def test_signed_kings_must_be_at_most_three_distinct_hotkeys(kings):
     p = build_payload(_state(), now=T0)
-    p["weights"] = {"5Fa": 0.5}
-    with pytest.raises(LeaderboardError, match="sum to 1"):
+    p["kings"] = kings
+    with pytest.raises(LeaderboardError, match="kings"):
         verify(sign(p, KEY), PUB, netuid=32, now=T0)
 
 
@@ -85,24 +95,5 @@ def test_deregistered_kings_drop_out_of_the_signed_weights():
         return hk != "5Fb"
 
     p = verify(sign(build_payload(st, now=T0, is_registered=reg), KEY), PUB, netuid=32, now=T0)
-    assert p["weights"] == {"5Fa": 1.0} and p["king"]["submission_id"] == "s1"
+    assert p["kings"] == ["5Fa"] and p["king"]["submission_id"] == "s1"
     assert [h["submission_id"] for h in p["history"]] == ["s1", "baseline"]
-
-
-def test_launch_ramp_pays_a_quarter_for_three_days_after_the_first_miner_crown():
-    t = datetime(2026, 12, 1, tzinfo=UTC)
-    st = KingState.initial("baseline", "owner", t)
-    assert build_payload(st, now=t.timestamp() + 86400)["weights"] == {BURN_KEY: 1.0}  # baseline: all burned
-    first = t + timedelta(days=2)
-    st.apply_crown("s1", "5Fa", first, 0.02)
-    p = verify(sign(build_payload(st, now=first.timestamp() + 3600), KEY), PUB, netuid=32,
-               now=first.timestamp() + 3600)  # fmt: skip
-    assert p["weights"] == pytest.approx({"5Fa": 0.25, BURN_KEY: 0.75})
-    assert p["launch_ramp"]["until"] == first.timestamp() + 3 * 86400
-    # a second crown inside the window: the usual proportions, still scaled to a quarter
-    st.apply_crown("s2", "5Fb", first + timedelta(days=1), 0.01)
-    p = build_payload(st, now=(first + timedelta(days=1, hours=1)).timestamp())
-    assert p["weights"] == pytest.approx({"5Fb": 0.25 * 0.90, "5Fa": 0.25 * 0.10, BURN_KEY: 0.75})
-    # the window is counted from the FIRST miner crown, not from the latest one
-    p = build_payload(st, now=first.timestamp() + 3 * 86400 + 1)
-    assert p["weights"] == pytest.approx({"5Fb": 0.90, "5Fa": 0.10}) and p["launch_ramp"] is None

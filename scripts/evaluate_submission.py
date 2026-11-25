@@ -7,7 +7,7 @@ with none yet, the owner's identity baseline (inputs unchanged) is scored first 
 
 --detectors its_ai runs the whole cycle on the free proxy detector (a demo: It's AI never decides the
 crown, D-33); king state and king run then live in files tagged with the detector set.
---billing test uses Stripe TEST mode (a test-card top-up when the balance is short); off = owner run.
+--billing test meters and settles on a local ledger (a dev credit when the balance is short); off = owner run.
 
 Usage:
   python scripts/evaluate_submission.py --replay ref_v2 --detectors its_ai --billing test
@@ -21,7 +21,7 @@ import json
 import uuid
 from pathlib import Path
 
-from humanizer_eval.billing import Accounts, BillingService, PriceCard, StripeAPI
+from humanizer_eval.billing import Accounts, BillingService, PriceCard
 from humanizer_eval.budget import SpendLedger
 from humanizer_eval.config import get_settings
 from humanizer_eval.detectors.registry import CROWN_DETECTORS, build_detector
@@ -141,11 +141,8 @@ def main() -> int:
 
     billing = None
     if args.billing == "test":
-        api = StripeAPI(s.stripe_secret_key)  # refuses live keys
-        if not api.test_mode:
-            raise SystemExit("--billing test needs a Stripe test key")
         billing = BillingService(PriceCard.load("configs/price_card.json"),
-                                 Accounts(var_dir() / "billing" / "pilot.sqlite"), api)  # fmt: skip
+                                 Accounts(var_dir() / "billing" / "pilot.sqlite"))  # fmt: skip
 
     if args.replay:
         outs = json.loads(decrypt_at_rest(key, (pdir / f"{args.replay}.enc").read_bytes()))
@@ -164,8 +161,10 @@ def main() -> int:
     try:
         res = evaluate_submission(sub, ctx, **kw)
     except InsufficientBalance as e:
-        print(f"balance short by {e.amount_due_cents} cents: Stripe TEST top-up")
-        billing.test_topup(args.hotkey, e.amount_due_cents, ref=f"{e.quote['id']}:testcard")
+        print(f"balance short by {e.amount_due_cents} cents: dev credit on the local ledger")
+        billing.accounts.record_payment(
+            f"dev:{e.quote['id']}", args.hotkey, e.amount_due_cents, 0, {"dev": True}
+        )
         res = evaluate_submission(sub, ctx, **kw)
     p = res.private
     summary = {

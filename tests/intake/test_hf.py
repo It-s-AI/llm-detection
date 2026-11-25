@@ -127,7 +127,7 @@ def _world(tmp_path, hub, commitments):
 
     from .test_intake import World
 
-    w = World(tmp_path, limits=IntakeLimits(stripe_poll_interval_s=0))
+    w = World(tmp_path, limits=IntakeLimits(payment_poll_interval_s=0))
     w.svc.hub = w.env.hub = hub.client()
     w.svc.commitment = lambda hk: commitments.get(hk)
     w.svc.secret_key = w.env.secret_key = bytes(range(32))
