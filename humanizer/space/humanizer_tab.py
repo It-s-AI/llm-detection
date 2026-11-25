@@ -1,4 +1,4 @@
-"""SN32 humanizer competition (half of the weights from v4): a separate section of the SN32 leaderboard Space.
+"""SN32 humanizer competition (20% of the weights): a separate section of the SN32 leaderboard Space.
 
 It reads only the evaluator's public API (Space variable HUMANIZER_API, e.g. https://eval.example):
 /v1/info, /v1/leaderboard, /v1/results and /v1/kings, cached for a minute. It shares nothing with the
@@ -22,21 +22,20 @@ import pandas as pd
 API = os.environ.get("HUMANIZER_API", "").rstrip("/")
 TTL_S = 60
 TIMEOUT_S = 10
-BURN = "__burn__"
+SHARES = (0.85, 0.10, 0.05)
 _cache: dict = {"t": 0.0, "v": None}
 
-INTRO = """<p>The humanizer competition gets half of SN32's miner emission: miners submit a model that
+INTRO = """<p>The humanizer competition gets 20% of SN32's miner emission: miners submit a model that
 rewrites AI text so the crown detectors take it for human writing while the meaning and quality are kept. Each
 submission is scored on the period's hidden texts; a challenger is crowned when its score <b>S</b>
 beats the king's on the same texts with confidence. The king gets 85%, the two previous kings 10% and
-5%. For the first 3 days after the first miner crown the kings get a quarter of that (the rest is
-burned). Bundles become public 48 hours after the coronation.</p>"""
+5% (a missing previous king's share goes to the king). While the owner's baseline is king, the 20%
+goes to detection. Bundles become public 48 hours after the coronation.</p>"""
 
 
 TEST_BANNER = """<div style="border:2px solid #d97706;border-radius:8px;padding:10px 14px;margin:6px 0">
-<b>TEST LAUNCH.</b> Testnet, the free It's AI detector instead of the crown detectors, Stripe test payments
-(card 4242 4242 4242 4242, any future date and CVC: no real money). Results and crowns here do not
-carry over to the production launch.</div>"""
+<b>TEST LAUNCH.</b> Testnet, the free It's AI detector instead of the crown detectors. Results and crowns
+here do not carry over to the production launch.</div>"""
 CLOSED_BANNER = """<div style="border:2px solid #d97706;border-radius:8px;padding:10px 14px;margin:6px 0">
 <b>TEST LAUNCH: code and rules only.</b> Submissions open at the production launch on mainnet. Read the
 rules, the miner guide and the reference humanizer in
@@ -64,8 +63,6 @@ def _fetch():
 
 
 def _hk(h) -> str:
-    if h == BURN:
-        return "burn (owner UID)"
     s = str(h or "")
     return s[:6] + "…" + s[-4:] if len(s) > 14 else s
 
@@ -114,10 +111,12 @@ def _summary(info: dict, lb: dict) -> str:
 def _payouts(lb: dict) -> pd.DataFrame:
     king = (lb.get("king") or {}).get("hotkey")
     rows = []
-    for h, w in sorted((lb.get("weights") or {}).items(), key=lambda kv: -kv[1]):
-        role = "unowned (burned)" if h == BURN else ("king" if h == king else "previous king")
-        rows.append([_hk(h), role, f"{100 * float(w):.1f}%"])
-    return pd.DataFrame(rows, columns=["Hotkey", "Role", "Share"])
+    kings = [h for h in (lb.get("kings") or []) if isinstance(h, str)][: len(SHARES)]
+    for i, h in enumerate(kings):
+        w = SHARES[i] + (sum(SHARES[len(kings) :]) if i == 0 else 0.0)
+        role = "king" if h == king or i == 0 else "previous king"
+        rows.append([_hk(h), role, f"{100 * w:.1f}%"])
+    return pd.DataFrame(rows, columns=["Hotkey", "Role", "Share of the humanizer 20%"])
 
 
 def _results(res: dict, dets: list[str]) -> pd.DataFrame:

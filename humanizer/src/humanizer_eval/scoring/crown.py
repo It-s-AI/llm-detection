@@ -6,8 +6,10 @@ is strictly above ``delta_min`` (D-23, D-25). Gate quality enters ``S`` per outp
 is off by default (``min_gate_pass = 0``, owner decision 2026-11-09) and kept only as an option.
 
 Payouts: the current king gets 85%, the two previous kings with *distinct hotkeys* 10% and 5%.
-Missing slots (fewer than three distinct kings) and slots held by the owner's baseline (D-13) go to
-the burn sink ``BURN_KEY``.
+Missing slots (fewer than three distinct kings) and slots held by the owner's baseline go to the
+current king. Nothing is burned (owner's decision 2026-11-25): while the owner's baseline is king there
+are no payout hotkeys and the validators give the competition's share to detection. The shares are
+constants of the validator code; the evaluator only publishes who the kings are (``payout_hotkeys``).
 """
 
 from __future__ import annotations
@@ -28,8 +30,6 @@ from humanizer_eval.scoring.metric import (
     SubmissionRun,
 )
 
-#: Payout sink for shares that belong to nobody (missing kings, the owner's baseline).
-BURN_KEY = "__burn__"
 #: ``(hotkey, registered_at) -> bool``: is this hotkey still registered from that registration block?
 IsRegistered = Callable[[str, "int | None"], bool]
 #: Shares of the current king and the two previous distinct kings, in basis points (sum 10000).
@@ -104,6 +104,17 @@ def crown_decision(
     )
 
 
+def payout_shares(kings: list[str]) -> dict[str, float]:
+    """85/10/5 over ``kings`` (newest first, distinct); the shares of missing slots go to the first."""
+    kings = list(dict.fromkeys(kings))[: len(PAYOUT_SHARES_BP)]
+    if not kings:
+        return {}
+    total = sum(PAYOUT_SHARES_BP)
+    bp = {hk: PAYOUT_SHARES_BP[i] for i, hk in enumerate(kings)}
+    bp[kings[0]] += total - sum(bp.values())
+    return {hk: v / total for hk, v in bp.items()}
+
+
 # --- king history and payouts -----------------------------------------------------------------
 @dataclass(frozen=True)
 class KingEntry:
@@ -119,8 +130,6 @@ class KingEntry:
     def __post_init__(self) -> None:
         if not self.submission_id or not self.hotkey:
             raise ValueError("submission_id and hotkey must be non-empty")
-        if self.hotkey == BURN_KEY:
-            raise ValueError(f"{BURN_KEY!r} is reserved for the burn sink")
         if self.crowned_at.tzinfo is None or self.crowned_at.utcoffset() is None:
             raise ValueError("crowned_at must be timezone-aware")
         if self.delta_s is not None and not np.isfinite(self.delta_s):
@@ -161,7 +170,7 @@ class KingState:
 
     @classmethod
     def initial(cls, baseline_submission_id: str, owner_hotkey: str, crowned_at: datetime) -> KingState:
-        """Start a track with the owner's baseline as king; its share is burned (D-13)."""
+        """Start a track with the owner's baseline as king; it is paid nothing (D-13)."""
         return cls([KingEntry(baseline_submission_id, owner_hotkey, crowned_at, None, is_baseline=True)])
 
     @property
@@ -214,35 +223,18 @@ class KingState:
                 break
         return slots
 
-    def payout_weights(self, is_registered: IsRegistered | None = None) -> dict[str, float]:
-        """``{hotkey: weight}`` summing to 1; unowned shares under ``BURN_KEY`` (D-12, D-13).
-
-        A previous-king slot that is missing or held by the owner's baseline rolls to the current
-        king (as in SN34). The current king's own share is burned only when it is the baseline,
-        and then the unowned residual is burned too.
-        """
-        bp: dict[str, int] = {}
-        burn = 0
+    def payout_hotkeys(self, is_registered: IsRegistered | None = None) -> list[str]:
+        """Hotkeys of the current king and the previous distinct kings, newest first (at most 3), the
+        owner's baseline left out; empty while the baseline is king. This is what the leaderboard signs."""
         slots = self.payout_slots(is_registered)
-        current = slots[0] if slots and not slots[0].is_baseline else None
-        residual = 0
-        for i, share in enumerate(PAYOUT_SHARES_BP):
-            e = slots[i] if i < len(slots) else None
-            if e is None or e.is_baseline:
-                if i == 0:
-                    burn += share
-                else:
-                    residual += share
-            else:
-                bp[e.hotkey] = bp.get(e.hotkey, 0) + share
-        if current is not None:
-            bp[current.hotkey] += residual
-        else:
-            burn += residual
-        if burn:
-            bp[BURN_KEY] = burn
-        total = sum(PAYOUT_SHARES_BP)
-        return {k: v / total for k, v in bp.items()}
+        if not slots or slots[0].is_baseline:
+            return []
+        return [e.hotkey for e in slots if not e.is_baseline]
+
+    def payout_weights(self, is_registered: IsRegistered | None = None) -> dict[str, float]:
+        """``{hotkey: share}`` of the competition (summing to 1, or empty while the baseline is king):
+        the same rule as the validator's (D-12): 85/10/5, missing slots roll to the current king."""
+        return payout_shares(self.payout_hotkeys(is_registered))
 
     # --- serialization ----------------------------------------------------------------------
     def to_dict(self) -> dict:

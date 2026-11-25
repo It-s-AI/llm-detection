@@ -20,7 +20,7 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
 
 - **D-10 ✅** Two competitions in one subnet: detection (as now) and humanizer. Since v4 (owner's decision
   2026-11-21) this is **one weight vector**, without a second mechanism: the validator sets
-  `0.5 × detection + 0.5 × humanizer` (branch `v4` in It-s-AI/llm-detection; the evaluator code is the `humanizer/`
+  `0.8 × detection + 0.2 × humanizer` (owner's decision 2026-11-25; branch `v4` in It-s-AI/llm-detection; the evaluator code is the `humanizer/`
   folder in the same place). A duel with the SN32 detectors in v1
   **is not done** (postponed).
 - **D-11 ✅** One king. A challenger is compared **directly with the current king** on the same
@@ -28,15 +28,17 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
   of a period, subsequent challengers are compared with the new one.
 - **D-12 ✅** Mechanism 1 payouts: 85/10/5 — the current king and the two previous **distinct hotkeys** (not "top 3 by
   score": otherwise the top would be taken by copies of the open king). If there is no previous king (or it is the owner's baseline),
-  its share goes entirely to the current king (as in SN34). The share of a current king that is the baseline is burned (D-13).
-- **D-13 🟡** The starting king is the owner's baseline; its share is burned. There is no growing burn during a long
-  reign.
-  Launch window (owner's decision 2026-11-21): for 3 days after the first miner coronation the kings get
-  25% of the competition's share (85/10/5 proportions kept) and 75% is burned, so that a launch-time
-  exploit can be debugged before it earns the full share (`publish/leaderboard.py`, `LAUNCH_RAMP_*`).
-- **D-14 ✅** The humanizer share is **50%** of the validator's weights from launch (owner's decision 2026-11-21; previously: 10% →
-  25% → 50%). The share is a constant in the validator code: all validators on v4 set the same split; it can be
-  changed only by different code.
+  its share goes entirely to the current king (as in SN34). The shares are constants of the validator code
+  (`KING_SHARES`, owner's decision 2026-11-25); the leaderboard carries only the kings' hotkeys, newest first
+  (D-92). A king not in the metagraph is dropped by the validator and the others close ranks. Nothing is burned.
+- **D-13 🟡** The starting king is the owner's baseline; it is paid nothing: while it is king the leaderboard
+  lists no kings and validators give the humanizer share to detection. No burn and no launch window (owner's
+  decision 2026-11-25; previously: the baseline's share burned, and for 3 days after the first miner coronation
+  the kings got 25% of the share with 75% burned).
+- **D-14 ✅** The humanizer share is **20%** of the validator's weights, detection keeps 80% (owner's decision 2026-11-25;
+  previously: 50%, and before that 10% → 25% → 50%). The share is a constant in the validator code (`HUMANIZER_SHARE`):
+  all validators on the same release set the same split; it can be changed only by different code. The
+  `HUMANIZER_START` date gate is removed (the start date has passed).
 
 ## Metric
 
@@ -213,14 +215,44 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
 
 ## Payment
 
-- **D-80 ✅** A reserve via Stripe of **~$220** per submission (itemized: detectors, judges, Lium, fees) →
-  settlement at actual cost under the public rates → the remainder goes to the hotkey's balance → refund on request to the original
-  payment method (idempotent; withdrawal is blocked during a run). The scheme is the same as at SN34/Yugos.
-  The report for a submission is itemized as "quantity × rate" (words per detector, judge tokens, pod hours);
-  after the period is revealed, anyone can recompute the total. **No cryptographic proofs at launch**
-  (a log with hashes on chain, spot re-checking of detectors — later, D-81). The full call log
-  is kept by the owner (disputes/chargebacks). A public refund policy. The result is held back until
-  the payment is confirmed. At launch, the period's shared costs are paid by the owner.
+- **D-80 ✅** A reserve of **~$220** per submission (itemized: detectors, judges, Lium) → settlement at actual
+  cost under the public rates → the remainder goes to the hotkey's balance → refund on request
+  (idempotent; refused while a hold is open). The scheme is the same as at SN34/Yugos. All amounts are
+  **USDC** (1 USDC = 1 USD on the card, kept internally in cents of USDC; price card 2026-11-25, currency
+  `usdc`); payment is only in TAO (D-82). Stripe was removed on 2026-11-25 (owner's decision): no cards, no
+  processor fee line. The report for a submission is itemized as "quantity × rate" (words per detector,
+  judge tokens, pod hours); after the period is revealed, anyone can recompute the total. **No
+  cryptographic proofs at launch** (a log with hashes on chain, spot re-checking of detectors — later,
+  D-81). The full call log is kept by the owner (disputes). A public refund policy. The result is held back
+  until the payment is confirmed. At launch, the period's shared costs are paid by the owner.
+- **D-82 ✅ Payment in TAO, balances in USDC (owner's decisions 2026-11-25).**
+  - *Deposit.* Each hotkey has one deposit address of its own: the Substrate mirror
+    (`blake2_256("evm:" + h160)`) of an EVM account whose key derives from one server secret
+    (`var/keys/tao_deposits.key`), so a plain TAO transfer (btcli, any wallet, an exchange) funds it.
+    `GET /v1/deposit` shows it. When a submission's balance is short, submit returns the address and the
+    TAO to send: the USDC missing × (1 + 5% buffer) at the current rate + the bridge's cost, within the
+    quote's hour; TAO sent in time that lands up to 1 h after the window still counts, anything else stays
+    on the balance.
+  - *Conversion.* Each deposit, whole and on its own, is bridged from Bittensor EVM to Base by the
+    ForeverMoney bridge over Chainlink CCIP (~2 min, ~0.005 TAO ≈ $1 incl. gas), then swapped on Base
+    TAO → WETH (Uniswap V3 0.3%) → USDC (0.05%), ~0.4% on 1 TAO; the USDC that came out is credited. A
+    swap more than 2% under the small-trade price waits. After that nobody carries exchange-rate risk.
+  - *Treasury.* One EVM account (`var/keys/tao_treasury.key`, the same address on both chains) holds the
+    USDC (native Circle USDC on Base) and some ETH on Base for refund fees. The owner sees the balances,
+    what miners are owed and the free USDC with `scripts/tao_treasury.py`, and sends free USDC on Base
+    (e.g. to Coinbase) with `--withdraw-usdc X --to 0x...`.
+  - *Refunds* only on request, any time except while a hold is open (`POST /v1/refunds {key, to,
+    amount_usdc?}`; `POST /v1/refunds/quote` estimates without moving money). USDC → TAO on Base at the
+    rate of that moment → bridged back to Finney (~30 min, the bridge unstakes) → to **any ss58 address
+    named in the request** (owner's decision 2026-11-25: a deregistered or lost hotkey must not lock the
+    money in; deposits come from any wallet too; a stolen hotkey can withdraw its balance, an accepted
+    risk for balances of this size). The way back's cost (CCIP fee ~0.0023 ETH ≈ $3.8, paid in ETH by the treasury, plus ~$0.05
+    gas) is deducted from the refund; if what remains buys less than 0.01 TAO the refund fails and the
+    money stays. The miner sees the TAO sent and the CCIP message id.
+  - *Risks.* ForeverMoney is young (live since 2026-08-20); admin is a 2-of-3 Safe; audited by Hackerbane
+    in Sept 2026 (0 critical/high/medium); bridged TAO on Base is backed by root-staked TAO in their vault.
+    A paused bridge makes deposits wait on the deposit address.
+  - Code: `billing/tao.py`, `billing/evm.py`. Not yet run with real money.
 - **D-81 ⏳** Verifiability of reports (later): a call log with hash chaining, a hash on chain before the
   result is announced, a verifier script with spot re-checking of detectors.
 
@@ -232,12 +264,14 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
   are pinned to a model; if the model is unavailable, evaluation pauses.
 - **D-91 ✅** All paid clients go through a local expense log with hard limits
   (`humeval budget`).
-- **D-92 ✅** Validator integration: the humanizer share comes from a signed leaderboard. If there is no fresh one
-  (server unavailable, invalid signature), the kings of the last valid leaderboard are paid, even after it
-  expires (owner's decision 2026-11-21). Burn happens only at a validator that has not yet received any valid leaderboard.
-  The leaderboard is signed with a separate ed25519 key (the public key is pinned in the
-  validator code), validity 3 h, the version number never decreases; burn and the shares of unregistered hotkeys go to the
-  subnet owner's UID (report 11).
+- **D-92 ✅** Validator integration: the kings come from a signed leaderboard (schema `sn32-humanizer-leaderboard/2`,
+  `"kings": [current, previous distinct, one before]`, 0–3 hotkeys, newest first; no weights in it). If there is no
+  fresh one (server unavailable, invalid signature), the kings of the last valid leaderboard are paid, even after it
+  expires (owner's decision 2026-11-21). With no king to pay (the baseline is king, no listed king is registered, or
+  no valid leaderboard ever received) the validator uses the detection weights alone; nothing is burned (owner's
+  decision 2026-11-25). The leaderboard is signed with a separate ed25519 key (the public key is pinned in the
+  validator code), validity 3 h, the version number never decreases (report 11). Validators on the old schema `/1`
+  refuse the new leaderboard and keep paying the kings of the last `/1` leaderboard they had until they update.
 
 ## Open questions
 
@@ -285,6 +319,9 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
 | 2026-11-21 | D-13 | Launch window: 3 days after the first miner crown the kings get 25% of the competition's share, 75% is burned; everything is burned while the baseline is king | owner's decision |
 | 2026-11-21 | D-10, D-14, D-92 | 50/50 share (detection and humanizer); when the leaderboard is unavailable, the last kings are paid rather than burn; the evaluator code is the `humanizer/` folder in It-s-AI/llm-detection, branch `v4` | owner's decisions |
 | 2026-11-21 | D-10, D-14, D-92, Q-13 | No second mechanism: validator v4 sets one weight vector, 90% detection and 10% humanizer from the signed leaderboard; without the embedded key, v4 sets weights like v3. Q-13 (128 UIDs × 2 mechanisms) withdrawn. Verified on the testnet 87 metagraph with a live leaderboard: after weight processing the humanizer share is 10%; the SN32 owner is registered (UID 129), so there is somewhere to send the burn | owner's decision |
+| 2026-11-25 | D-82 | *(superseded the same day by the row below)* Payment in TAO next to Stripe: per-submission deposit address, swap to USDC on the TaoFi pool of Bittensor EVM on arrival, charge in USD, unused part back in TAO automatically | owner's decision (miners' request); pool liquidity checked on chain |
+| 2026-11-25 | D-80, D-82 | Stripe removed; payments only in TAO, balances in USDC, refunds on request via Base to any address the miner names. One deposit address per hotkey; each deposit bridged to Base (ForeverMoney, Chainlink CCIP) and swapped to USDC on Uniswap V3; buffer 5%, swap waits beyond 2% slippage; refunds swapped back to TAO and bridged to Finney, the way back's cost deducted, minimum 0.01 TAO; price card 2026-11-25 in USDC, no processor fee line | owner's decisions 2026-11-25; route checked on chain (1 TAO → 175.91 USDC on Base against a market of ~176.3) |
+| 2026-11-25 | D-10, D-12, D-13, D-14, D-92 | 80/20 split (detection / humanizer); the split and 85/10/5 are constants of the validator code; the leaderboard (schema `/2`) carries only the kings' hotkeys; the validator drops unregistered kings and gives missing slots to the current king; burn and the launch window removed: with no king (baseline) or no leaderboard ever received, the humanizer share goes to detection; `HUMANIZER_START` removed | owner's decision: shares fixed in validator code, burn removed |
 | 2026-11-20 | D-57 | The commitment and the Merkle root are written on chain as a `remark` record from the notary wallet; `verify_period.py` checks that the commitment landed before block B, and the Merkle root before the first evaluation | owner's decision; verified on testnet |
 | 2026-11-20 | D-56, D-57, D-70 | Automatic period rotation: commitment and block B at the start of the period, assembly after B is finalized, preparation of the next period on the server (H is scored once and cached, the king is run in advance), switchover, reveal of the closed period in `/v1/periods/<id>/` and a check with `verify_period.py`. The bundle archive is cleaned up: kings with a live registration stay, the rest are mirrored first | tasks for production; behavior covered by tests |
 | 2026-11-20 | D-22, D-42, D-43 | G2 checks only language and genre (person/tense are no longer penalized). G3 v3: judges list defects with a quote and severity; new level 0.75 — only a few minor flaws; 0.5 — a noticeable defect or more minor ones than max(3, ⌈words/75⌉); the arbiter decides within the range between the judges | owner's decisions on the Q-12 samples |

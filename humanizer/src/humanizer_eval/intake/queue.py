@@ -91,7 +91,7 @@ class Row:
     commit_block: int | None = None  # block of that commitment
     secret: str | None = None  # encrypted read token for a private repo; cleared after the evaluation
     archived: int = 0  # the king's bundle is in our archive
-    payment_url: str | None = None  # Stripe Checkout link while the submission awaits payment
+    payment_url: str | None = None  # unused since payments moved to TAO (queues made before keep it)
 
     def to_dict(self) -> dict[str, Any]:
         return {f.name: getattr(self, f.name) for f in fields(self)}

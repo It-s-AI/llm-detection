@@ -1,8 +1,9 @@
-"""HTTP API for miners (FastAPI; the `api` extra). Every route except ``/v1/info``, the Stripe webhook and
-the Checkout landing pages is signed with the miner's hotkey (``intake/auth.py``).
+"""HTTP API for miners (FastAPI; the `api` extra). Every route except the public ones (info, leaderboard,
+results, kings, periods) is signed with the miner's hotkey (``intake/auth.py``). Money is USDC; it arrives
+as TAO at the hotkey's deposit address and goes back as TAO (billing/tao.py).
 
     GET    /v1/info                         period, crown detectors, quote estimate, queue length
-    GET    /v1/leaderboard                  signed payout weights for validators (mechanism 1, D-92)
+    GET    /v1/leaderboard                  the signed list of kings validators pay (D-92)
     GET    /v1/results?period=<id>          finished submissions of a period: scores and aggregates (public)
     GET    /v1/kings                        the kings, newest first, with the public link to each bundle
                                             48 h after its coronation (D-70; publish/kings.py)
@@ -13,11 +14,13 @@ the Checkout landing pages is signed with the miner's hotkey (``intake/auth.py``
                                             (development: {bundle_url, bundle_sha256, bundle_bytes})
     GET    /v1/submissions/{id}             state, place in the queue, public result (D-58)
     GET    /v1/submissions/{id}/statement   line items after settlement
-    POST   /v1/submissions/{id}/paid        "I have paid the Checkout link": asks Stripe now, joins the queue
+    POST   /v1/submissions/{id}/paid        "I have sent the TAO": checks the deposit now, joins the queue
     DELETE /v1/submissions/{id}             cancel before it runs (the hold is released)
-    GET    /v1/balance                      balance and available (not held) cents
-    POST   /v1/refunds                      {key, amount_cents?}: to the original payments, idempotent per key
-    POST   /v1/stripe/webhook               Stripe events (signature checked with the webhook secret)
+    GET    /v1/deposit                      the hotkey's TAO deposit address, the rate, the balance
+    GET    /v1/balance                      balance and available (not held) USDC, deposits on their way
+    POST   /v1/refunds/quote                {to, amount_usdc?}: what a refund would send now (no money moves)
+    POST   /v1/refunds                      {key, to, amount_usdc?}: back in TAO to the ss58 address ``to``
+    GET    /v1/refunds/{key}                where a refund is (swapped, bridged, delivered)
 """
 
 from __future__ import annotations
@@ -29,11 +32,10 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
-from starlette.concurrency import run_in_threadpool as call  # sqlite and Stripe calls block
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool as call  # sqlite and chain calls block
 
 from humanizer_eval.billing.accounts import BillingError
-from humanizer_eval.billing.stripe_api import StripeError
 from humanizer_eval.intake.auth import AuthError, Verifier
 from humanizer_eval.intake.queue import QueueError
 from humanizer_eval.intake.service import Forbidden, IntakeService, NotFound, RateLimited, Unavailable
@@ -48,7 +50,6 @@ def create_app(
     svc: IntakeService,
     verifier: Verifier,
     *,
-    webhook_secret: str | None = None,
     leaderboard: Callable[[], dict[str, Any]] | None = None,
     kings: Callable[[], dict[str, Any]] | None = None,
     periods_dir: Path | None = None,  # schedule.json: commitments, seed blocks, Merkle roots (lifecycle)
@@ -162,7 +163,12 @@ def create_app(
                     raise ValueError(f"unknown fields {sorted(unknown)}")
                 return await call(svc.submit_hf, hk, commitment=d.get("commitment"),
                                   hf_token=d.get("hf_token"), name=d.get("name", ""))  # fmt: skip
-            unknown = set(d) - {"bundle_url", "bundle_sha256", "bundle_bytes", "name"}
+            unknown = set(d) - {
+                "bundle_url",
+                "bundle_sha256",
+                "bundle_bytes",
+                "name",
+            }
             if unknown:
                 raise ValueError(f"unknown fields {sorted(unknown)}")
             return await call(
@@ -216,51 +222,36 @@ def create_app(
 
         return await guarded(f, request)
 
+    @app.get("/v1/deposit")
+    async def deposit(request: Request):
+        async def f(r):
+            hk, _ = await signed(r)
+            return await call(svc.deposit, hk)
+
+        return await guarded(f, request)
+
+    @app.post("/v1/refunds/quote")
+    async def refund_quote(request: Request):
+        async def f(r):
+            hk, d = await signed(r)
+            return await call(svc.refund_quote, hk, d.get("to"), d.get("amount_usdc"))
+
+        return await guarded(f, request)
+
     @app.post("/v1/refunds")
     async def refund(request: Request):
         async def f(r):
             hk, d = await signed(r)
-            return await call(svc.refund, hk, d.get("key", ""), d.get("amount_cents"))
+            return await call(svc.refund, hk, d.get("key", ""), d.get("to"), d.get("amount_usdc"))
 
         return await guarded(f, request)
 
-    @app.post("/v1/stripe/webhook")
-    async def webhook(request: Request):
-        if not webhook_secret:
-            return err(404, "webhooks are not configured")
-        payload = await request.body()
-        if len(payload) > 1024 * 1024:
-            return err(413, "payload too large")
-        try:
-            r = await call(
-                svc.stripe_webhook, payload, request.headers.get("stripe-signature", ""), webhook_secret
-            )
-        except BillingError as e:
-            # Stripe retries non-2xx; a fee not yet available is worth a retry, a bad signature is not
-            return err(503 if "fee" in str(e) else 400, str(e))
-        except (StripeError, ValueError) as e:
-            return err(400, str(e))
-        return JSONResponse({"result": r})
+    @app.get("/v1/refunds/{key}")
+    async def refund_status(key: str, request: Request):
+        async def f(r):
+            hk, _ = await signed(r)
+            return await call(svc.refund_status, hk, key)
 
-    def _sid(request: Request) -> str:
-        sid = request.query_params.get("sid", "")
-        return sid if re.fullmatch(r"sub-[0-9a-f]{16}", sid) else "<submission_id>"
-
-    @app.get("/v1/checkout/done")
-    async def done(request: Request):
-        """Where Stripe sends the payer (Checkout requires a return URL): plain text, what to run next."""
-        return PlainTextResponse(
-            "Payment received. Confirm it from your terminal:\n\n"
-            f"    python scripts/miner_submit.py --api <this server> --wallet <coldkey> --hotkey <hotkey> "
-            f"paid {_sid(request)}\n\n"
-            "(it is also picked up automatically within a minute).\n"
-        )
-
-    @app.get("/v1/checkout/cancelled")
-    async def cancelled(request: Request):
-        return PlainTextResponse(
-            f"Payment cancelled. Submission {_sid(request)} waits for payment until the link expires; "
-            "open the same link again to pay, or cancel the submission.\n"
-        )
+        return await guarded(f, request)
 
     return app

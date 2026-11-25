@@ -65,12 +65,6 @@ class PriceCard:
             raise KeyError(f"judge model {model!r} is not on price card {self.version}")
         return (tokens_in * j["in_per_mtok"] + tokens_out * j["out_per_mtok"]) / 1e6
 
-    def with_payment_fee(self, net_cents: int) -> tuple[int, int]:
-        """Gross amount whose estimated processor fee leaves ``net_cents``: (gross, fee)."""
-        f = self.raw["payment_fee_estimate"]
-        gross = math.ceil((net_cents + f["fixed_usd"] * 100) / (1 - f["pct"]))
-        return gross, gross - net_cents
-
 
 @dataclass
 class LineItem:
@@ -154,11 +148,6 @@ def quote(card: PriceCard, input_words: Sequence[int], detectors: Sequence[str] 
             cents_up(lium["quote_hours"] * lium["rate_per_hour_usd"]),
         )
     )
-    _, fee = card.with_payment_fee(st.total_cents)
-    f = card.raw["payment_fee_estimate"]
-    st.items.append(
-        LineItem("payment_fee_estimate", 1, "payment", f"{f['pct'] * 100:.1f}% + ${f['fixed_usd']}", fee)
-    )
     return st
 
 
@@ -170,7 +159,7 @@ def statement(
     pod_hours: float,
     meta: dict[str, Any] | None = None,
 ) -> Statement:
-    """Actual cost from metered quantities (no payment fee: it was paid, non-refundable, at top-up)."""
+    """Actual cost from metered quantities."""
     st = Statement("statement", card.version, card.sha256, meta=dict(meta or {}))
     st.items += _detector_items(card, detector_words)
     for model in sorted(judge_tokens):

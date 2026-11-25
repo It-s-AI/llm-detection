@@ -12,14 +12,12 @@ decisions behind them are in [`spec.md`](spec.md) (`D-xx`). How to build and sub
   texts; if it wins with confidence (section 6) it becomes the new king at once.
 * The competition pays **85%** to the current king and **10% / 5%** to the two previous kings with
   **different hotkeys**. If there is no previous king (or it is the owner's baseline), its share goes to
-  the current king. While the owner's baseline is king, its share is burned.
-* **Launch window:** for the first **3 days** after the first miner is crowned, the kings get only
-  **25%** of the competition's share (in the same 85/10/5 proportions) and the rest is burned. This gives
-  time to find and stop an exploit that slipped through at launch before it earns the full share; after
-  the 3 days payouts are full.
-* The competition gets **half** of the miners' emission: from v4 every validator gives it 50% of its
-  weights (detection keeps the other 50%), taken from a leaderboard signed by the subnet owner. If the
-  owner's server is down, validators keep paying the kings of the last valid leaderboard.
+  the current king. Nothing is burned.
+* The competition gets **20%** of every validator's weights (detection keeps the other **80%**). The
+  split and the 85/10/5 shares are constants of the validator code (SN32 v4, one weight vector); the
+  leaderboard signed by the subnet owner says only who the kings are. If the owner's server is down,
+  validators keep paying the kings of the last valid leaderboard.
+* While the owner's baseline is king (no miner crowned yet), the competition's 20% goes to detection.
 * A king whose hotkey loses its registration drops out: the kings after it move up one place, and if it
   was the current king, the crown goes back to the previous one.
 
@@ -167,9 +165,10 @@ submission's scores, the payouts and the kings.
 ## 9. Money
 
 Every evaluation is paid by the miner: the detectors' words, the judges' tokens and the pod's hours at
-the published price card. You pay a hold for the quote (about **$165** for a 500-text period), are
-charged the **metered** cost (usually much less), and can refund the rest to your card. Details:
-[`billing-policy.md`](billing-policy.md).
+the published price card. Money is **USDC**; you pay in **TAO** to your hotkey's own deposit address, and
+it is converted to USDC when it arrives. You pay a hold for the quote (about **165 USDC** for a 500-text
+period), are charged the **metered** cost (usually much less), and can ask for the rest back at any time:
+refunds go in TAO to any address you name. Details: [`billing-policy.md`](billing-policy.md).
 
 ## Test launch (before production)
 
@@ -178,4 +177,4 @@ The test launch publishes the code, the rules and the reference humanizer so tha
 would give nothing in return. The evaluator's public API is up in read-only mode (`/v1/info`,
 `/v1/leaderboard`, `/v1/results`, `/v1/kings`). Build and check your bundle locally (`miners.md`,
 section 1). Submissions open on **Monday, 2026-11-23, 12:00 UTC** on mainnet subnet 32; at the same
-moment the validators on v4 start giving the competition its half of the weights.
+moment the validators on v4 start giving the competition its share of the weights.

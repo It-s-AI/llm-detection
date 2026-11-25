@@ -9,7 +9,8 @@ bundles on the miners' Hugging Face repos pinned by those commitments, runs on L
 counts once the bundle is in <state>/archive. 48 h after a coronation GET /v1/kings links the king's bundle:
 the miner's repo at the pinned commit if anyone can download it, else our copy in --mirror-repo.
 Development: --replay-map {bundle_url: saved outputs name in the period dir} runs no pod; --dev-any-hotkey
-skips the registration check. Stripe must be in test mode unless --live-stripe (not before launch).
+skips the registration check. Payments: TAO to per-hotkey deposit addresses, kept as USDC on Base
+(billing/tao.py; keys var/keys/tao_*.key).
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from humanizer_eval.billing import Accounts, BillingService, PriceCard, StripeAPI
+from humanizer_eval.billing import Accounts, BillingService, PriceCard
 from humanizer_eval.budget import SpendLedger
 from humanizer_eval.config import get_settings
 from humanizer_eval.detectors.registry import CROWN_DETECTORS, build_detector
@@ -53,11 +54,21 @@ from humanizer_eval.runner.lium import LiumClient, Registry
 from humanizer_eval.scoring.crown import KingState
 
 
+def load_or_create_secret(path: Path) -> bytes:
+    """A 32-byte secret kept as hex (mode 600), created on first use."""
+    import secrets
+
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(secrets.token_hex(32))
+        path.chmod(0o600)
+    return bytes.fromhex(path.read_text().strip())
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8032)
-    ap.add_argument("--public-url", default="http://127.0.0.1:8032", help="base for Checkout return URLs")
     ap.add_argument("--period", default=None, help="fixed period dir name (default: periods/CURRENT)")
     ap.add_argument("--pool", default="pool-full-v2,pool-full")
     ap.add_argument("--allow-missing-human", action="store_true")
@@ -68,7 +79,10 @@ def main() -> int:
     ap.add_argument("--replay-map", type=Path, default=None)
     ap.add_argument("--lium", action="store_true", help="really rent Lium pods for bundles")
     ap.add_argument("--cheap-gpu", action="store_true", help="tests only: a 3090/4090-class pod, not an H100")
-    ap.add_argument("--live-stripe", action="store_true")
+    ap.add_argument("--tao-buffer", type=float, default=0.05,
+                    help="extra TAO asked over what is missing (the rate may move); the rest stays on the balance")  # fmt: skip
+    ap.add_argument("--tao-max-slippage", type=float, default=0.02,
+                    help="a swap paying more than this under the small-trade price waits")  # fmt: skip
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--n-boot", type=int, default=2000)
     ap.add_argument("--no-worker", action="store_true")
@@ -83,7 +97,7 @@ def main() -> int:
         "--mode",
         choices=("prod", "test"),
         default="prod",
-        help="test: shown as TEST everywhere, Stripe test keys only, a daily evaluation cap",
+        help="test: shown as TEST everywhere, a daily evaluation cap",
     )
     ap.add_argument(
         "--network", default="finney", help="the chain the metagraph snapshot comes from (shown in /v1/info)"
@@ -143,16 +157,21 @@ def main() -> int:
     def store_for(pid: str) -> SubmissionStore:
         return stores.setdefault(pid, SubmissionStore(state / "periods" / pid / "submissions", key))
 
-    api = StripeAPI(s.stripe_secret_key)
-    if not api.test_mode and (args.mode == "test" or not args.live_stripe):
-        raise SystemExit(
-            "Stripe key is live; refusing (test mode never takes a live key; prod needs --live-stripe)"
-        )
     if args.mode == "test" and args.max_evals_per_day is None:
         args.max_evals_per_day = 30
-    billing = BillingService(
-        PriceCard.load("configs/price_card.json"), Accounts(state / "billing.sqlite"), api
-    )
+    accounts = Accounts(state / "billing.sqlite")
+    from humanizer_eval.billing.evm import ForeverMoneyBaseRoute, RouteConfig
+    from humanizer_eval.billing.tao import TaoConfig, TaoRail
+    from humanizer_eval.ops.alerts import from_settings as _alerts
+
+    rc = RouteConfig(**{k: v for k, v in (("bittensor_rpc", s.tao_rpc), ("base_rpc", s.base_rpc)) if v})
+    route = ForeverMoneyBaseRoute(load_or_create_secret(var_dir() / "keys" / "tao_treasury.key"), rc)
+    tao_alert = _alerts(state_path=var_dir() / "ops" / "alerts_state.json")
+    tao_rail = TaoRail(state / "tao.sqlite", route, load_or_create_secret(var_dir() / "keys" / "tao_deposits.key"),
+                       accounts, TaoConfig(buffer=args.tao_buffer, max_slippage=args.tao_max_slippage),
+                       alert=lambda m: tao_alert.send(m, dedupe="tao-" + m[:40]))  # fmt: skip
+    print(f"payments in TAO; treasury {route.treasury} (keep ~0.02 ETH on it on Base for refund bridge fees)")
+    billing = BillingService(PriceCard.load("configs/price_card.json"), accounts, tao_rail)
     queue = SubmissionQueue(state / "queue.sqlite")
     if args.dev_any_hotkey:  # every hotkey counts as registered at block 0 (one submission each)
 
@@ -169,9 +188,7 @@ def main() -> int:
     secret_key = load_or_create_key(var_dir() / "keys" / "intake_secrets.key")
     limits = IntakeLimits(allow_raw_urls=bool(args.replay_map),  # raw URLs only with the dev replay map
                           max_evals_per_day=args.max_evals_per_day, submissions_open=not args.closed)  # fmt: skip
-    svc = IntakeService(queue, billing, period, store_for, registration,
-                        success_url=f"{args.public_url}/v1/checkout/done",
-                        cancel_url=f"{args.public_url}/v1/checkout/cancelled", limits=limits,
+    svc = IntakeService(queue, billing, period, store_for, registration, limits=limits,
                         commitment=commitment, hub=hub, secret_key=secret_key,
                         about={"mode": args.mode, "network": args.network, "netuid": args.netuid})  # fmt: skip
 
@@ -278,7 +295,7 @@ def main() -> int:
             )
         return lb_cache["env"]
 
-    app = create_app(svc, verifier, webhook_secret=s.stripe_webhook_secret or None, leaderboard=leaderboard,
+    app = create_app(svc, verifier, leaderboard=leaderboard,
                      kings=publisher.public, periods_dir=periods,
                      reveal_dir=var_dir() / "public" / "periods")  # fmt: skip
 

@@ -4,7 +4,7 @@ Pure numpy, no network: inputs are detector scores that the detector gateway alr
 """
 
 from humanizer_eval.scoring.bootstrap import PairedBootstrapResult, paired_bootstrap
-from humanizer_eval.scoring.crown import BURN_KEY, CrownDecision, KingEntry, KingState, crown_decision
+from humanizer_eval.scoring.crown import CrownDecision, KingEntry, KingState, crown_decision
 from humanizer_eval.scoring.metric import (
     GATE_FAIL_SCORE,
     HumanReference,
@@ -21,7 +21,6 @@ from humanizer_eval.scoring.metric import (
 )
 
 __all__ = [
-    "BURN_KEY",
     "GATE_FAIL_SCORE",
     "CrownDecision",
     "HumanReference",

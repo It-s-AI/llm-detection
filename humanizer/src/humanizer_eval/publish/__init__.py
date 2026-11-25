@@ -1,4 +1,4 @@
-"""What the owner publishes: the signed leaderboard validators set mechanism-1 weights from, and the
+"""What the owner publishes: the signed list of kings validators pay the humanizer part to, and the
 kings' bundles 48 h after each coronation."""
 
 from humanizer_eval.publish.kings import HFMirror, KingPublisher, MirrorError
@@ -7,6 +7,7 @@ from humanizer_eval.publish.leaderboard import (
     LeaderboardError,
     build_payload,
     load_or_create_signing_key,
+    shares,
     sign,
     verify,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "MirrorError",
     "build_payload",
     "load_or_create_signing_key",
+    "shares",
     "sign",
     "verify",
 ]

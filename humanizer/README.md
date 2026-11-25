@@ -7,9 +7,9 @@ Miners publish a humanizer (code + weights) in their own Hugging Face repo and p
 evaluator runs it offline on a fresh GPU pod over the period's hidden texts. It checks every output with
 LLM judges (meaning, style, naturalness), sends the outputs to GPTZero, ZeroGPT and Pangram, and decides
 with a paired statistical test against the current king whether the submission takes the crown. The king
-and the two previous kings share the competition's emission 85/10/5 (half of the miners' emission).
-Validators add those weights from a leaderboard signed by the subnet owner to their detection weights
-(SN32 v4: one weight vector, detection 50%, humanizer 50%).
+and the two previous kings share the competition's emission 85/10/5. Validators set one weight vector,
+detection 80% and humanizer 20%; the split and the 85/10/5 shares are fixed in the validator code, and the
+only thing they take from a leaderboard signed by the subnet owner is who the kings are.
 
 This folder is part of the subnet repository [It-s-AI/llm-detection](https://github.com/It-s-AI/llm-detection)
 (branch `v4`, folder `humanizer/`): the subnet owner runs it; validators and miners do not need it to run
@@ -21,7 +21,7 @@ their neurons, but it is the exact code every submission is judged by.
 |---|---|
 | a miner | [the rules](docs/rules.md), then [how to build and submit](docs/miners.md) and the [reference humanizer](examples/ref_humanizer/README.md) |
 | a validator | [what changes for validators](docs/validators.md) |
-| anyone | [the money: prices, holds, refunds](docs/billing-policy.md) |
+| anyone | [the money: prices, paying in TAO, balances in USDC, holds, refunds](docs/billing-policy.md) |
 
 **Test launch:** the code, the rules and the reference humanizer are public; submissions open at the production launch.
 See the last section of [the rules](docs/rules.md#test-launch-before-production). The leaderboard is the
@@ -35,7 +35,7 @@ See the last section of [the rules](docs/rules.md#test-launch-before-production)
   - `detectors/`: the detector clients.
   - `scoring/`: the metric and the crown test.
   - `runner/` and `harness/`: the bundle and the GPU pod.
-  - `billing/`: quotes, holds and refunds.
+  - `billing/`: quotes, holds and refunds; TAO payments kept as USDC on Base.
   - `intake/`: the miners' API and the queue.
   - `publish/`: the signed leaderboard and the kings' bundles.
 * `scripts/miner_submit.py`: the miner's command-line tool: upload, commit on chain, submit, pay, follow.

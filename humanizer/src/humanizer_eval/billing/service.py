@@ -1,11 +1,14 @@
-"""Billing flow for one submission (D-80): quote -> top-up -> hold -> settle -> refund on request.
+"""Billing flow for one submission (D-80, D-82): quote -> pay in TAO -> hold -> settle -> refund on request.
 
-q = svc.make_quote(hotkey, input_words)          # upper bound, valid for card["quote_ttl_seconds"]
-pay = svc.checkout(q["id"], success_url, cancel_url)   # Stripe Checkout for what the balance lacks
-svc.confirm_checkout(session_id)                 # webhook or poll: credit net of the actual fee
-svc.start(q["id"], submission_id)                # hold the quote; refunds wait until settled
-svc.finish(submission_id, statement)             # charge metered cost (<= hold), free the rest
-svc.refund(hotkey, key)                          # unused balance back to the original payments
+q = svc.make_quote(hotkey, input_words)        # upper bound in USDC, valid for card["quote_ttl_seconds"]
+svc.deposit(hotkey)                            # the hotkey's TAO deposit address (billing/tao.py)
+svc.payment(q["id"])                           # what is missing for the hold, in USDC and in TAO now
+svc.collect(hotkey)                            # TAO that arrived -> bridged, swapped, credited in USDC
+svc.start(q["id"], submission_id)              # hold the quote; refunds wait until it is settled
+svc.finish(submission_id, statement)           # charge the metered cost (<= hold), free the rest
+svc.refund(hotkey, key, to)                    # USDC -> TAO at the current rate, to any ss58 address
+
+Balances are cents of USDC (accounts.py); every payment is a TAO deposit converted to USDC.
 """
 
 from __future__ import annotations
@@ -17,149 +20,54 @@ from typing import Any
 
 from humanizer_eval.billing.accounts import Accounts, BillingError
 from humanizer_eval.billing.prices import PriceCard, Statement, quote
-from humanizer_eval.billing.stripe_api import StripeAPI, StripeError, payment_fee_cents, verify_webhook
-
-STRIPE_MIN_CENTS = 50
-STRIPE_MIN_EXPIRY_S = 31 * 60  # Checkout: expires_at at least 30 min ahead
-STRIPE_MAX_EXPIRY_S = 24 * 3600 - 60  # ... and at most 24 h
+from humanizer_eval.billing.tao import WEI, SlippageTooHigh, TaoRail, usdc
 
 
 class BillingService:
-    def __init__(
-        self,
-        card: PriceCard,
-        accounts: Accounts,
-        stripe: StripeAPI | None = None,
-        now=time.time,
-        sleep=time.sleep,
-    ):
+    def __init__(self, card: PriceCard, accounts: Accounts, tao: TaoRail | None = None, now=time.time):
         self.card = card
         self.accounts = accounts
-        self.stripe = stripe
+        self.tao = tao
         self._now = now
-        self._sleep = sleep
 
-    def _stripe(self) -> StripeAPI:
-        if self.stripe is None:
-            raise BillingError("Stripe is not configured")
-        return self.stripe
+    def _rail(self) -> TaoRail:
+        if self.tao is None:
+            raise BillingError("payments in TAO are not configured here")
+        return self.tao
 
-    # --- quote and top-up -------------------------------------------------------------------------
+    # --- quote and payment --------------------------------------------------------------------------
     def make_quote(
         self, hotkey: str, input_words: Sequence[int], detectors: Sequence[str] | None = None
     ) -> dict:
         st = quote(self.card, input_words, detectors)
-        fee = next(i.amount_cents for i in st.items if i.item == "payment_fee_estimate")
-        hold = st.total_cents - fee  # the fee is paid at top-up, the hold covers the evaluation itself
         qid = f"q_{uuid.uuid4().hex[:20]}"
         expires = self._now() + float(self.card.raw.get("quote_ttl_seconds", 3600))
-        body = {**st.to_dict(), "hotkey": hotkey, "hold_cents": hold, "expires_ts": expires}
-        self.accounts.save_quote(qid, hotkey, hold, expires, body)
+        body = {**st.to_dict(), "hotkey": hotkey, "hold_cents": st.total_cents, "expires_ts": expires}
+        self.accounts.save_quote(qid, hotkey, st.total_cents, expires, body)
         return {"id": qid, **body}
 
     def amount_due(self, quote_id: str) -> int:
-        """Gross amount to pay now so the balance covers the quote's hold (0 if it already does)."""
+        """Cents of USDC still missing on the balance for the quote's hold (0 if it is covered)."""
         q = self._quote(quote_id, check_expiry=False)
-        need = q["hold_cents"] - self.accounts.available(q["hotkey"])
-        if need <= 0:
-            return 0
-        gross, _ = self.card.with_payment_fee(need)
-        return max(gross, STRIPE_MIN_CENTS)
+        return max(0, q["hold_cents"] - self.accounts.available(q["hotkey"]))
 
-    def checkout(self, quote_id: str, success_url: str, cancel_url: str) -> dict[str, Any]:
-        q = self._quote(quote_id)
+    def deposit(self, hotkey: str) -> dict[str, Any]:
+        return self._rail().deposit(hotkey)
+
+    def payment(self, quote_id: str) -> dict[str, Any]:
+        """How to cover the quote: the deposit address and the TAO to send at the current rate."""
+        q = self._quote(quote_id, check_expiry=False)
         due = self.amount_due(quote_id)
-        if due == 0:
-            return {"amount_cents": 0, "url": None, "session_id": None}
-        # the link works as long as the quote (Stripe allows 30 min .. 24 h from now)
-        now = self._now()
-        expires_at = int(min(max(q["expires_ts"], now + STRIPE_MIN_EXPIRY_S), now + STRIPE_MAX_EXPIRY_S))
-        s = self._stripe().create_checkout_session(
-            amount_cents=due,
-            hotkey=q["hotkey"],
-            ref=quote_id,
-            success_url=success_url,
-            cancel_url=cancel_url,
-            description=f"Evaluation credit for hotkey {q['hotkey'][:12]}..., quote {quote_id}",
-            expires_at=expires_at,
-        )
-        return {
-            "amount_cents": due,
-            "url": s.get("url"),
-            "session_id": s["id"],
-            "expires_at": s.get("expires_at") or expires_at,
-        }
-
-    def check_checkout(self, session_id: str) -> dict[str, Any]:
-        """Ask Stripe about a Checkout Session and credit it if it is paid (idempotent).
-
-        ``{"status": open|complete|expired, "paid": bool, "credited": bool, "url": link while open,
-        "expires_at": ts}``. Raises BillingError when it is paid but the fee is not known yet (retry)."""
-        s = self._stripe().retrieve_checkout_session(session_id)
-        paid = s.get("payment_status") == "paid"
-        out = {
-            "status": s.get("status"),
-            "paid": paid,
-            "credited": False,
-            "url": s.get("url") if s.get("status") == "open" else None,
-            "expires_at": s.get("expires_at"),
-        }
-        if paid:
-            self._credit_session(session_id, s)
-            out["credited"] = True
+        out: dict[str, Any] = {"method": "tao", **self.deposit(q["hotkey"]), "due_usdc": usdc(due),
+                               "expires_ts": q["expires_ts"]}  # fmt: skip
+        if due > 0:
+            out["amount_tao"] = f"{self._rail().tao_for_cents(due) / WEI:.4f}"
+            out["buffer"] = self._rail().cfg.buffer
         return out
 
-    def confirm_checkout(self, session_id: str) -> bool:
-        """Credit a paid Checkout Session (idempotent). False if already credited."""
-        s = self._stripe().retrieve_checkout_session(session_id)
-        if s.get("payment_status") != "paid":
-            raise BillingError(f"session {session_id} is not paid ({s.get('payment_status')})")
-        return self._credit_session(session_id, s)
-
-    def _credit_session(self, session_id: str, s: dict[str, Any]) -> bool:
-        pi = s.get("payment_intent")
-        if not isinstance(pi, dict):
-            raise BillingError("payment intent not expanded")
-        fee = self._wait_fee(pi)
-        hotkey = (s.get("metadata") or {}).get("hotkey")
-        if not hotkey:
-            raise BillingError("session has no hotkey")
-        return self.accounts.record_payment(
-            pi["id"],
-            hotkey,
-            int(s["amount_total"]),
-            fee,
-            {"session": session_id, "ref": s.get("client_reference_id")},
-        )
-
-    def _wait_fee(self, pi: dict, tries: int = 10, delay: float = 1.0) -> int:
-        """The processor's actual fee; Stripe creates the balance transaction shortly after the charge.
-        Never credits a payment with an unknown fee (crediting gross would refund money we never got)."""
-        for attempt in range(tries):
-            fee = payment_fee_cents(pi)
-            if fee is not None:
-                return fee
-            if attempt < tries - 1:
-                self._sleep(delay)
-                pi = self._stripe().retrieve_payment_intent(pi["id"])
-        raise BillingError("processor fee not available yet; retry shortly")
-
-    def handle_webhook(self, payload: bytes, sig_header: str, secret: str) -> str:
-        event = verify_webhook(payload, sig_header, secret)
-        if event.get("type") in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
-            obj = event["data"]["object"]
-            if obj.get("payment_status") == "paid":
-                return "credited" if self.confirm_checkout(obj["id"]) else "duplicate"
-        return "ignored"
-
-    def test_topup(self, hotkey: str, amount_cents: int, ref: str) -> dict[str, Any]:
-        """Test mode only: pay with Stripe's test card and credit the balance."""
-        pi = self._stripe().create_test_payment(amount_cents=amount_cents, hotkey=hotkey, ref=ref)
-        if pi.get("status") != "succeeded":
-            raise BillingError(f"test payment not succeeded: {pi.get('status')}")
-        fee = self._wait_fee(pi)
-        self.accounts.record_payment(pi["id"], hotkey, int(pi["amount"]), fee, {"ref": ref, "test": True})
-        return {"payment_intent": pi["id"], "gross_cents": int(pi["amount"]), "fee_cents": fee}
+    def collect(self, hotkey: str) -> int:
+        """Convert TAO that reached the hotkey's deposit address; cents credited by this call."""
+        return self._rail().collect(hotkey)
 
     # --- evaluation ---------------------------------------------------------------------------------
     def _quote(self, quote_id: str, check_expiry: bool = True) -> dict:
@@ -171,8 +79,8 @@ class BillingService:
         return q
 
     def start(self, quote_id: str, submission_id: str, *, paid_in_time: bool = False) -> dict:
-        """Hold the quote. ``paid_in_time``: its Checkout was paid before the link expired, so the quote
-        holds even if the payment is confirmed after the quote's own expiry."""
+        """Hold the quote. ``paid_in_time``: the TAO arrived within the window even if its conversion
+        finished after the quote's own expiry."""
         q = self._quote(quote_id, check_expiry=not paid_in_time)
         h = self.accounts.open_hold(submission_id, q["hotkey"], q["hold_cents"])
         return {"submission_id": h.submission_id, "hold_cents": h.amount_cents}
@@ -193,27 +101,36 @@ class BillingService:
         h = self.accounts.release(submission_id)
         return {"submission_id": submission_id, "status": h.status, "charged_cents": 0}
 
-    # --- refunds ------------------------------------------------------------------------------------
-    def refund(self, hotkey: str, key: str, amount_cents: int | None = None) -> list[dict]:
-        """Refund (default: all available) to the original payments; safe to call again with the same key."""
+    # --- refunds --------------------------------------------------------------------------------------
+    def refund_quote(self, hotkey: str, to: str, amount_cents: int | None = None) -> dict[str, Any]:
+        """What a refund would send now (no money moves)."""
+        rail = self._rail()
+        cents = self.accounts.available(hotkey) if amount_cents is None else amount_cents
+        if cents <= 0:
+            raise BillingError("nothing to refund")
+        cost = rail.refund_cost_usdc(cents, to)
+        net = cents * 10_000 - cost
+        tao = rail.route.quote_buy(net) / WEI if net > 0 else 0.0
+        return {"amount_usdc": usdc(cents), "cost_usdc": f"{cost / 1e6:.2f}", "tao_estimate": round(tao, 4),
+                "to": to}  # fmt: skip
+
+    def refund(self, hotkey: str, key: str, to: str, amount_cents: int | None = None) -> dict[str, Any]:
+        """USDC of the balance (default: all available) back in TAO to ``to`` (any ss58 address),
+        at the rate of now; the cost of the way back comes out of it. Safe to call again with the key."""
+        rail = self._rail()
         plan = self.accounts.plan_refund(key, hotkey, amount_cents)
-        out = []
-        for pid, amt in plan:
-            try:
-                r = self._stripe().create_refund(
-                    payment_intent=pid, amount_cents=amt, idem=f"refund:{key}:{pid}", hotkey=hotkey
-                )
-                ok = r.get("status") in ("succeeded", "pending")
-                self.accounts.finish_refund(key, pid, ok, r.get("id"))
-                out.append(
-                    {
-                        "payment_intent": pid,
-                        "amount_cents": amt,
-                        "status": r.get("status"),
-                        "refund": r.get("id"),
-                    }
-                )
-            except StripeError as e:
-                self.accounts.finish_refund(key, pid, False)
-                out.append({"payment_intent": pid, "amount_cents": amt, "status": "failed", "error": str(e)})
-        return out
+        cents = sum(a for _, a in plan)
+        rail.start_refund(key, hotkey, cents, to, plan)
+        try:
+            rail.drive_refund(key)
+        except SlippageTooHigh:
+            pass  # waits; the background pass continues it
+        except Exception as e:  # RPC trouble: the background pass continues it
+            import logging
+
+            logging.getLogger(__name__).warning("refund %s waits: %s", key, e)
+        return rail.refund_state(key) or {}
+
+    def housekeeping(self) -> dict[str, list[str]]:
+        """Background pass: deposits converted, conversions and refunds moved on."""
+        return {} if self.tao is None else self.tao.watch()

@@ -1,13 +1,13 @@
-"""Miner balances: payments, holds, settlements and refunds in integer cents (D-80).
+"""Miner balances: payments, holds, settlements and refunds in integer cents of USDC (D-80, D-82).
 
     balance(hotkey)   = sum(net payments) - sum(settled charges) - sum(refunds)
     available(hotkey) = balance - sum(open holds)
 
-* A payment is credited **net** of the processor's actual fee (the fee is non-refundable).
+* A payment is a TAO deposit converted to USDC (billing/tao.py), credited with the USDC that came out.
 * A submission opens a hold for its quote; settling charges the metered statement, capped at the hold
   (the quote is an upper bound; an overrun is the owner's), and frees the rest.
-* Refunds go back to the original payments, newest first, never more than a payment's remaining amount;
-  they are refused while any hold of the hotkey is open (no withdrawal during a run).
+* A refund is reserved against the payments, newest first, never more than a payment's remaining amount;
+  it is refused while any hold of the hotkey is open (no withdrawal during a run).
 
 Every mutating call is idempotent on its natural key (payment id, submission id, refund key) and runs in
 ``BEGIN IMMEDIATE`` so concurrent processes cannot double-spend a balance.
@@ -250,8 +250,11 @@ class Accounts:
             return h
 
     # --- refunds ----------------------------------------------------------------------------------
-    def plan_refund(self, key: str, hotkey: str, amount_cents: int | None = None) -> list[tuple[str, int]]:
-        """Reserve a refund of ``amount`` (default: everything available) across payments, newest first.
+    def plan_refund(
+        self, key: str, hotkey: str, amount_cents: int | None = None, prefix: str | None = None
+    ) -> list[tuple[str, int]]:
+        """Reserve a refund of ``amount`` (default: everything available) across payments, newest first;
+        ``prefix``: only payments whose id starts with it (e.g. the TAO ones, billing/tao.py).
 
         Returns ``[(payment_id, cents)]`` rows in state 'pending'; re-planning the same key returns the
         rows already planned (idempotent). Refused while a hold is open.
@@ -267,6 +270,8 @@ class Accounts:
                     "a submission of this hotkey is being evaluated; refunds wait until it is settled"
                 )
             _, avail = self._balance(c, hotkey)
+            if prefix is not None:
+                avail = min(avail, self._refundable(c, hotkey, prefix))
             want = avail if amount_cents is None else amount_cents
             if want <= 0:
                 raise BillingError("nothing to refund")
@@ -274,9 +279,9 @@ class Accounts:
                 raise BillingError(f"refund {want} exceeds available balance {avail} cents")
             plan, left = [], want
             for pid, gross, refunded in c.execute(
-                "SELECT id, gross_cents, refunded_cents FROM payments WHERE hotkey = ? "
+                "SELECT id, gross_cents, refunded_cents FROM payments WHERE hotkey = ? AND id LIKE ? "
                 "ORDER BY ts DESC, id DESC",
-                (hotkey,),
+                (hotkey, (prefix or "") + "%"),
             ).fetchall():
                 take = min(left, gross - refunded)
                 if take > 0:
@@ -295,7 +300,20 @@ class Accounts:
                 c.execute("UPDATE payments SET refunded_cents = refunded_cents + ? WHERE id = ?", (amt, pid))
             return plan
 
-    def finish_refund(self, key: str, payment_id: str, ok: bool, stripe_id: str | None = None) -> None:
+    @staticmethod
+    def _refundable(c: sqlite3.Connection, hotkey: str, prefix: str) -> int:
+        return c.execute(
+            "SELECT COALESCE(SUM(gross_cents - refunded_cents), 0) FROM payments "
+            "WHERE hotkey = ? AND id LIKE ?",
+            (hotkey, prefix + "%"),
+        ).fetchone()[0]
+
+    def refundable(self, hotkey: str, prefix: str) -> int:
+        """What payments whose id starts with ``prefix`` can still take back (before the balance cap)."""
+        with self._conn() as c:
+            return self._refundable(c, hotkey, prefix)
+
+    def finish_refund(self, key: str, payment_id: str, ok: bool, ref: str | None = None) -> None:
         with self._tx() as c:
             row = c.execute(
                 "SELECT status, amount_cents FROM refunds WHERE key = ? AND payment_id = ?", (key, payment_id)
@@ -307,7 +325,7 @@ class Accounts:
                 return
             c.execute(
                 "UPDATE refunds SET status = ?, stripe_id = ? WHERE key = ? AND payment_id = ?",
-                ("done" if ok else "failed", stripe_id, key, payment_id),
+                ("done" if ok else "failed", ref, key, payment_id),
             )
             if not ok:  # the money stays with the miner's balance
                 c.execute(

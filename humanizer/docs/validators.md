@@ -1,46 +1,48 @@
 # Validators: the humanizer competition in SN32 v4
 
-From v4, SN32 runs two competitions on **one set of weights**, **half each**; there is no second mechanism.
+From v4, SN32 runs two competitions on **one set of weights**; there is no second mechanism.
 
 * **Detection** (unchanged): your validator scores the detection miners exactly as before. They get
-  **50%** of your weights, in the same proportions as in v3.
-* **Humanizer competition** ([`rules.md`](rules.md)): the other **50%**, split 85% / 10% / 5%
+  **80%** of your weights, in the same proportions as in v3.
+* **Humanizer competition** ([`rules.md`](rules.md)): the other **20%**, split 85% / 10% / 5%
   between the current king and the two previous kings.
 
+The split and the 85/10/5 shares are constants of the validator code
+(`HUMANIZER_SHARE = 0.2`, `KING_SHARES = (0.85, 0.10, 0.05)`), so every validator on the same release
+sets the same split; they change only with another release.
+
 **Validators run no evaluation for the humanizer competition.** The subnet owner's evaluator runs the
-miners' humanizers and publishes the payouts as a **signed leaderboard**. Your validator fetches it,
-verifies it and adds it to the weights it sets anyway. There is no extra compute, no new API key and no
-new cost.
+miners' humanizers and publishes **who the kings are** in a **signed leaderboard**. Your validator
+fetches it, verifies it and adds the kings' shares to the weights it sets anyway. There is no extra
+compute, no new API key and no new cost.
 
-## What changes in your validator
+## What your validator does
 
-The code is the `v4` branch of [It-s-AI/llm-detection](https://github.com/It-s-AI/llm-detection/tree/v4)
-(version 4.0.0, on top of v3.15.1); the evaluator's code is in its `humanizer/` folder (run by the subnet
-owner, not by validators). It adds `detection/validator/humanizer_mechanism.py` and one step in
-`set_weights`. The validator:
+The code is the `v4` branch of [It-s-AI/llm-detection](https://github.com/It-s-AI/llm-detection/tree/v4);
+the evaluator's code is in its `humanizer/` folder (run by the subnet owner, not by validators). The
+humanizer part is `detection/validator/humanizer_mechanism.py` plus one step in `set_weights`. The
+validator:
 
 1. **Fetches** the leaderboard from the configured URLs. The first valid one wins.
 2. **Verifies** it:
    - the ed25519 signature against the public key of the owner's leaderboard key, built into the release;
-   - the schema, `netuid` 32 and the competition id;
+   - the schema (`sn32-humanizer-leaderboard/2`), `netuid` 32 and the competition id;
    - the expiry (an envelope is valid for 3 hours);
-   - that the sequence number never goes back, so an older leaderboard replayed later is refused.
-3. **Maps hotkeys to UIDs.** Shares of hotkeys that are not registered, and the `__burn__` share, go to
-   the subnet owner's UID (burn).
-4. **Blends** the two competitions: `weights = 0.5 × detection + 0.5 × humanizer`. The detection part is
+   - that the sequence number never goes back, so an older leaderboard replayed later is refused;
+   - that `kings` is a list of at most 3 distinct hotkeys.
+3. **Pays the kings.** Kings whose hotkeys are not in the metagraph are dropped and the rest close
+   ranks; they get 85% / 10% / 5% in their order, and the shares of missing slots go to the current king.
+4. **Blends** the two competitions: `weights = 0.8 × detection + 0.2 × humanizer`. The detection part is
    your normalized scores as in v3. The result then goes through the usual weight processing and
    commit-reveal.
 5. **Keeps the last valid leaderboard on disk** (it survives restarts). When no fresh one can be had (the
    owner's server is down, a bad signature), the kings of the last valid leaderboard keep their share,
-   also past its expiry. Only a validator that has never received a valid leaderboard sends the humanizer
-   half to the subnet owner's UID (burn).
+   also past its expiry.
 
-The split is a constant of the code, so every validator running v4 sets the same split; it changes only
-with another release.
-
-Until the release that builds in the leaderboard's public key and URL, the humanizer share is not applied
-and v4 sets exactly the v3 weights, so it is safe to deploy early. A failure while computing the share
-(for example an RPC error) reuses the previous round's humanizer weights.
+When there is no king to pay (the owner's baseline is king, none of the kings is registered, or the
+validator has never received a valid leaderboard), the validator sets the detection weights alone: the
+humanizer 20% goes to detection. Nothing is burned. A failure while computing the humanizer part (for
+example an RPC error) reuses the previous round's humanizer weights.
 
 ## Flags
 
@@ -50,18 +52,17 @@ and v4 sets exactly the v3 weights, so it is safe to deploy early. A failure whi
 | `--humanizer.public_key` | built-in | hex ed25519 public key of the signer, overrides the built-in key |
 | `--humanizer.disable` | off | leave the humanizer competition out (not recommended: your weights then differ from the other validators') |
 
-## Timeline
+## Updating
 
-1. **Now**: the code and the rules are public in the `v4` branch (version 4.0.1, with the leaderboard's
-   URL and public key built in); no submissions yet. **Update now:** `git fetch origin && git checkout v4
-   && pip install -e .`, then restart your validator; `run.sh` follows the branch you are on. Until the
-   start v4 sets exactly the v3 weights and does not even fetch the leaderboard.
-2. **Monday, 2026-11-23, 12:00 UTC**: submissions open, and every validator on v4 switches to 50/50 at
-   that moment by itself. A validator still on v3 keeps setting the v3 weights.
+Update with `git fetch origin && git checkout v4 && pip install -e .`, then restart your
+validator; `run.sh` follows the branch you are on. A validator still on v3 keeps setting the v3 weights.
+An older v4 validator (leaderboard schema `sn32-humanizer-leaderboard/1`) refuses the new leaderboard and
+keeps paying the kings of the last `/1` leaderboard it had, with the old split, until it is updated.
 
 ## Check it yourself
 
 The leaderboard is public: `GET <evaluator>/v1/leaderboard` returns the envelope
-`{"payload": "<json>", "signature": "<hex>", "public_key": "<hex>"}`. The payload's `weights` map hotkeys
-to shares of the humanizer competition (they sum to 1). The same verification code is in the evaluator
+`{"payload": "<json>", "signature": "<hex>", "public_key": "<hex>"}`. The payload's `kings` lists the
+kings' hotkeys, newest first: the current king, the previous distinct king and the one before (0 to 3
+hotkeys; empty while the owner's baseline is king). The same verification code is in the evaluator
 (`humanizer/src/humanizer_eval/publish/leaderboard.py`) and is covered by tests on both sides.

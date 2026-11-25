@@ -69,7 +69,7 @@ def main() -> int:
             raise SystemExit(
                 f"{u}: not a valid leaderboard for this key and netuid {args.netuid}: {e}"
             ) from e
-        print(f"ok  {u}: seq {p['seq']}, {len(p['weights'])} weight entries")
+        print(f"ok  {u}: seq {p['seq']}, kings {p['kings']}")
     f = args.repo / TARGET
     before = f.read_text()
     after = patch(before, key, args.url)

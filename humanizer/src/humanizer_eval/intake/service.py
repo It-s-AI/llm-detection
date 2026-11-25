@@ -1,13 +1,15 @@
 """What a miner can do (HTTP-free; ``intake/api.py`` maps it to routes).
 
-    submit(bundle_url, sha256, bytes)   -> quote for the current period; Stripe Checkout for what the
-                                          balance lacks; queued at once when the balance covers the hold
-    paid(sid) / status poll / webhook   -> Stripe says the Checkout link was paid: the hold opens and the
-                                          submission joins the queue (no web site needed: the miner gets
-                                          the link from the submit command and confirms with "paid")
+    deposit()                           -> the hotkey's TAO deposit address (billing/tao.py): TAO sent
+                                          there is bridged to Base, swapped to USDC, credited to the balance
+    submit(...)                         -> quote for the current period in USDC; queued at once when the
+                                          balance covers the hold, else the TAO to send for what is missing
+    paid(sid) / status poll             -> the deposit is checked now; once the balance covers the hold, the
+                                          hold opens and the submission joins the queue
     status(sid)                         -> state, place in the queue, the public result (D-58)
     cancel(sid)                         -> before it runs: the hold is released
-    balance(), refund(key)              -> the hotkey's money (refunds wait while a hold is open)
+    balance(), refund(key, to)          -> the hotkey's USDC; a refund goes back in TAO at the current rate to
+                                          any address the miner names (refunds wait while a hold is open)
 
 Rules that keep the queue fair and cheap to run:
 * only hotkeys registered on the subnet (the share of a king that cannot receive weights would be lost);
@@ -15,13 +17,14 @@ Rules that keep the queue fair and cheap to run:
   submission per hotkey, a cap on the waiting queue (a flood costs the flooder the holds);
 * the bundle is a https URL with its sha256 and size (<= 50 GB, D-61); the pod downloads and checks it,
   our server never touches the bytes;
-* order = payment time; one evaluation at a time (one pod, D-65).
+* order = payment time.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import json
+import logging
 import re
 import time
 import uuid
@@ -32,6 +35,7 @@ from urllib.parse import urlsplit
 
 from humanizer_eval.billing.accounts import BillingError
 from humanizer_eval.billing.prices import quote as price_quote
+from humanizer_eval.billing.tao import SlippageTooHigh, usdc
 from humanizer_eval.intake.queue import QueueError, Row, SubmissionQueue
 from humanizer_eval.runner.bundle import MAX_BUNDLE_BYTES
 
@@ -42,7 +46,10 @@ _NAME = re.compile(r"^[A-Za-z0-9 ._-]{0,64}$")
 PUBLIC_RESULT = ("S", "crowned", "S_king", "delta", "lower_bound", "alpha", "levels", "gates", "judge_errors",
                  "detectors")  # fmt: skip
 _PERIOD_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,40}$")
-LATE_GIVE_UP_S = 24 * 3600  # a Checkout link lives at most 24 h: past that, nothing can still be paid
+#: TAO sent within the quote's hour takes a few minutes to arrive as USDC (bridge, swap): a submission waits
+#: this long past its window before it expires (the money stays on the balance either way)
+LATE_GIVE_UP_S = 3600
+log = logging.getLogger(__name__)
 
 
 class NotFound(LookupError):
@@ -66,14 +73,11 @@ class IntakeLimits:
     max_bundle_bytes: int = MAX_BUNDLE_BYTES  # D-61, the same limit the pod enforces
     max_waiting: int = 50
     max_url_len: int = 2048
-    stripe_poll_interval_s: float = 15.0  # background and status checks of an unpaid Checkout link
-    paid_check_interval_s: float = 3.0  # the miner's "paid" command asks Stripe at most this often
-    late_check_interval_s: float = 60.0  # past the payment window: last looks at the link before expiring
-    #: at most this many evaluations opened per 24 h, all miners together (None: no cap). The test
-    #: launch sets it: test payments cost miners nothing, but judges and pods cost us money.
+    payment_poll_interval_s: float = 15.0  # status checks of an unpaid submission's deposit address
+    paid_check_interval_s: float = 3.0  # the miner's "paid" command checks at most this often
+    #: at most this many evaluations opened per 24 h, all miners together (None: no cap)
     max_evals_per_day: int | None = None
-    #: False: the API is read-only (info, leaderboard, results, kings): the test launch shows the code and
-    #: the rules, while an evaluation would cost as much as in production and give nothing in return
+    #: False: the API is read-only (info, leaderboard, results, kings)
     submissions_open: bool = True
     closed_message: str = "submissions are closed during the test launch; they open at the production launch"
     allow_raw_urls: bool = False  # development only: a bundle at any https URL instead of HF + commitment
@@ -112,8 +116,6 @@ class IntakeService:
         store_for: Callable[[str], Any],  # period_id -> SubmissionStore
         registration: Callable[[str], int | None],  # hotkey -> its registration block, None if not registered
         *,
-        success_url: str,
-        cancel_url: str,
         limits: IntakeLimits | None = None,
         now: Callable[[], float] = time.time,
         commitment: Callable[[str], tuple[str, int] | None] | None = None,  # hotkey -> (data, block)
@@ -127,8 +129,6 @@ class IntakeService:
         self.period = period
         self.store_for = store_for
         self.registration = registration
-        self.success_url = success_url
-        self.cancel_url = cancel_url
         self.limits = limits or IntakeLimits()
         self._now = now
         self._polled: dict[str, float] = {}
@@ -148,7 +148,9 @@ class IntakeService:
             "n_inputs": ctx.n,
             "crown_detectors": list(ctx.detectors),
             "price_card": {"version": self.billing.card.version, "sha256": self.billing.card.sha256},
-            "quote_total_cents": est.total_cents,
+            "payment_methods": ["tao"],
+            "currency": "usdc",
+            "quote_total_usdc": usdc(est.total_cents),
             "queue": {
                 "waiting": counts.get("queued", 0) + counts.get("paused", 0),
                 "running": counts.get("running", 0),
@@ -287,7 +289,13 @@ class IntakeService:
         out: dict[str, Any] = {
             "submission_id": sid,
             "period_id": ctx.period_id,
-            "quote": {k: q[k] for k in ("id", "total_cents", "hold_cents", "items", "expires_ts")},
+            "quote": {
+                "id": q["id"],
+                "total_usdc": usdc(q["total_cents"]),
+                "hold_usdc": usdc(q["hold_cents"]),
+                "items": q["items"],
+                "expires_ts": q["expires_ts"],
+            },
             **(extra or {}),
         }
         row = self._try_enqueue(self.queue.get(sid))  # type: ignore[arg-type]
@@ -295,36 +303,23 @@ class IntakeService:
             out.update(state="queued", queue_position=self.queue.position(sid), payment=None)
             return out
         try:
-            pay = self.billing.checkout(
-                q["id"], f"{self.success_url}?sid={sid}", f"{self.cancel_url}?sid={sid}"
-            )
+            pay = self.billing.payment(q["id"])
         except Exception:
-            self.queue.update(sid, state="cancelled", finished_ts=self._now(), note="checkout failed")
+            self.queue.update(sid, state="cancelled", finished_ts=self._now(), note="no payment address")
             raise
-        self.queue.update(sid, checkout_session=pay.get("session_id"), payment_url=pay.get("url"))
         out.update(state="awaiting_payment", payment={**pay, "then": f"POST /v1/submissions/{sid}/paid"})
         return out
 
-    def _try_enqueue(self, row: Row, chk: dict[str, Any] | None = None) -> Row:
-        """awaiting_payment -> queued if the balance covers the hold; -> expired past the payment window.
-
-        A Checkout link paid before it expired counts even when the payment is confirmed later: past the
-        window we ask Stripe once more (at most every ``late_check_interval_s``) and expire only on a
-        definite "not paid"; while Stripe does not answer, nothing is decided."""
+    def _try_enqueue(self, row: Row) -> Row:
+        """awaiting_payment -> queued once the balance covers the hold; -> expired past the window (plus
+        ``LATE_GIVE_UP_S`` while TAO sent in time is still on its way)."""
         if row.state != "awaiting_payment":
             return row
-        late = row.expires_ts is not None and self._now() > row.expires_ts
-        if late and self._now() > row.expires_ts + LATE_GIVE_UP_S:  # type: ignore[operator]
-            return self._expire(row)  # a payment confirmed after this still lands on the balance
-        if late and row.checkout_session:
-            chk = chk or self._check_payment(row, self.limits.late_check_interval_s)
-            if chk is None or (chk["paid"] and not chk["credited"]) or chk.get("status") == "open":
-                return row  # no answer, fee not known yet, or the link is still open: decide later
-            if not chk["paid"]:
-                return self._expire(row)
-        elif late:
-            return self._expire(row)
+        now = self._now()
+        late = row.expires_ts is not None and now > row.expires_ts
         if self.billing.amount_due(row.quote_id) > 0:
+            if late and (now > row.expires_ts + LATE_GIVE_UP_S or not self._converting(row.hotkey)):  # type: ignore[operator]
+                return self._expire(row)
             return row
         try:
             self.billing.start(row.quote_id, row.id, paid_in_time=late)
@@ -336,6 +331,10 @@ class IntakeService:
             self.billing.fail(row.id)
             return self.queue.get(row.id)  # type: ignore[return-value]
 
+    def _converting(self, hotkey: str) -> bool:
+        tao = getattr(self.billing, "tao", None)
+        return tao is not None and tao.pending_cents(hotkey) > 0
+
     def _expire(self, row: Row) -> Row:
         try:
             return self.queue.update(row.id, expect=("awaiting_payment",), state="expired", payment_url=None)
@@ -343,43 +342,33 @@ class IntakeService:
             return self.queue.get(row.id)  # type: ignore[return-value]
 
     def enqueue_ready(self) -> list[str]:
-        """Called after a credited payment and by the worker loop: also notices paid links by itself
-        (at most every ``stripe_poll_interval_s`` per submission), so the queue follows payment order
-        even if the miner never runs "paid"."""
+        """Called by the worker loop: deposits converted and refunds moved on (billing housekeeping), then
+        every submission whose balance now covers its hold joins the queue, in payment order."""
+        try:
+            self.billing.housekeeping()
+        except Exception as e:
+            log.warning("payments housekeeping failed: %s", e)
         moved = []
         for row in self.queue.by_state("awaiting_payment"):
-            if self._poll_payment(self._try_enqueue(row)).state != "awaiting_payment":
+            if self._try_enqueue(row).state != "awaiting_payment":
                 moved.append(row.id)
         return moved
 
-    def stripe_webhook(self, payload: bytes, sig_header: str, secret: str) -> str:
-        r = self.billing.handle_webhook(payload, sig_header, secret)
-        if r == "credited":
-            self.enqueue_ready()
-        return r
-
-    def _check_payment(self, row: Row, min_interval: float) -> dict[str, Any] | None:
-        """Ask Stripe about the row's Checkout link and credit it if paid; None if not asked (too soon,
-        no link) or Stripe did not answer."""
-        if row.state != "awaiting_payment" or not row.checkout_session:
+    def _collect(self, row: Row, min_interval: float) -> dict[str, Any] | None:
+        """Check the hotkey's deposit address now (rate-limited); None if not asked or it failed."""
+        if row.state != "awaiting_payment":
             return None
         now = self._now()
-        if now - self._polled.get(row.id, 0.0) < min_interval:  # inf: never ask
+        if now - self._polled.get(row.hotkey, 0.0) < min_interval:
             return None
-        self._polled[row.id] = now
+        self._polled[row.hotkey] = now
         try:
-            return self.billing.check_checkout(row.checkout_session)
-        except BillingError as e:  # paid, but the processor's fee is not known yet
-            return {"status": "complete", "paid": True, "credited": False, "pending": str(e)}
-        except Exception:
+            return {"credited_cents": self.billing.collect(row.hotkey)}
+        except SlippageTooHigh as e:
+            return {"credited_cents": 0, "waiting": str(e)}
+        except Exception as e:
+            log.warning("deposit of %s not checked: %s", row.hotkey, e)
             return None
-
-    def _poll_payment(self, row: Row) -> Row:
-        """Webhooks are optional: ask Stripe whether the link was paid (rate-limited)."""
-        chk = self._check_payment(row, self.limits.stripe_poll_interval_s)
-        if chk is not None and chk["credited"]:
-            return self._try_enqueue(self.queue.get(row.id), chk)  # type: ignore[arg-type]
-        return row
 
     def results(self, period_id: str | None = None, limit: int = 500) -> dict[str, Any]:
         """Finished submissions of a period (default: the current one), newest first: public scores only."""
@@ -405,7 +394,10 @@ class IntakeService:
         return row
 
     def status(self, hotkey: str, sid: str) -> dict[str, Any]:
-        row = self._poll_payment(self._try_enqueue(self._own(hotkey, sid)))
+        row = self._own(hotkey, sid)
+        if row.state == "awaiting_payment":
+            self._collect(row, self.limits.payment_poll_interval_s)
+            row = self._try_enqueue(self.queue.get(sid))  # type: ignore[arg-type]
         out: dict[str, Any] = {
             "submission_id": sid,
             "state": row.state,
@@ -414,7 +406,7 @@ class IntakeService:
             "enqueued_ts": row.enqueued_ts,
             "started_ts": row.started_ts,
             "finished_ts": row.finished_ts,
-            "hold_cents": row.hold_cents,
+            "hold_usdc": None if row.hold_cents is None else usdc(row.hold_cents),
         }
         if row.hf_repo:
             out["bundle"] = {
@@ -429,10 +421,13 @@ class IntakeService:
         if row.state == "paused":
             out["retry_at"] = row.retry_at
         if row.state == "awaiting_payment":
-            out["amount_due_cents"] = self.billing.amount_due(row.quote_id)
             out["quote_expires_ts"] = row.expires_ts
-            out["payment"] = {"url": row.payment_url, "amount_cents": out["amount_due_cents"],
-                              "expires_ts": row.expires_ts}  # fmt: skip
+            try:
+                out["payment"] = self.billing.payment(row.quote_id)
+                out["payment"]["arriving_usdc"] = usdc(self.billing.tao.pending_cents(hotkey))
+            except Exception as e:  # no rate now: the address still works
+                log.debug("payment info: %s", e)
+                out["payment"] = {"due_usdc": usdc(self.billing.amount_due(row.quote_id))}
         if row.period_id:
             pub = self.store_for(row.period_id).status(sid)
             if pub is not None:
@@ -440,25 +435,30 @@ class IntakeService:
         return out
 
     def paid(self, hotkey: str, sid: str) -> dict[str, Any]:
-        """The miner says the Checkout link is paid: ask Stripe now and, if so, join the queue."""
+        """The miner says the TAO is sent: check the deposit now and, once covered, join the queue."""
         row = self._own(hotkey, sid)
         chk = None
         if row.state == "awaiting_payment":
-            chk = self._check_payment(row, self.limits.paid_check_interval_s)
-            self._try_enqueue(self.queue.get(sid), chk)  # type: ignore[arg-type]
+            chk = self._collect(row, self.limits.paid_check_interval_s)
+            self._try_enqueue(self.queue.get(sid))  # type: ignore[arg-type]
         out = self.status(hotkey, sid)
         st = out["state"]
+        pay = out.get("payment") or {}
         if st == "awaiting_payment":
-            if chk is not None and chk["paid"]:
-                out["message"] = "payment received; Stripe is still confirming it: run paid again in a minute"
-            elif chk is None and row.checkout_session:
-                out["message"] = "could not reach Stripe (or asked too often): run paid again shortly"
+            if chk is not None and chk.get("waiting"):
+                out["message"] = "your TAO arrived; the swap waits for better prices and runs by itself"
+            elif float(pay.get("arriving_usdc") or 0) > 0:
+                out["message"] = ("your TAO is on its way to USDC (bridge and swap, a few minutes); "
+                                  "the submission joins the queue by itself once it is credited")  # fmt: skip
             else:
-                out["message"] = "no payment yet: pay at payment.url before payment.expires_ts, then run paid"
+                out["message"] = (f"no TAO yet: send {pay.get('amount_tao')} TAO to {pay.get('address')} "
+                                  "before "
+                                  "quote_expires_ts, then run paid")  # fmt: skip
         elif st in ("queued", "paused"):
             out["message"] = f"payment confirmed; in the queue at position {out.get('queue_position')}"
         elif st == "expired":
-            out["message"] = "the payment window closed unpaid; submit again (the registration is not used)"
+            out["message"] = ("the payment window closed; whatever arrived is on your balance: submit again "
+                              "(the registration is not used) or ask for a refund")  # fmt: skip
         else:
             out["message"] = f"state {st}"
         return out
@@ -484,21 +484,68 @@ class IntakeService:
         if h is not None and h.status == "open":
             self.billing.fail(sid)
             released = h.amount_cents
-        return {"submission_id": sid, "state": "cancelled", "released_cents": released}
+        return {"submission_id": sid, "state": "cancelled", "released_usdc": usdc(released)}
 
     # --- money ---------------------------------------------------------------------------------------
+    @staticmethod
+    def _dest(to: Any) -> str:
+        from humanizer_eval.billing.tao import ss58_pubkey
+
+        try:
+            ss58_pubkey(to if isinstance(to, str) else "")
+        except Exception as e:
+            raise ValueError("to: the ss58 address the TAO goes to (any wallet)") from e
+        return to
+
+    def deposit(self, hotkey: str) -> dict[str, Any]:
+        """The hotkey's TAO deposit address: TAO sent there becomes USDC on the balance."""
+        if self.registration(hotkey) is None and self.billing.accounts.balance(hotkey) <= 0:
+            raise Forbidden("hotkey is not registered on the subnet")
+        dep = self.billing.deposit(hotkey)
+        price = None
+        try:
+            price = round(self.billing.tao.route.price(), 2)
+        except Exception as e:
+            log.debug("no TAO price: %s", e)
+        return {**dep, "price_usdc_per_tao": price, **self.balance(hotkey)}
+
     def balance(self, hotkey: str) -> dict[str, Any]:
         acc = self.billing.accounts
-        return {
-            "hotkey": hotkey,
-            "balance_cents": acc.balance(hotkey),
-            "available_cents": acc.available(hotkey),
-        }
+        out = {"hotkey": hotkey, "currency": "usdc", "balance_usdc": usdc(acc.balance(hotkey)),
+               "available_usdc": usdc(acc.available(hotkey))}  # fmt: skip
+        tao = getattr(self.billing, "tao", None)
+        if tao is not None:
+            out["arriving_usdc"] = usdc(tao.pending_cents(hotkey))
+            out["deposits"] = tao.inbound(hotkey, limit=5)
+        return out
 
-    def refund(self, hotkey: str, key: str, amount_cents: int | None = None) -> dict[str, Any]:
+    @staticmethod
+    def _cents(amount_usdc: Any) -> int | None:
+        if amount_usdc is None:
+            return None
+        try:
+            cents = round(float(amount_usdc) * 100)
+        except (TypeError, ValueError) as e:
+            raise ValueError("amount_usdc: a positive number of USDC, e.g. 25.50") from e
+        if cents <= 0:
+            raise ValueError("amount_usdc must be positive")
+        return cents
+
+    def refund_quote(self, hotkey: str, to: Any, amount_usdc: Any = None) -> dict[str, Any]:
+        """What a refund would send now: the TAO estimate after the cost of the way back."""
+        return self.billing.refund_quote(hotkey, self._dest(to), self._cents(amount_usdc))
+
+    def refund(self, hotkey: str, key: str, to: Any, amount_usdc: Any = None) -> dict[str, Any]:
+        """USDC of the balance (default: all available) back in TAO, at the current rate, to ``to``: any ss58
+        address the miner names (it also works after the hotkey was deregistered). The bridge and swap cost
+        come out of the amount; the TAO sent is reported."""
         if not re.match(r"^[A-Za-z0-9_-]{8,64}$", key or ""):
             raise ValueError("refund key: 8-64 of [A-Za-z0-9_-] (reuse it to retry safely)")
-        if amount_cents is not None and (not isinstance(amount_cents, int) or amount_cents <= 0):
-            raise ValueError("amount_cents must be a positive integer")
-        rows = self.billing.refund(hotkey, f"{hotkey}:{key}", amount_cents)
-        return {"refunds": rows, **self.balance(hotkey)}
+        st = self.billing.refund(hotkey, f"{hotkey}:{key}", self._dest(to), self._cents(amount_usdc))
+        return {"refund": st, **self.balance(hotkey)}
+
+    def refund_status(self, hotkey: str, key: str) -> dict[str, Any]:
+        st = self.billing.tao.refund_state(f"{hotkey}:{key}") if getattr(self.billing, "tao", None) else None
+        if st is None:
+            raise NotFound("no such refund")
+        return st

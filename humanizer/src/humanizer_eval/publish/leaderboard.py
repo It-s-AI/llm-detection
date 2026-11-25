@@ -1,9 +1,12 @@
-"""Signed leaderboard of the humanizer competition (D-12, D-13, D-92): its share of the validators' weights.
+"""Signed leaderboard of the humanizer competition (D-12, D-92): who its kings are.
 
-The owner's evaluator signs the payout weights of the current king state with a dedicated ed25519 key;
-validators pin its public key, check the signature, the subnet, the competition id ("mechid": 1, a
-label, not a chain mechanism since SN32 v4), the expiry and that the
-sequence number never goes back, then map hotkeys to UIDs. Anything wrong or missing -> burn.
+The weights themselves are constants of the validator code (owner's decision 2026-11-25): detection 80%,
+humanizer 20%, and inside the humanizer part 85/10/5 to the current king and the two previous distinct
+kings, the shares of missing slots to the current king. Nothing is burned. The evaluator only tells the
+validators who the kings are: their hotkeys, newest first, signed with a dedicated ed25519 key. Validators
+pin its public key, check the signature, the subnet, the competition id ("mechid": 1, a label), the expiry
+and that the sequence number never goes back; with no king (the owner's baseline reigns) or no valid
+leaderboard ever received, the humanizer part goes to detection.
 
 Envelope (JSON)::
 
@@ -13,22 +16,15 @@ Envelope (JSON)::
 
 Payload::
 
-    {"schema": "sn32-humanizer-leaderboard/1", "netuid": 32, "mechid": 1, "seq": <ms>,
+    {"schema": "sn32-humanizer-leaderboard/2", "netuid": 32, "mechid": 1, "seq": <ms>,
      "issued_at": <unix s>, "expires_at": <unix s>,
-     "weights": {"<hotkey>": 0.85, ..., "__burn__": 0.15},
-     "king": {...current king entry...}, "history": [...last coronations, newest first...],
-     "launch_ramp": {"until": <unix s>, "paid_share": 0.25} | null}
-
-Launch ramp (D-13, owner's decision 2026-11-21): while the owner's baseline is king, everything is burned.
-For the first ``LAUNCH_RAMP_S`` after the first miner coronation the miners get only ``LAUNCH_RAMP_PAID`` of
-the competition's weights (in the usual 85/10/5 proportions) and the rest is burned, so that an exploit
-that slipped through at launch can be found and stopped before it earns the full share.
+     "kings": ["<current king hotkey>", "<previous>", "<one before>"],   # 0..3, distinct
+     "king": {...current king entry...} | null, "history": [...last coronations, newest first...]}
 """
 
 from __future__ import annotations
 
 import json
-import math
 import time
 from pathlib import Path
 from typing import Any
@@ -36,11 +32,9 @@ from typing import Any
 from nacl.exceptions import BadSignatureError
 from nacl.signing import SigningKey, VerifyKey
 
-from humanizer_eval.scoring.crown import BURN_KEY, IsRegistered, KingState
+from humanizer_eval.scoring.crown import PAYOUT_SHARES_BP, IsRegistered, KingState, payout_shares
 
-SCHEMA = "sn32-humanizer-leaderboard/1"
-LAUNCH_RAMP_S = 3 * 86400.0
-LAUNCH_RAMP_PAID = 0.25
+SCHEMA = "sn32-humanizer-leaderboard/2"
 
 
 class LeaderboardError(ValueError):
@@ -67,23 +61,13 @@ def build_payload(
     history: int = 10,
     now: float | None = None,
     is_registered: IsRegistered | None = None,
-    ramp_s: float = LAUNCH_RAMP_S,
-    ramp_paid: float = LAUNCH_RAMP_PAID,
 ) -> dict[str, Any]:
-    """Payout weights of the kings that still hold their registration (a deregistered king drops out
-    and the others close ranks, D-66); everything to burn without a miner king; during the launch ramp
-    the miners' part is scaled to ``ramp_paid`` and the rest goes to burn."""
+    """The kings that still hold their registration (a deregistered king drops out and the others close
+    ranks, D-66), newest first; none while the owner's baseline is king."""
     now = time.time() if now is None else now
     active = state.active_history(is_registered) if state is not None else []
-    weights = state.payout_weights(is_registered) if state is not None and active else {BURN_KEY: 1.0}
+    kings = state.payout_hotkeys(is_registered) if state is not None else []
     cur = active[-1] if active else None
-    first = next((e for e in state.history if not e.is_baseline), None) if state is not None else None
-    ramp = None
-    if first is not None and now < first.crowned_at.timestamp() + ramp_s:
-        ramp = {"until": first.crowned_at.timestamp() + ramp_s, "paid_share": ramp_paid}
-        paid = {k: v * ramp_paid for k, v in weights.items() if k != BURN_KEY}
-        burn = 1.0 - sum(paid.values())
-        weights = {**paid, BURN_KEY: burn} if burn > 1e-12 else paid
     return {
         "schema": SCHEMA,
         "netuid": netuid,
@@ -91,11 +75,15 @@ def build_payload(
         "seq": int(now * 1000),
         "issued_at": now,
         "expires_at": now + ttl_s,
-        "weights": weights,
-        "king": None if cur is None else cur.to_dict(),
+        "kings": kings,
+        "king": None if cur is None or cur.is_baseline else cur.to_dict(),
         "history": [e.to_dict() for e in reversed(active[-history:])],
-        "launch_ramp": ramp,
     }
+
+
+def shares(payload: dict[str, Any]) -> dict[str, float]:
+    """``{hotkey: share of the humanizer part}`` as the validators compute it (for display)."""
+    return payout_shares(list(payload.get("kings") or []))
 
 
 def sign(payload: dict[str, Any], key: SigningKey) -> dict[str, str]:
@@ -130,12 +118,12 @@ def verify(
         raise LeaderboardError("leaderboard expired or not yet valid")
     if int(p["seq"]) < min_seq:
         raise LeaderboardError("leaderboard is older than one already accepted")
-    w = p.get("weights")
-    if not isinstance(w, dict) or not w:
-        raise LeaderboardError("no weights")
-    vals = list(w.values())
-    if any(not isinstance(v, int | float) or not math.isfinite(v) or v < 0 for v in vals) or not math.isclose(
-        sum(vals), 1.0, abs_tol=1e-6
+    k = p.get("kings")
+    if (
+        not isinstance(k, list)
+        or len(k) > len(PAYOUT_SHARES_BP)
+        or any(not isinstance(h, str) or not h for h in k)
+        or len(set(k)) != len(k)
     ):
-        raise LeaderboardError("weights must be non-negative and sum to 1")
+        raise LeaderboardError("kings must be at most 3 distinct hotkeys")
     return p

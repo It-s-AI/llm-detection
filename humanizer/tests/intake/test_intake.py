@@ -1,15 +1,16 @@
 import hashlib
-import hmac
 import json
 import time
+import uuid
 from dataclasses import replace
 
-import httpx
 import pytest
 
-from billing.test_billing import CARD, FakeStripe
+from billing.test_billing import CARD
+from billing.test_tao import COLD, FakeRoute
 from evaluation.test_pipeline import KEY, FakeGates, FakeLLM, N, _ctx, _detectors, _outputs
-from humanizer_eval.billing import Accounts, BillingService, StripeAPI
+from humanizer_eval.billing import Accounts, BillingService
+from humanizer_eval.billing.tao import WEI, TaoConfig, TaoRail
 from humanizer_eval.detectors.base import DetectorScore
 from humanizer_eval.evaluation import EvalConfig, KingRun, ReplayRunner, SubmissionStore
 from humanizer_eval.intake import (
@@ -25,11 +26,10 @@ from humanizer_eval.intake import (
 )
 from humanizer_eval.intake.api import create_app
 from humanizer_eval.intake.client import MinerClient, SeedSigner
-from humanizer_eval.scoring.crown import BURN_KEY, KingState
+from humanizer_eval.scoring.crown import KingState
 
 URL = "https://huggingface.co/miner/bundle/resolve/main/b.tar"
 SHA = "ab" * 32
-WHSEC = "whsec_test"
 
 
 def _sha(hotkey: str) -> str:
@@ -45,16 +45,15 @@ class CountingReplay(ReplayRunner):
 
 
 class World:
-    """Intake service, queue, billing (fake Stripe), worker on the fake period from the pipeline tests."""
+    """Intake service, queue, billing (TAO on a fake chain), worker on the fake period from the pipeline tests."""
 
     def __init__(self, tmp_path, *, registered=None, limits=None):
         self.t = [time.time()]
         now = lambda: self.t[0]  # noqa: E731
-        self.fake = FakeStripe()
-        api = StripeAPI("sk_test_x", transport=httpx.MockTransport(self.fake.handler))
-        self.billing = BillingService(
-            CARD, Accounts(tmp_path / "b.sqlite"), api, now=now, sleep=lambda s: None
-        )
+        self.route = FakeRoute()
+        acc = Accounts(tmp_path / "b.sqlite")
+        rail = TaoRail(tmp_path / "tao.sqlite", self.route, b"m" * 32, acc, TaoConfig(), now=now)
+        self.billing = BillingService(CARD, acc, rail, now=now)
         self.queue = SubmissionQueue(tmp_path / "q.sqlite", now=now)
         self.ctx = _ctx()
         self.stores = {}
@@ -66,9 +65,7 @@ class World:
             lambda: self.ctx,
             self.store_for,
             self.registration,
-            success_url="https://eval.test/v1/checkout/done",
-            cancel_url="https://eval.test/v1/checkout/cancelled",
-            limits=limits or IntakeLimits(stripe_poll_interval_s=0, allow_raw_urls=True),
+            limits=limits or IntakeLimits(payment_poll_interval_s=0, allow_raw_urls=True),
             now=now,
         )
         self.bundles = {URL: _outputs(self.ctx)}
@@ -108,50 +105,44 @@ class World:
     def client(self, signer):
         from fastapi.testclient import TestClient
 
-        app = create_app(self.svc, self.verifier, webhook_secret=WHSEC)
+        app = create_app(self.svc, self.verifier)
         return MinerClient("http://testserver", signer, http=TestClient(app))
 
     def pay(self, hotkey, cents=100_000):
-        self.billing.accounts.record_payment(
-            f"pi_{hotkey[:6]}_{cents}_{len(self.fake.pis)}", hotkey, cents, 0
-        )
+        self.billing.accounts.record_payment(f"tao:{uuid.uuid4().hex}", hotkey, cents, 0)
 
+    def send_tao(self, payment, tao=None):
+        """The miner sends the TAO the payment asks for (or ``tao``) to its deposit address."""
+        a = payment["evm_address"]
+        self.route.bt[a] = self.route.bt.get(a, 0) + int(float(tao or payment["amount_tao"]) * WEI)
 
-def _webhook(http, session_id):
-    payload = json.dumps(
-        {
-            "type": "checkout.session.completed",
-            "data": {"object": {"id": session_id, "payment_status": "paid"}},
-        }
-    ).encode()
-    ts = int(time.time())
-    sig = hmac.new(WHSEC.encode(), f"{ts}.".encode() + payload, hashlib.sha256).hexdigest()
-    return http.post("/v1/stripe/webhook", content=payload, headers={"stripe-signature": f"t={ts},v1={sig}"})
+    def converge(self, n=5):
+        for _ in range(n):
+            self.t[0] += 31  # past the deposit poll interval of a paying hotkey
+            self.svc.enqueue_ready()
 
 
 def test_full_flow_through_the_api(tmp_path):
-    w = World(
-        tmp_path, limits=IntakeLimits(stripe_poll_interval_s=float("inf"), allow_raw_urls=True)
-    )  # webhook, no polling
+    w = World(tmp_path, limits=IntakeLimits(payment_poll_interval_s=float("inf"), allow_raw_urls=True))
     miner = SeedSigner(b"\x05" * 32)
     c = w.client(miner)
     info = c.info()
     assert info["period_id"] == "p-test" and info["n_inputs"] == N and info["queue"]["waiting"] == 0
     sub = c.submit(URL, SHA, 10**9, name="v1")
     sid = sub["submission_id"]
-    assert sub["state"] == "awaiting_payment" and sub["payment"]["url"].startswith(
-        "https://checkout.stripe.test/"
-    )
+    pay = sub["payment"]
+    assert sub["state"] == "awaiting_payment" and pay["method"] == "tao" and float(pay["amount_tao"]) > 0
+    assert c.deposit()["address"] == pay["address"]  # one deposit address per hotkey
     st = c.status(sid)
-    assert st["state"] == "awaiting_payment" and st["amount_due_cents"] == sub["payment"]["amount_cents"]
-    # Stripe calls the webhook: the payment is credited and the submission joins the queue
-    r = _webhook(c.http, sub["payment"]["session_id"])
-    assert r.status_code == 200 and r.json()["result"] == "credited"
+    assert st["state"] == "awaiting_payment" and st["payment"]["due_usdc"] == sub["quote"]["hold_usdc"]
+    # the miner sends the TAO; the background pass bridges, swaps, credits and queues it
+    w.send_tao(pay, tao=float(pay["amount_tao"]) + 0.5)  # more than due: the rest stays as USDC
+    w.converge()
     st = c.status(sid)
     assert st["state"] == "queued" and st["queue_position"] == 1
     assert w.billing.accounts.hold(sid).status == "open"
     with pytest.raises(Exception, match="409"):
-        c.refund("refund-key-1")  # money is held while the submission waits or runs
+        c.refund("refund-key-1", COLD)  # money is held while the submission waits or runs
     # the worker: the baseline king is scored on this period first, then the challenger
     out = w.worker.run_once()
     assert out["state"] == "done" and out["crowned"]
@@ -169,9 +160,12 @@ def test_full_flow_through_the_api(tmp_path):
     state = KingState.from_json((tmp_path / "king_state.json").read_text())
     assert state.current.submission_id == sid and state.history[0].is_baseline
     bal = c.balance()
-    assert bal["available_cents"] == bal["balance_cents"] > 0
-    ref = c.refund("refund-key-1")
-    assert ref["refunds"][0]["status"] == "succeeded" and ref["balance_cents"] == 0
+    assert bal["available_usdc"] == bal["balance_usdc"] and float(bal["balance_usdc"]) > 0
+    assert float(c.refund_quote(COLD)["tao_estimate"]) > 0
+    ref = c.refund("refund-key-1", COLD)  # any address the miner names
+    assert ref["refund"]["to"] == COLD and ref["balance_usdc"] == "0.00"
+    w.converge()
+    assert c.refund_status("refund-key-1")["stage"] == "delivered" and len(w.route.delivered) == 1
 
 
 def test_bad_requests(tmp_path):
@@ -208,7 +202,7 @@ def test_bad_requests(tmp_path):
 
 
 def test_queue_cap_and_payment_order(tmp_path):
-    w = World(tmp_path, limits=IntakeLimits(max_waiting=2, stripe_poll_interval_s=0, allow_raw_urls=True))
+    w = World(tmp_path, limits=IntakeLimits(max_waiting=2, payment_poll_interval_s=0, allow_raw_urls=True))
     signers = [SeedSigner(bytes([i]) * 32) for i in (1, 2, 3)]
     for s in signers:
         w.pay(s.ss58_address)
@@ -239,24 +233,23 @@ def test_cancel_releases_the_hold_and_expired_quote(tmp_path):
     sid = sub["submission_id"]
     assert w.billing.accounts.available(m) < 100_000
     out = w.svc.cancel(m, sid)
-    assert out["released_cents"] > 0 and w.billing.accounts.available(m) == 100_000
+    assert float(out["released_usdc"]) > 0 and w.billing.accounts.available(m) == 100_000
     assert w.queue.claim() is None
     # an unpaid quote expires; the miner submits again later
     m2 = SeedSigner(b"\x06" * 32).ss58_address
     sub2 = w.svc.submit(m2, bundle_url=URL, bundle_sha256=_sha(m2), bundle_bytes=10)
-    w.fake.paid = False
-    w.fake.sessions[sub2["payment"]["session_id"]]["expired"] = True  # Stripe closed the link
     w.t[0] += 3601
     assert w.svc.status(m2, sub2["submission_id"])["state"] == "expired"
 
 
-def test_status_poll_credits_a_paid_checkout_without_webhook(tmp_path):
+def test_status_polls_follow_the_tao_to_the_queue(tmp_path):
     w = World(tmp_path)
     m = SeedSigner(b"\x05" * 32).ss58_address
     sub = w.svc.submit(m, bundle_url=URL, bundle_sha256=_sha(m), bundle_bytes=10)
     assert sub["state"] == "awaiting_payment"
-    st = w.svc.status(m, sub["submission_id"])  # FakeStripe reports the session paid
-    assert st["state"] == "queued"
+    w.send_tao(sub["payment"])
+    states = [w.svc.status(m, sub["submission_id"])["state"] for _ in range(4)]  # bridge, arrive, swap
+    assert states[-1] == "queued"
 
 
 def _failing_detectors(dets, name):
@@ -371,8 +364,8 @@ def test_leaderboard_endpoint_serves_a_verifiable_envelope(tmp_path):
 
     http = TestClient(create_app(w.svc, w.verifier, leaderboard=board))
     p = verify(http.get("/v1/leaderboard").json(), key.verify_key.encode().hex(), netuid=32)
-    # the first miner king, crowned just now: inside the 3-day launch ramp, a quarter paid, the rest burned
-    assert p["weights"] == {m: 0.25, BURN_KEY: 0.75} and p["king"]["hotkey"] == m
+    # the first miner king: the only payout hotkey (the validators give it the whole humanizer part)
+    assert p["kings"] == [m] and p["king"]["hotkey"] == m
     assert TestClient(create_app(w.svc, w.verifier)).get("/v1/leaderboard").status_code == 404
 
 
@@ -464,90 +457,78 @@ def test_snapshot_registration_blocks(tmp_path):
     assert m.is_registered("5B", 20) and not m.is_registered("5B", 21) and not m.is_registered("5C", None)
 
 
-# --- paying by link from the terminal: submit -> Stripe link -> pay -> "paid" ------------------------
-def _link_world(tmp_path, **kw):
+# --- paying in TAO from the terminal: submit -> send TAO -> "paid" -----------------------------------
+def _pay_world(tmp_path, **kw):
     lim = IntakeLimits(
-        stripe_poll_interval_s=float("inf"), paid_check_interval_s=0, allow_raw_urls=True, **kw
+        payment_poll_interval_s=float("inf"), paid_check_interval_s=0, allow_raw_urls=True, **kw
     )
-    w = World(tmp_path, limits=lim)
-    w.fake.paid = False
-    return w
+    return World(tmp_path, limits=lim)
 
 
-def test_pay_by_link_then_paid_command(tmp_path):
-    w = _link_world(tmp_path)
+def test_paid_command_follows_the_tao(tmp_path):
+    w = _pay_world(tmp_path)
     c = w.client(SeedSigner(b"\x06" * 32))
     sub = c.submit(URL, SHA, 10**9)
     sid, pay = sub["submission_id"], sub["payment"]
-    form = next(f for m, p, f, _ in w.fake.calls if m == "POST" and p == "/v1/checkout/sessions")
-    assert form["payment_method_types[0]"] == "card"
-    assert int(form["expires_at"]) == pay["expires_at"] == int(sub["quote"]["expires_ts"])
-    assert form["success_url"] == f"https://eval.test/v1/checkout/done?sid={sid}"
-    assert pay["then"] == f"POST /v1/submissions/{sid}/paid"
-    r = c.paid(sid)  # not paid yet: the link again, and the deadline
-    assert r["state"] == "awaiting_payment" and "no payment yet" in r["message"]
-    assert r["payment"] == {
-        "url": pay["url"],
-        "amount_cents": pay["amount_cents"],
-        "expires_ts": sub["quote"]["expires_ts"],
-    }
-    w.fake.paid = True
+    assert (
+        pay["then"] == f"POST /v1/submissions/{sid}/paid" and pay["expires_ts"] == sub["quote"]["expires_ts"]
+    )
     r = c.paid(sid)
-    assert r["state"] == "queued" and r["queue_position"] == 1 and "confirmed" in r["message"]
-    assert w.billing.accounts.hold(sid).status == "open"
-    bal = c.balance()["balance_cents"]
-    assert c.paid(sid)["state"] == "queued" and c.balance()["balance_cents"] == bal  # credited once
-    page = c.http.get(f"/v1/checkout/done?sid={sid}").text
-    assert f"paid {sid}" in page
-    assert "<submission_id>" in c.http.get("/v1/checkout/done?sid=<script>").text
+    assert r["state"] == "awaiting_payment" and "no TAO yet" in r["message"]
+    w.send_tao(pay)
+    r = c.paid(sid)  # the bridge is on its way
+    assert r["state"] == "awaiting_payment" and "on its way" in r["message"]
+    for _ in range(3):
+        r = c.paid(sid)
+    assert (
+        r["state"] == "queued"
+        and "confirmed" in r["message"]
+        and w.billing.accounts.hold(sid).status == "open"
+    )
+    bal = c.balance()["balance_usdc"]
+    assert c.paid(sid)["state"] == "queued" and c.balance()["balance_usdc"] == bal  # credited once
 
 
-def test_paid_before_the_link_expired_counts_after_the_window(tmp_path):
-    w = _link_world(tmp_path)
-    sid = w.svc.submit("5Fhk-late", bundle_url=URL, bundle_sha256=_sha("late"), bundle_bytes=10**9)[
-        "submission_id"
-    ]
-    w.fake.paid = True  # paid in the last minute ...
-    w.t[0] += 3700  # ... confirmed after the window
-    r = w.svc.paid("5Fhk-late", sid)
-    assert r["state"] == "queued" and w.billing.accounts.hold(sid).status == "open"
+def test_tao_sent_in_time_counts_after_the_window(tmp_path):
+    w = _pay_world(tmp_path)
+    sub = w.svc.submit("5Fhk-late", bundle_url=URL, bundle_sha256=_sha("late"), bundle_bytes=10**9)
+    sid = sub["submission_id"]
+    w.send_tao(sub["payment"])
+    w.svc.paid("5Fhk-late", sid)  # sent in the last minute: the bridge starts ...
+    w.t[0] += 3700  # ... and lands after the window
+    w.converge()
+    assert w.queue.get(sid).state == "queued" and w.billing.accounts.hold(sid).status == "open"
 
 
-def test_unpaid_link_expires_but_a_stripe_outage_decides_nothing(tmp_path):
-    w = _link_world(tmp_path)
+def test_unpaid_submission_expires_and_late_tao_stays_on_the_balance(tmp_path):
+    w = _pay_world(tmp_path)
     hk = "5Fhk-unpaid"
     sub = w.svc.submit(hk, bundle_url=URL, bundle_sha256=_sha("u1"), bundle_bytes=10**9)
-    sid, cs = sub["submission_id"], sub["payment"]["session_id"]
+    sid = sub["submission_id"]
     w.t[0] += 3700
-    w.fake.down = True
-    assert w.svc.status(hk, sid)["state"] == "awaiting_payment"  # Stripe did not answer: wait
-    w.fake.down = False
-    w.t[0] += 61
-    assert w.svc.status(hk, sid)["state"] == "awaiting_payment"  # the link is still open at Stripe
-    w.fake.sessions[cs]["expired"] = True
-    w.t[0] += 61
     r = w.svc.paid(hk, sid)
-    assert r["state"] == "expired" and "submit again" in r["message"] and "payment" not in r
-    # an unpaid quote does not use the registration
-    assert (
-        w.svc.submit(hk, bundle_url=URL, bundle_sha256=_sha("u2"), bundle_bytes=10**9)["state"]
-        == "awaiting_payment"
-    )
+    assert r["state"] == "expired" and "submit again" in r["message"]
+    w.send_tao(sub["payment"])  # too late: it becomes USDC on the balance anyway
+    for _ in range(4):
+        w.billing.collect(hk)
+    assert w.billing.accounts.available(hk) > 0
+    # an unpaid quote does not use the registration; the balance pays the next one at once
+    nxt = w.svc.submit(hk, bundle_url=URL, bundle_sha256=_sha("u2"), bundle_bytes=10**9)
+    assert nxt["state"] in ("queued", "awaiting_payment")
 
 
-def test_a_paid_link_is_noticed_without_the_command(tmp_path):
-    w = _link_world(tmp_path)
-    w.svc.limits.stripe_poll_interval_s = 0
-    sid = w.svc.submit("5Fhk-bg", bundle_url=URL, bundle_sha256=_sha("bg"), bundle_bytes=10**9)[
-        "submission_id"
-    ]
+def test_tao_is_noticed_without_the_command(tmp_path):
+    w = _pay_world(tmp_path)
+    sub = w.svc.submit("5Fhk-bg", bundle_url=URL, bundle_sha256=_sha("bg"), bundle_bytes=10**9)
+    sid = sub["submission_id"]
     assert w.svc.enqueue_ready() == []
-    w.fake.paid = True
-    assert w.svc.enqueue_ready() == [sid] and w.queue.get(sid).state == "queued"
+    w.send_tao(sub["payment"])
+    w.converge()
+    assert w.queue.get(sid).state == "queued"
 
 
 def test_public_results_show_scores_not_texts_or_money(tmp_path):
-    w = World(tmp_path, limits=IntakeLimits(stripe_poll_interval_s=float("inf"), allow_raw_urls=True))
+    w = World(tmp_path, limits=IntakeLimits(payment_poll_interval_s=float("inf"), allow_raw_urls=True))
     m = SeedSigner(b"\x07" * 32)
     w.pay(m.ss58_address)
     sid = w.svc.submit(m.ss58_address, bundle_url=URL, bundle_sha256=_sha("pub"), bundle_bytes=10, name="v7")[
@@ -570,7 +551,7 @@ def test_public_results_show_scores_not_texts_or_money(tmp_path):
 
 
 def test_test_mode_daily_cap_and_info(tmp_path):
-    w = World(tmp_path, limits=IntakeLimits(stripe_poll_interval_s=float("inf"), allow_raw_urls=True,
+    w = World(tmp_path, limits=IntakeLimits(payment_poll_interval_s=float("inf"), allow_raw_urls=True,
                                             max_evals_per_day=2))  # fmt: skip
     w.svc.about = {"mode": "test", "network": "test", "netuid": 87}
     info = w.svc.info()
@@ -590,7 +571,7 @@ def test_test_mode_daily_cap_and_info(tmp_path):
 
 
 def test_closed_evaluator_is_read_only(tmp_path):
-    w = World(tmp_path, limits=IntakeLimits(stripe_poll_interval_s=float("inf"), allow_raw_urls=True,
+    w = World(tmp_path, limits=IntakeLimits(payment_poll_interval_s=float("inf"), allow_raw_urls=True,
                                             submissions_open=False))  # fmt: skip
     m = SeedSigner(b"\x09" * 32)
     c = w.client(m)
@@ -603,7 +584,7 @@ def test_closed_evaluator_is_read_only(tmp_path):
 
 
 def test_claim_allows_up_to_max_running(tmp_path):
-    w = World(tmp_path, limits=IntakeLimits(stripe_poll_interval_s=float("inf"), allow_raw_urls=True))
+    w = World(tmp_path, limits=IntakeLimits(payment_poll_interval_s=float("inf"), allow_raw_urls=True))
     for k in ("a", "b", "c"):
         hk = f"5F{k}par"
         w.pay(hk)
@@ -614,7 +595,7 @@ def test_claim_allows_up_to_max_running(tmp_path):
 
 
 def test_crown_is_re_decided_when_the_king_changed_during_the_run(tmp_path):
-    w = World(tmp_path, limits=IntakeLimits(stripe_poll_interval_s=float("inf"), allow_raw_urls=True))
+    w = World(tmp_path, limits=IntakeLimits(payment_poll_interval_s=float("inf"), allow_raw_urls=True))
     a, b = "5Farace", "5Fbrace"
     for hk in (a, b):
         w.pay(hk)

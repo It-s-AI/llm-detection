@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pytest
 
-from humanizer_eval.scoring.crown import BURN_KEY, KingEntry, KingState, crown_decision
+from humanizer_eval.scoring.crown import KingEntry, KingState, crown_decision, payout_shares
 from humanizer_eval.scoring.metric import SubmissionRun
 from humanizer_eval.scoring.simulate import SimConfig, advantage_for_delta, simulate_period
 
@@ -97,14 +97,21 @@ def test_crown_is_strict_inequality():
 
 
 # --- king state and payouts --------------------------------------------------------------------
-def test_baseline_king_share_is_burned():
+def test_baseline_king_has_no_payout_hotkeys():
     ks = KingState.initial("baseline-v1", "owner-hk", T0)
     assert ks.current.is_baseline
-    assert ks.payout_weights() == {BURN_KEY: 1.0}
+    assert ks.payout_hotkeys() == [] and ks.payout_weights() == {}
 
 
-def test_empty_state_burns_everything():
-    assert KingState().payout_weights() == {BURN_KEY: 1.0}
+def test_empty_state_pays_nobody():
+    assert KingState().payout_hotkeys() == [] and KingState().payout_weights() == {}
+
+
+def test_payout_shares_roll_missing_slots_to_the_king():
+    assert payout_shares([]) == {}
+    assert payout_shares(["a"]) == {"a": 1.0}
+    assert payout_shares(["a", "b"]) == pytest.approx({"a": 0.90, "b": 0.10})
+    assert payout_shares(["a", "b", "c", "d"]) == pytest.approx({"a": 0.85, "b": 0.10, "c": 0.05})
 
 
 def test_85_10_5_with_growing_history():
@@ -119,7 +126,6 @@ def test_85_10_5_with_growing_history():
     ks.apply_crown("sub-d", "hk-d", T0 + timedelta(days=4), 0.04)
     w = ks.payout_weights()
     assert w == pytest.approx({"hk-d": 0.85, "hk-c": 0.10, "hk-b": 0.05})
-    assert BURN_KEY not in w
     assert sum(w.values()) == pytest.approx(1.0)
 
 
@@ -139,6 +145,7 @@ def test_previous_kings_are_distinct_hotkeys():
     # slots: hk-a (current), hk-b, then the next distinct hotkey is the baseline -> rolls to hk-a
     assert ks.payout_weights() == pytest.approx({"hk-a": 0.90, "hk-b": 0.10})
     assert [e.submission_id for e in ks.payout_slots()] == ["sub-a2", "sub-b1", "baseline-v1"]
+    assert ks.payout_hotkeys() == ["hk-a", "hk-b"]
 
 
 def test_same_hotkey_crowning_itself_twice():
@@ -157,8 +164,6 @@ def test_apply_crown_validation():
         ks.apply_crown("sub-b", "hk-b", T0, 0.01)
     with pytest.raises(ValueError, match="timezone"):
         ks.apply_crown("sub-b", "hk-b", datetime(2026, 12, 1), 0.01)
-    with pytest.raises(ValueError, match="reserved"):
-        ks.apply_crown("sub-b", BURN_KEY, T0 + timedelta(days=2), 0.01)
     with pytest.raises(ValueError, match="finite"):
         ks.apply_crown("sub-b", "hk-b", T0 + timedelta(days=2), float("nan"))
     assert len(ks.history) == 2
