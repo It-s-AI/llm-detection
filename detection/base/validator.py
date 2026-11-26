@@ -321,7 +321,9 @@ class BaseValidatorNeuron(BaseNeuron):
                     state_path=os.path.join(self.config.neuron.full_path, "humanizer_leaderboard.json"),
                     log=bt.logging.warning,
                 )
-            self._humanizer_vector = self.humanizer.dense(list(self.metagraph.hotkeys))
+            regs = getattr(self.metagraph, "block_at_registration", None)
+            regs = [int(b) for b in regs] if regs is not None and len(regs) == len(self.metagraph.hotkeys) else None
+            self._humanizer_vector = self.humanizer.dense(list(self.metagraph.hotkeys), regs)
             self._humanizer_ok = True
         except Exception as e:
             if not getattr(self, "_humanizer_ok", False):

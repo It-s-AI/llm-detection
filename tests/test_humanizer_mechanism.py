@@ -23,7 +23,7 @@ HOTKEYS = ["5Fowner", "5Fa", "5Fb", "5Fc"]
 NONE = [0.0, 0.0, 0.0, 0.0]
 
 
-def envelope(kings, *, now=T0, ttl=3 * 3600, netuid=32, mechid=1, key=KEY, seq=None):
+def envelope(kings, *, now=T0, ttl=3 * 3600, netuid=32, mechid=1, key=KEY, seq=None, regs=None):
     p = {
         "schema": hm.SCHEMA,
         "netuid": netuid,
@@ -35,6 +35,8 @@ def envelope(kings, *, now=T0, ttl=3 * 3600, netuid=32, mechid=1, key=KEY, seq=N
         "king": None,
         "history": [],
     }
+    if regs is not None:
+        p["king_registered_at"] = regs
     body = json.dumps(p, sort_keys=True, separators=(",", ":"))
     return {"payload": body, "signature": key.sign(body.encode()).signature.hex(), "public_key": PUB}
 
@@ -177,3 +179,19 @@ def test_blend_is_80_20():
 def test_blend_with_no_detection_scores_and_misaligned_lengths():
     assert hm.blend([0.0, 0.0, 0.0], [0.0, 1.0]) == pytest.approx([0.0, 0.2, 0.0])
     assert hm.blend([1.0, 1.0], [0.0, 0.5, 0.5]) == pytest.approx([0.4, 0.5])  # UID 2 not known yet
+
+
+def test_a_king_that_registered_again_is_not_paid_even_from_a_stale_leaderboard():
+    """The evaluator drops a king whose hotkey re-registered (D-66); a validator holding an old envelope
+    (the owner's server down) must not keep paying him 85%."""
+    env = envelope(["5Fb", "5Fa"], regs=[100, 50])
+    regs_now = [1, 50, 100, 7]
+    assert board({"https://a": env}).dense(HOTKEYS, regs_now) == pytest.approx(vec(u2=0.90, u1=0.10))
+    regs_now[2] = 4321  # 5Fb was deregistered and registered again
+    assert board({"https://a": env}).dense(HOTKEYS, regs_now) == pytest.approx(vec(u1=1.0))
+    assert board({"https://a": env}).dense(HOTKEYS) == pytest.approx(vec(u2=0.90, u1=0.10))  # no metagraph data
+
+
+def test_malformed_registrations_refused():
+    with pytest.raises(hm.LeaderboardError):
+        hm.verify_envelope(envelope(["5Fb"], regs=[1, 2]), PUB, netuid=32, mechid=1, now=T0)

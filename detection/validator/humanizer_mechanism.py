@@ -82,14 +82,39 @@ def verify_envelope(
         or len(set(k)) != len(k)
     ):
         raise LeaderboardError("kings must be at most 3 distinct hotkeys")
+    regs = p.get("king_registered_at")
+    if regs is not None and (
+        not isinstance(regs, list)
+        or len(regs) != len(k)
+        or any(r is not None and (not isinstance(r, int) or isinstance(r, bool)) for r in regs)
+    ):
+        raise LeaderboardError("king_registered_at must give one block (or null) per king")
     return p
 
 
-def king_shares(kings: Sequence[str], hotkeys: Sequence[str]) -> Optional[List[float]]:
+def king_shares(
+    kings: Sequence[str],
+    hotkeys: Sequence[str],
+    king_registered_at: Optional[Sequence[Optional[int]]] = None,
+    registered_at: Optional[Sequence[int]] = None,
+) -> Optional[List[float]]:
     """One value per UID summing to 1: ``KING_SHARES`` over the kings that are in the metagraph, in their
-    order, the shares of missing slots to the first of them. None when no king is registered."""
+    order, the shares of missing slots to the first of them. None when no king is registered.
+
+    With ``king_registered_at`` (signed, the block each king was crowned under) and ``registered_at``
+    (the metagraph's block_at_registration per UID), a king whose hotkey registered again since is not
+    paid: per the evaluator's rule the crown went back to the previous king (D-66). This holds even while
+    the leaderboard is stale."""
     index = {hk: uid for uid, hk in enumerate(hotkeys)}
-    present = [hk for hk in dict.fromkeys(kings) if hk in index][: len(KING_SHARES)]
+    regs = list(king_registered_at) if king_registered_at is not None else [None] * len(kings)
+
+    def same_registration(i: int, hk: str) -> bool:
+        if registered_at is None or i >= len(regs) or regs[i] is None:
+            return True
+        return int(registered_at[index[hk]]) == int(regs[i])
+
+    present = [hk for i, hk in enumerate(kings) if hk in index and same_registration(i, hk)]
+    present = list(dict.fromkeys(present))[: len(KING_SHARES)]
     if not present:
         return None
     out = [0.0] * len(hotkeys)
@@ -187,12 +212,16 @@ class HumanizerLeaderboard:
         return self.payload
 
     # --- weights ---------------------------------------------------------------------------------
-    def dense(self, hotkeys: Sequence[str]) -> Optional[List[float]]:
+    def dense(
+        self, hotkeys: Sequence[str], registered_at: Optional[Sequence[int]] = None
+    ) -> Optional[List[float]]:
         """The humanizer part as one value per UID (``len(hotkeys)`` values summing to 1), or None when
         there is no king to pay (no valid leaderboard ever, the owner's baseline reigns, or no king is
         registered): then the detection weights are used alone."""
         p = self.refresh()
-        return None if p is None else king_shares(p["kings"], hotkeys)
+        if p is None:
+            return None
+        return king_shares(p["kings"], hotkeys, p.get("king_registered_at"), registered_at)
 
 
 def blend(
