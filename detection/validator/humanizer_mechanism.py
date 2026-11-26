@@ -204,7 +204,10 @@ class HumanizerLeaderboard:
                 continue
             if int(p["seq"]) >= self.seq:
                 self.seq, self.envelope, self.payload = int(p["seq"]), env, p
-                self._save()
+                try:  # a full disk must not freeze the payouts on the old kings: the new board is used anyway
+                    self._save()
+                except OSError as e:
+                    self._log(f"humanizer leaderboard state not saved: {e}")
             break
         if self.payload is not None and self._now() >= self.payload["expires_at"]:
             self._log("humanizer leaderboard: no fresh one; the kings of the last valid one keep their share")
