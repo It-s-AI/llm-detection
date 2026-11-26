@@ -324,11 +324,20 @@ class BaseValidatorNeuron(BaseNeuron):
             regs = getattr(self.metagraph, "block_at_registration", None)
             regs = [int(b) for b in regs] if regs is not None and len(regs) == len(self.metagraph.hotkeys) else None
             self._humanizer_vector = self.humanizer.dense(list(self.metagraph.hotkeys), regs)
+            self._humanizer_hotkeys = list(self.metagraph.hotkeys)
             self._humanizer_ok = True
         except Exception as e:
             if not getattr(self, "_humanizer_ok", False):
                 bt.logging.error(f"humanizer share not applied: {e}")
                 return detection
+            # the previous vector is by UID: reuse it only for UIDs that still hold the same hotkey
+            prev, hks = self._humanizer_vector, getattr(self, "_humanizer_hotkeys", None)
+            now = list(self.metagraph.hotkeys)
+            if prev is not None and hks is not None:
+                keep = [w if i < len(now) and i < len(hks) and now[i] == hks[i] else 0.0 for i, w in enumerate(prev)]
+                total = sum(keep)
+                self._humanizer_vector = [w / total for w in keep] if total > 0 else None
+                self._humanizer_hotkeys = now
             bt.logging.error(f"humanizer share: reusing the previous vector ({e})")
         hum = self._humanizer_vector
         if hum is None:

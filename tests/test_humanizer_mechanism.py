@@ -177,7 +177,9 @@ def test_blend_is_80_20():
 
 
 def test_blend_with_no_detection_scores_and_misaligned_lengths():
-    assert hm.blend([0.0, 0.0, 0.0], [0.0, 1.0]) == pytest.approx([0.0, 0.2, 0.0])
+    # no detection weight at all: its 80% is spread evenly, the king still gets only his 20%
+    a = 0.8 / 3
+    assert hm.blend([0.0, 0.0, 0.0], [0.0, 1.0]) == pytest.approx([a, a + 0.2, a])
     assert hm.blend([1.0, 1.0], [0.0, 0.5, 0.5]) == pytest.approx([0.4, 0.5])  # UID 2 not known yet
 
 
@@ -195,3 +197,11 @@ def test_a_king_that_registered_again_is_not_paid_even_from_a_stale_leaderboard(
 def test_malformed_registrations_refused():
     with pytest.raises(hm.LeaderboardError):
         hm.verify_envelope(envelope(["5Fb"], regs=[1, 2]), PUB, netuid=32, mechid=1, now=T0)
+
+
+def test_blend_never_gives_the_kings_more_than_their_share():
+    nan = float("nan")
+    out = hm.blend([nan, nan, nan, nan], [0.0, 0.0, 0.0, 1.0])
+    assert out[3] == pytest.approx(0.8 / 4 + 0.2) and sum(out) == pytest.approx(1.0)
+    out = hm.blend([0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0])
+    assert out == pytest.approx([0.2, 0.2, 0.2, 0.4])

@@ -26,6 +26,7 @@ received, the detection weights are used alone: the humanizer part goes to detec
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -229,13 +230,15 @@ def blend(
 ) -> List[float]:
     """One weight vector for both competitions: ``(1 - share) * detection + share * humanizer``.
 
-    ``detection`` is normalized here (all zero: the detection part is empty and only the humanizer share
-    is set). ``humanizer`` None (no king, or disabled) leaves the detection weights unchanged. The
-    humanizer vector is aligned to the detection one by UID: missing UIDs count as 0, extra ones are cut."""
-    det = [max(0.0, float(x)) for x in detection]
+    ``detection`` is normalized here; non-finite values count as 0, and with no detection weight at all its
+    part is spread evenly (the kings never get more than ``share``). ``humanizer`` None (no king, or
+    disabled) leaves the detection weights unchanged. The humanizer vector is aligned to the detection one
+    by UID: missing UIDs count as 0, extra ones are cut."""
+    det = [float(x) if math.isfinite(float(x)) and float(x) > 0 else 0.0 for x in detection]
     if humanizer is None:
         return det
     total = sum(det)
-    det = [x / total for x in det] if total > 0 else det
+    n = len(det)
+    det = [x / total for x in det] if total > 0 else [1.0 / n] * n if n else det
     hum = [float(humanizer[i]) if i < len(humanizer) else 0.0 for i in range(len(det))]
     return [(1.0 - share) * d + share * h for d, h in zip(det, hum)]
