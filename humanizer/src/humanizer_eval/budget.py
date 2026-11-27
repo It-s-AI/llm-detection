@@ -8,11 +8,18 @@ conservative, never overspend.
 
 The ledger is a single SQLite file; check-and-reserve runs inside
 `BEGIN IMMEDIATE`, so concurrent processes on one machine cannot race past a cap.
+
+In production a second, dynamic limit (``PoolLimit``) covers all paid services together: since the
+launch, what we spent and reserved may not exceed what miners paid in (net of refunds) plus a gap for the
+owner's own runs plus a weekly allowance for every period begun since the launch (building a period: the
+human reference, the king's run). More submissions bring more money and so more room; a bug that loops on
+paid calls is stopped after the gap.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import time
 import uuid
@@ -40,6 +47,38 @@ CREATE INDEX IF NOT EXISTS ledger_service ON ledger(service, status);
 """
 
 
+@dataclass(frozen=True)
+class PoolLimit:
+    billing_db: Path  # intake billing.sqlite (payments of the miners)
+    since_ts: float
+    gap_usd: float
+    services: tuple[str, ...] = ("pangram", "gptzero", "zerogpt", "openrouter", "lium")
+    weekly_usd: float = 0.0  # our own spend per period (the period's build), added once per period begun
+    period_s: float = 7 * 86400.0
+
+    def allowance_usd(self, now: float | None = None) -> float:
+        """The room besides the miners' money: the gap plus ``weekly_usd`` per period begun."""
+        return pool_allowance(self.since_ts, self.gap_usd, self.weekly_usd, self.period_s, now)
+
+    def paid_in_usd(self) -> float:
+        if not Path(self.billing_db).exists():
+            return 0.0
+        with sqlite3.connect(f"file:{self.billing_db}?mode=ro", uri=True, timeout=30) as c:
+            cents = c.execute(
+                "SELECT COALESCE(SUM(net_cents - refunded_cents), 0) FROM payments WHERE ts >= ?",
+                (self.since_ts,),
+            ).fetchone()[0]
+        return cents / 100
+
+
+def pool_allowance(since_ts: float, gap_usd: float, weekly_usd: float, period_s: float = 7 * 86400.0,
+                   now: float | None = None) -> float:  # fmt: skip
+    """gap + weekly × the periods begun since ``since_ts`` (the first counts from the launch on)."""
+    t = time.time() if now is None else now
+    begun = 0 if t < since_ts else math.floor((t - since_ts) / period_s) + 1
+    return gap_usd + weekly_usd * begun
+
+
 @dataclass
 class Reservation:
     ledger: SpendLedger
@@ -63,7 +102,8 @@ class Reservation:
 
 
 class SpendLedger:
-    def __init__(self, path: Path | str, caps: dict[str, float]):
+    def __init__(self, path: Path | str, caps: dict[str, float], pool: PoolLimit | None = None):
+        self.pool = pool
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.caps = dict(caps)
@@ -101,6 +141,17 @@ class SpendLedger:
             committed, open_ = self._totals(c, service)
         return self.caps.get(service, 0.0) - committed - open_
 
+    def open_reservations(self, service: str) -> list[tuple[str, str, float]]:
+        """``(id, ref, estimate)`` of the reservations of ``service`` still open."""
+        with self._conn() as c:
+            return [
+                (r[0], r[1] or "", float(r[2]))
+                for r in c.execute(
+                    "SELECT id, ref, estimate_usd FROM ledger WHERE service = ? AND status = 'open'",
+                    (service,),
+                )
+            ]
+
     def summary(self) -> dict[str, dict[str, float]]:
         out: dict[str, dict[str, float]] = {}
         with self._conn() as c:
@@ -127,6 +178,21 @@ class SpendLedger:
                         f"{service}: cap ${cap:.2f}, spent ${committed:.2f}, reserved ${open_:.2f},"
                         f" requested ${estimate_usd:.2f}"
                     )
+                if self.pool is not None and service in self.pool.services:
+                    p = self.pool
+                    marks = ",".join("?" * len(p.services))
+                    used = c.execute(
+                        "SELECT COALESCE(SUM(COALESCE(actual_usd, estimate_usd)), 0) FROM ledger "  # noqa: S608
+                        f"WHERE ts >= ? AND status != 'released' AND service IN ({marks})",
+                        (p.since_ts, *p.services),
+                    ).fetchone()[0]
+                    paid, room = p.paid_in_usd(), p.allowance_usd()
+                    if used + estimate_usd > paid + room + 1e-9:
+                        raise BudgetExceededError(
+                            f"spend limit: ${used:.2f} spent or reserved since launch, miners paid in "
+                            f"${paid:.2f} + gap and weekly allowance ${room:.0f}; requested {service} "
+                            f"${estimate_usd:.2f}"
+                        )
                 c.execute(
                     "INSERT INTO ledger (id, ts, service, status, estimate_usd, ref) VALUES (?,?,?,?,?,?)",
                     (rid, time.time(), service, "open", estimate_usd, ref),

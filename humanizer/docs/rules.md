@@ -23,7 +23,7 @@ decisions behind them are in [`spec.md`](spec.md) (`D-xx`). How to build and sub
 
 ## 2. Periods
 
-* A period lasts **4 days**. It has about **500 hidden English texts** written by strong LLMs (12
+* A period lasts **7 days**. It has about **500 hidden English texts** written by strong LLMs (12
   generators, closed and open) across genres (academic writing, essays, business and marketing,
   homework answers, forum Q&A, blog articles, reviews, news, creative), **150–350 words** each.
 * Each period also has a **human reference set H** of the same size, from large pre-2022 human corpora,
@@ -53,11 +53,12 @@ decisions behind them are in [`spec.md`](spec.md) (`D-xx`). How to build and sub
   order. Layout, licenses and a working example: [`examples/ref_humanizer`](../examples/ref_humanizer/README.md).
 * **One submission per registration of a hotkey.** A cancelled, expired-unpaid or failed-on-our-side
   submission does not use it. The same bundle (same sha256) from another hotkey is refused.
-* **Keep your registration until you are evaluated.** Right before your evaluation runs (also when it
-  resumes after a pause) we check that your hotkey still holds the registration it submitted from. If it
-  was pruned meanwhile, the submission is dropped and nothing is charged: a crown from a lost
+* **Keep your registration until you are evaluated.** Right before your bundle runs we check that your
+  hotkey still holds the registration it submitted from. If it was pruned before that, the submission is
+  dropped and nothing is charged. If it is pruned after your bundle ran (for example during a pause), the
+  evaluation is finished and charged for what was used, but no crown is given: a crown from a lost
   registration could not be paid anyway.
-* Submissions run **in the order they were paid**, several at once, each on its own pod.
+* Submissions run **in the order they were paid**, one at a time, each on its own pod.
 
 ## 4. Execution
 
@@ -131,8 +132,10 @@ never decides a crown.
 
 **Identical conditions.** You and the king are always judged and scored the same way:
 * **Every output is judged and scored completely.** If a judge or a detector fails on even one output, it is
-  asked again; if it keeps failing, your evaluation pauses and resumes later. An output never gets level
-  0 or a "caught" score because our judge or detector failed.
+  asked again (the judges without their cache); if it keeps failing, your evaluation pauses and resumes
+  later. An output never gets level 0 or a "caught" score because our judge or detector failed. The one
+  exception: a detector that refuses one of your texts as such (HTTP 400/404/413/415/422, for example a
+  text it does not accept) while it scores the others counts that text as caught.
 * **The same judges on the same infrastructure.** Each judge model is pinned to one provider, with no
   fallback to another; if it is down, evaluations wait.
 * **The same scoring code and settings.** The king's run carries a fingerprint of the scoring code, the
@@ -141,8 +144,8 @@ never decides a crown.
 * **The same detector models.** If a detector vendor changes its model during a period (a new version
   string, or two control texts from H scoring differently), evaluations pause until H and the king are
   rescored by the new model.
-* **The same GPU model:** every run, the king's included, uses an NVIDIA H100 80GB HBM3 (SXM) pod, never the
-  slower PCIe variant.
+* **The GPU:** every run, the king's included, uses one NVIDIA H100 80GB HBM3 (SXM) GPU, or an NVIDIA H200
+  when no single H100 HBM3 can be rented; never the slower H100 PCIe. Your code must fit in 80 GB.
 
 LLM judges are not deterministic across different texts, but the same text always gets the same verdict
 (verdicts are cached), and the king's outputs and yours go through exactly the same steps.

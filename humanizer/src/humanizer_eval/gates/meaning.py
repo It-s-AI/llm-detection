@@ -416,8 +416,11 @@ def decide_g1(
     res.facts = [{"id": i, "fact": f.text, **_row(rv[i])} for i, f in enumerate(plan.facts)]
     res.sentences = [{"id": i, "sentence": t, **_row(pv[i])} for i, t in enumerate(plan.out_sents)]
     omitted = sum(v.final == "omitted" for v in rv.values())
-    contra = sum(v.final == "contradicted" for v in rv.values()) + sum(
-        v.final == "contradicted" for v in pv.values()
+    # one distortion shows twice: the source fact is contradicted (recall) and the output sentence that
+    # carries it is incompatible with the source (precision); count it once (rules.md 5: one is level 0.5)
+    contra = max(
+        sum(v.final == "contradicted" for v in rv.values()),
+        sum(v.final == "contradicted" for v in pv.values()),
     )
     added = sum(v.final == "added" for v in pv.values())
     padded = sum(

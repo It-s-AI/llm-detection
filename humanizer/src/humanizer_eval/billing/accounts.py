@@ -41,6 +41,10 @@ CREATE TABLE IF NOT EXISTS quotes (
     id TEXT PRIMARY KEY, hotkey TEXT NOT NULL, hold_cents INTEGER NOT NULL, expires_ts REAL NOT NULL,
     body TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS hold_cards (
+    submission_id TEXT PRIMARY KEY,
+    card_sha256 TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS holds_hotkey ON holds(hotkey, status);
 CREATE INDEX IF NOT EXISTS payments_hotkey ON payments(hotkey);
 """
@@ -128,6 +132,10 @@ class Accounts:
         with self._conn() as c:
             return self._balance(c, hotkey)[1]
 
+    def open_hold_ids(self) -> list[str]:
+        with self._conn() as c:
+            return [r[0] for r in c.execute("SELECT submission_id FROM holds WHERE status = 'open'")]
+
     def hold(self, submission_id: str) -> Hold | None:
         with self._conn() as c:
             r = c.execute(
@@ -143,6 +151,25 @@ class Accounts:
                 "INSERT OR IGNORE INTO quotes (id, hotkey, hold_cents, expires_ts, body) VALUES (?,?,?,?,?)",
                 (quote_id, hotkey, hold_cents, expires_ts, json.dumps(body)),
             )
+
+    def hold_statement(self, submission_id: str) -> dict | None:
+        """The statement stored with a settled hold (it is written in the same transaction as the charge)."""
+        with self._conn() as c:
+            r = c.execute("SELECT statement FROM holds WHERE submission_id = ?", (submission_id,)).fetchone()
+        return json.loads(r[0]) if r and r[0] else None
+
+    def set_hold_card(self, submission_id: str, card_sha256: str) -> None:
+        """The price card the hold's quote was made with (the run is settled with it)."""
+        with self._tx() as c:
+            c.execute("INSERT OR IGNORE INTO hold_cards (submission_id, card_sha256) VALUES (?, ?)",
+                      (submission_id, card_sha256))  # fmt: skip
+
+    def hold_card(self, submission_id: str) -> str | None:
+        with self._conn() as c:
+            r = c.execute(
+                "SELECT card_sha256 FROM hold_cards WHERE submission_id = ?", (submission_id,)
+            ).fetchone()
+        return r[0] if r else None
 
     def get_quote(self, quote_id: str) -> dict | None:
         with self._conn() as c:
@@ -261,10 +288,14 @@ class Accounts:
         """
         with self._tx() as c:
             existing = c.execute(
-                "SELECT payment_id, amount_cents FROM refunds WHERE key = ? AND hotkey = ?", (key, hotkey)
+                "SELECT payment_id, amount_cents, status FROM refunds WHERE key = ? AND hotkey = ?",
+                (key, hotkey),
             ).fetchall()
+            if existing and all(st == "failed" for _, _, st in existing):
+                # its money was given back (a failed or abandoned refund): the key cannot move money again
+                raise BillingError("this refund key was closed without paying; use a new key")
             if existing:
-                return [(p, a) for p, a in existing]
+                return [(p, a) for p, a, _ in existing]
             if c.execute("SELECT 1 FROM holds WHERE hotkey = ? AND status = 'open'", (hotkey,)).fetchone():
                 raise BillingError(
                     "a submission of this hotkey is being evaluated; refunds wait until it is settled"
@@ -331,6 +362,13 @@ class Accounts:
                 c.execute(
                     "UPDATE payments SET refunded_cents = refunded_cents - ? WHERE id = ?", (amt, payment_id)
                 )
+
+    def refund_ts(self, key: str, payment_id: str) -> float | None:
+        with self._conn() as c:
+            r = c.execute(
+                "SELECT ts FROM refunds WHERE key = ? AND payment_id = ?", (key, payment_id)
+            ).fetchone()
+        return float(r[0]) if r else None
 
     def pending_refunds(self) -> list[tuple[str, str, str, int]]:
         with self._conn() as c:

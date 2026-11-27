@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from humanizer_eval.billing.accounts import Accounts, BillingError
-from humanizer_eval.billing.prices import PriceCard, Statement, quote
+from humanizer_eval.billing.prices import PriceCard, Statement, card_archive, quote
 from humanizer_eval.billing.tao import WEI, SlippageTooHigh, TaoRail, usdc
 
 
@@ -83,11 +83,27 @@ class BillingService:
         finished after the quote's own expiry."""
         q = self._quote(quote_id, check_expiry=not paid_in_time)
         h = self.accounts.open_hold(submission_id, q["hotkey"], q["hold_cents"])
+        sha = q.get("card_sha256") or (q.get("body") or {}).get("card_sha256")
+        if sha:  # the run is settled with the card it was quoted with
+            self.accounts.set_hold_card(submission_id, sha)
         return {"submission_id": h.submission_id, "hold_cents": h.amount_cents}
 
+    def card_for(self, submission_id: str) -> PriceCard:
+        """The card the submission was quoted with (settled with it, whatever card is current); the current
+        card when the quote's card is not known (a hold from before cards were pinned)."""
+        sha = self.accounts.hold_card(submission_id)
+        if sha is None or sha == self.card.sha256:
+            return self.card
+        card = card_archive().get(sha)
+        if card is None:
+            raise BillingError(
+                f"the price card {sha[:12]} of {submission_id}'s quote is not in configs/price_cards"
+            )
+        return card
+
     def finish(self, submission_id: str, statement: Statement) -> dict:
-        if statement.card_sha256 != self.card.sha256:
-            raise BillingError("statement priced with another price card")
+        if statement.card_sha256 != self.card_for(submission_id).sha256:
+            raise BillingError("statement priced with another price card than the quote's")
         h = self.accounts.settle(submission_id, statement.total_cents, statement.to_dict())
         return {
             "submission_id": submission_id,

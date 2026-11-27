@@ -16,9 +16,19 @@ import sqlite3
 import time
 from pathlib import Path
 
-SQLITE = ("spend_ledger.sqlite", "intake/queue.sqlite", "intake/billing.sqlite", "billing/pilot.sqlite")
+# intake/tao.sqlite: deposits and refunds in flight (bridged TAO, swaps, signed transactions); without it a
+# restore would lose a miner's payment that is on its way
+# tao.sqlite before billing.sqlite: a deposit credited between the two copies is then in neither (it is
+# credited again from tao.sqlite on restore), never in billing without its conversion row
+SQLITE = ("spend_ledger.sqlite", "intake/queue.sqlite", "intake/tao.sqlite", "intake/billing.sqlite",
+          "billing/pilot.sqlite")  # fmt: skip
 FILES = (
-    "intake/king_state.*.json",
+    # each submission's status, statement, record, outputs and metering: needed to settle a pending crown
+    # or answer a dispute after a restore (the bundles themselves are re-downloadable or mirrored)
+    "intake/periods/*/submissions/*/*.json",
+    "intake/periods/*/submissions/*/*.enc",
+    "lium/registry.json",  # our pods: without it a pod left running is not known as ours
+    "intake/king_state*.json",
     "crown/*.json",
     "keys/*",
     "keys/wallets/*/coldkey*",  # the notary wallet (period/notary.py)

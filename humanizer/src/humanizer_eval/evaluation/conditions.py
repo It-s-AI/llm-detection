@@ -18,7 +18,7 @@ even when an asymmetry would be unlikely or would favour nobody on average:
   must match H's stored scores, and before each evaluation they are scored again and must still match. Any
   difference pauses the evaluations (``ConditionsChanged``) until the owner rescores H and the king
   (``scripts/rescore_period.py``); a problem found when the period is loaded does the same (the server
-  stays up, nothing is evaluated). ``CANARY_TOL`` absorbs numeric noise only.
+  stays up, nothing is evaluated). ``canary_tol`` absorbs the vendor's own noise only.
 """
 
 from __future__ import annotations
@@ -48,6 +48,13 @@ CANARIES_PER_DETECTOR = 2
 #: the paid vendors return exactly the same score for the same text (difference 0, checked live 2026-11-21);
 #: a GPU-served model such as It's AI jitters around 1e-5. A model change moves mid-range texts far more.
 CANARY_TOL = 1e-3
+#: GPTZero answers the same text with one of two close values (two backends?): 0.3892 / 0.3964 on a
+#: mid-range H text, measured on the production key 2026-11-25; a model change moves such texts much more
+CANARY_TOL_BY_DETECTOR = {"gptzero": 0.02}
+
+
+def canary_tol(name: str) -> float:
+    return CANARY_TOL_BY_DETECTOR.get(name, CANARY_TOL)
 
 
 def scoring_fingerprint(
@@ -69,11 +76,21 @@ def versions(results: Sequence[Any]) -> list[str]:
     return sorted({r.version for r in results if getattr(r, "ok", True) and r.version})
 
 
-def _score_texts(det: Any, texts: Sequence[str]) -> list[float]:
+class CanaryUnavailable(RuntimeError):
+    """A canary got no answer (the detector is down): an outage, never a model change."""
+
+
+def _score_texts(det: Any, texts: Sequence[str], tries: int = 3) -> list[float]:
     res = det.score(list(texts))
+    for _ in range(tries - 1):  # like the H texts: a passing outage is asked again
+        bad = [i for i, r in enumerate(res) if not r.ok]
+        if not bad:
+            break
+        for i, r in zip(bad, det.score([texts[i] for i in bad]), strict=True):
+            res[i] = r
     bad = [r for r in res if not r.ok]
     if bad:
-        raise RuntimeError(f"{getattr(det, 'name', '?')}: canary not scored ({bad[0].error})")
+        raise CanaryUnavailable(f"{getattr(det, 'name', '?')}: canary not scored ({bad[0].error})")
     return [float(r.score) for r in res]
 
 
@@ -103,7 +120,7 @@ def take_baseline(
             texts = [human_texts[i] for i in idx]
             fresh = _score_texts(watch[name], texts)
             stale = max((abs(f - float(hs[i])) for f, i in zip(fresh, idx, strict=True)), default=0.0)
-            if stale > CANARY_TOL:
+            if stale > canary_tol(name):
                 raise RuntimeError(
                     f"{name}: H's stored scores differ from the vendor's current model by {stale:.4g} "
                     "(cached from an older model?): rescore with scripts/rescore_period.py"
@@ -129,7 +146,7 @@ def check(baseline: Mapping[str, Any] | None, watch: Mapping[str, Any] | None,
         if b.get("canary") and watch is not None and name in watch:
             now = _score_texts(watch[name], b["canary"]["texts"])
             diff = max((abs(x - y) for x, y in zip(now, b["canary"]["scores"], strict=True)), default=0.0)
-            if diff > CANARY_TOL:
+            if diff > canary_tol(name):
                 problems.append(
                     f"{name}: canary scores moved by {diff:.4g} since the period's human texts were scored"
                 )

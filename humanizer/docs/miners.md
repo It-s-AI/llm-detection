@@ -6,8 +6,8 @@ metric is in [`spec.md`](spec.md).
 
 ## 1. What you build
 
-A **bundle**: one `bundle.tar` with your code, its Python wheels and your weights. It runs on one H100
-(80 GB) with **no network**, within 60 minutes, and is at most **50 GB**. The layout, the entrypoint contract
+A **bundle**: one `bundle.tar` with your code, its Python wheels and your weights. It runs on one GPU, an H100 80GB
+HBM3 or, when none can be rented, an H200 (fit your code in 80 GB), with **no network**, within 60 minutes, and is at most **50 GB**. The layout, the entrypoint contract
 (`humanize(items) -> list[str]`) and a complete working example are in
 [`examples/ref_humanizer`](../examples/ref_humanizer/README.md). Check your bundle locally before you pay:
 
@@ -21,7 +21,8 @@ HUMEVAL_SUB=bundle HUMEVAL_IN=items_dir HUMEVAL_OUT=out python harness/run.py   
 * **A hotkey registered on SN32.** Each registration of a hotkey can make **one** submission; to submit
   again, register a new hotkey (or the same one again after it was deregistered). Keep the hotkey
   registered while you hold a crown: a king whose hotkey loses its registration drops out of the payouts.
-* **A Hugging Face account** with a model repo for the bundle (public or private).
+* **A Hugging Face account** with a model repo for the bundle: it may be private while you pay, it must be
+  **public** when the evaluation starts.
 * **TAO** for the evaluation hold. Your balance is kept in USDC; a typical quote is about 110–150 USDC,
   depending on the period's number of texts (`miner_submit.py --api <evaluator> info`). You are charged the metered cost (usually less) and the rest stays on your balance.
 
@@ -81,13 +82,14 @@ refused too. The bundle's sha256 is read from that commit's metadata when you su
 when the pod downloads it, so **pushing to the repo after submitting changes nothing**: to evaluate a new
 version, register a new hotkey, commit the new sha and submit again.
 
-### Private repos
+### Private while you pay, public when evaluated
 
-Add `--private` (upload) and `--hf-token <token>` (submit) with a **fine-grained token that can only read
-that one repo**. The token stays on the evaluator's server, encrypted; the evaluation pod only receives a
-short-lived signed download link, and the token is deleted when your evaluation ends. A public repo is
-visible to everyone before it is evaluated: identical copies from other hotkeys are refused, modified
-copies are not.
+You may keep the repo private while you submit and pay (a few minutes), so nobody can copy it meanwhile.
+Make it public right after paying (`miner_submit.py publish --send` does it as soon as the TAO is sent):
+the bundle is read when the evaluation starts. A repo still private then waits up to 15 minutes from the
+moment your payment was credited; if it is still private (or gated) after that, it is refused: nothing is
+charged, but the registration counts as used. No tokens are taken. An identical copy from another hotkey counts only for whoever committed it on chain
+first (a later copy is refused or dropped, nothing charged).
 
 ## 4. What happens next
 
@@ -108,8 +110,7 @@ downloadable until then). Re-runs of the king on later periods use our copy.
 
 **Publication.** 48 hours after the coronation `GET /v1/kings` links the king's bundle. The link is your
 repo at the pinned commit (`huggingface.co/<you>/<repo>/tree/<sha>`), but only if anyone can download that
-commit without a token, so make a private repo public by then. We check the link every 6 hours. If the
-repo is private, gated, deleted, or has a branch named like the commit, we publish our archived copy in a
+commit without a token. We check the link every 6 hours. If the repo became private, gated, deleted, or has a branch named like the commit, we publish our archived copy in a
 public repo of ours instead, and that copy stays.
 
 ## 5. Money

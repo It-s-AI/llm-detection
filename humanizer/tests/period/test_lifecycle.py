@@ -1,3 +1,4 @@
+import contextlib
 import json
 import stat
 
@@ -38,6 +39,7 @@ def _p1(d):
 
 
 def _world(tmp_path, **kw):
+    kw.setdefault("cfg", LifecycleConfig(period_s=4 * DAY))  # the scenarios below use 4-day periods
     d = tmp_path / "periods"
     _p1(d)
     clock, chain = Clock(), FakeChain()
@@ -46,6 +48,7 @@ def _world(tmp_path, **kw):
     def builder(pid, secret, bh, block):
         (d / pid).mkdir()
         (d / pid / "secret.hex").write_text(secret.hex())
+        (d / pid / "LOADED").touch()  # the server loads it (intake_server's loader writes this)
         built.append((pid, bh, block))
         return {"commitment": commitment(secret), "block_hash": bh, "merkle_root": "mr", "n_items": 7,
                 "cost_usd": 3.2}  # fmt: skip
@@ -94,16 +97,20 @@ def test_full_rotation(tmp_path):
     assert lc.step() == [] and any("not ready" in a for a in alerts)
     (d / "p2" / "READY").write_text("{}")
     b3 = chain.h + int((cfg.period_s - cfg.build_lead_s) / cfg.block_s)
-    assert lc.step() == ["switched p1 -> p2", f"committed p3 (seed block {b3})", "revealed p1"]
+    assert lc.step() == ["switched p1 -> p2", f"committed p3 (seed block {b3})"]
     sch = lc.schedule()
     assert (d / "CURRENT").read_text().strip() == "p2" and not (d / "NEXT").exists()
-    assert sch["periods"]["p1"]["revealed_at"] and sch["periods"]["p2"]["started_at"] == clock.t
-    assert revealed == ["p1"] and ("reveal", "p1") in published
+    assert sch["periods"]["p2"]["started_at"] == clock.t and not sch["periods"]["p1"].get("revealed_at")
     assert sch["periods"]["p3"]["planned_start"] == clock.t + cfg.period_s
+    # never in the switch's pass: a worker step that read p1 just before may still claim a run on it
+    clock.t += cfg.reveal_grace_s
+    assert lc.step() == ["revealed p1"]
+    assert lc.schedule()["periods"]["p1"]["revealed_at"]
+    assert revealed == ["p1"] and ("reveal", "p1") in published
 
 
 def test_switch_without_ready_after_the_grace_time(tmp_path):
-    lc, _, clock, chain, *_ = _world(tmp_path, cfg=LifecycleConfig(ready_grace_s=3600))
+    lc, _, clock, chain, *_ = _world(tmp_path, cfg=LifecycleConfig(period_s=4 * DAY, ready_grace_s=3600))
     lc.step()
     chain.h = 10**6
     clock.t += 3.6 * DAY
@@ -122,13 +129,15 @@ def test_reveal_waits_for_running_evaluations_of_that_period(tmp_path):
     chain.h, clock.t = 10**6, clock.t + 4 * DAY
     lc.step()
     (d / "p2" / "READY").write_text("{}")
+    lc.step()
+    clock.t += 3600
     assert "revealed p1" not in lc.step() and revealed == []
     running["p1"] = 0
     assert lc.step() == ["revealed p1"]
 
 
-def test_a_failed_build_alerts_and_is_retried(tmp_path):
-    lc, d, _, chain, _, alerts, *_ = _world(tmp_path)
+def test_a_failed_build_alerts_and_is_retried_an_hour_later(tmp_path):
+    lc, d, clock, chain, _, alerts, *_ = _world(tmp_path)
     lc.step()
     chain.h = 10**6
     good = lc.builder
@@ -138,7 +147,25 @@ def test_a_failed_build_alerts_and_is_retried(tmp_path):
     assert any("building p2 failed" in a for a in alerts)
     assert (d / ".p2.secret").exists() and lc.schedule()["next"] == "p2"
     lc.builder = good
+    assert "built p2" not in lc.step()  # the next timer pass (15 min): not yet, a build is paid
+    clock.t += 3600
     assert lc.step() == ["built p2"]
+
+
+def test_a_build_that_keeps_failing_stops_after_build_tries(tmp_path):
+    from humanizer_eval.period.lifecycle import BUILD_TRIES
+
+    lc, _, clock, chain, _, alerts, *_ = _world(tmp_path)
+    lc.step()
+    chain.h = 10**6
+    calls = []
+    lc.builder = lambda *a: calls.append(1) or (_ for _ in ()).throw(RuntimeError("openrouter down"))
+    for _ in range(200):  # ~2 days of timer passes
+        with contextlib.suppress(RuntimeError):
+            lc.step()
+        clock.t += 900
+    assert len(calls) == BUILD_TRIES and any("giving up" in a for a in alerts)
+    assert "tries used" in alerts[-1]  # each later pass says the rotation waits for the owner
 
 
 def test_a_manifest_that_does_not_match_the_commitment_is_refused(tmp_path):
@@ -248,3 +275,36 @@ def test_chain_free_balance_and_block_bodies():
     assert c.free_balance(pk) == 0.996106239
     assert seen["state_getStorage"][0].endswith(pk)  # blake2_128_concat: hash then the key itself
     assert c.block_extrinsics(5) == ["0x01", "0x02"] and seen["chain_getBlock"] == ["0x" + "aa" * 32]
+
+
+def test_a_commitment_on_chain_cannot_be_redone_once_its_seed_block_is_reached(tmp_path):
+    """Otherwise the owner, who knows the seed after B, could re-roll the period's dataset."""
+    lc, _, _, chain, *_ = _world(tmp_path)
+    lc.notary = FakeNotary(chain)
+    lc.step()
+    lc.step()
+    rec = lc.schedule()["periods"]["p2"]
+    assert rec.get("notary_commitment")
+    chain.h = rec["seed_block"] + 1
+    with pytest.raises(RuntimeError, match="cannot be redone"):
+        lc.recommit("try again")
+
+
+def test_never_switches_to_a_period_the_server_could_not_load(tmp_path):
+    """Past the grace time without READY the rotation switches only to a period the server has loaded at
+    least once: a period that never loads would stop every evaluation."""
+    lc, d, clock, chain, *_ = _world(tmp_path, cfg=LifecycleConfig(period_s=4 * DAY, ready_grace_s=3600))
+    lc.step()
+    chain.h = 10**6
+    clock.t += 3.6 * DAY
+    assert lc.step() == ["built p2"]
+    (d / "p2" / "LOADED").unlink()  # the server never managed to load p2
+    clock.t += 0.4 * DAY + 7200
+    assert lc.step() == []
+    assert (d / "CURRENT").read_text().strip() == "p1"
+    (d / "p2" / "LOADED").touch()
+    assert lc.step()[0] == "switched p1 -> p2"
+
+
+def test_a_period_lasts_seven_days_by_default():
+    assert LifecycleConfig().period_s == 7 * DAY  # owner's decision 2026-11-27 (was 4)

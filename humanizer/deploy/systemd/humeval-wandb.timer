@@ -1,0 +1,9 @@
+[Unit]
+Description=Mirror the humanizer evaluator's public state into W&B every 10 minutes
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

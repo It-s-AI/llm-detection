@@ -80,6 +80,27 @@ class HttpClient:
         self.bucket = TokenBucket(rate_per_sec, burst)
         self.retry = retry or RetryPolicy()
         self.sleep = sleep
+        self._tl = threading.local()  # per thread: what the paid sends of the current call did
+
+    def begin_paid(self) -> None:
+        """Start counting the sends of one paid call (``paid_sends`` after it)."""
+        self._tl.accepted = 0
+        self._tl.unknown = 0
+
+    def paid_sends(self) -> int:
+        """Sends since ``begin_paid`` the vendor may have billed: accepted (2xx) plus delivered with an
+        unknown outcome (a read timeout or a dropped connection after the request went out). A send
+        answered with an error status or one that never connected is not counted."""
+        return int(getattr(self._tl, "accepted", 0)) + int(getattr(self._tl, "unknown", 0))
+
+    def _count(self, method: str, resp: httpx.Response | None, exc: Exception | None) -> None:
+        if method.upper() == "GET" or not hasattr(self._tl, "accepted"):
+            return
+        if exc is not None:
+            if not isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)):
+                self._tl.unknown += 1
+        elif resp is not None and resp.status_code < 300:
+            self._tl.accepted += 1
 
     def request(self, method: str, url: str, **kwargs) -> httpx.Response:
         last_exc: Exception | None = None
@@ -88,11 +109,13 @@ class HttpClient:
             try:
                 resp = self._client.request(method, url, **kwargs)
             except (httpx.TimeoutException, httpx.TransportError) as e:
+                self._count(method, None, e)
                 last_exc = e
                 if attempt == self.retry.max_attempts:
                     break
                 self.sleep(self.retry.delay(attempt, None))
                 continue
+            self._count(method, resp, None)
             if resp.status_code in RETRY_STATUS and attempt < self.retry.max_attempts:
                 self.sleep(self.retry.delay(attempt, resp.headers.get("retry-after")))
                 continue

@@ -171,3 +171,31 @@ def test_every_genre_template_formats():
     # production mix (Q-2): mostly sections of papers, mostly non-argumentative essays
     assert sum("abstract" in t for t in GENRE_TEMPLATES["academic"]) == 1
     assert len(GENRE_TEMPLATES["academic"]) >= 6
+
+
+class RateLimitedLLM(FakeLLM):
+    """The validator provider answers 429 to the first ``n`` validate calls (as on p2's build)."""
+
+    def __init__(self, n):
+        super().__init__()
+        self.left = n
+
+    def chat(self, model, messages, **kw):
+        if kw.get("purpose", "").endswith(":validate") and self.left > 0:
+            self.left -= 1
+            raise RuntimeError("HTTP 429")
+        return super().chat(model, messages, **kw)
+
+
+def test_a_rate_limited_validator_does_not_shrink_the_period():
+    """Items whose fact validation failed on a call error are retried after a pause, not dropped."""
+    secret = b"s" * 32
+    pauses = []
+    full = build_period("p1", secret, BLOCK, FakePool(), FakeLLM(), CFG, n=20, workers=4)
+    r = build_period("p1", secret, BLOCK, FakePool(), RateLimitedLLM(80), CFG, n=20, workers=4,
+                     sleep=pauses.append)  # fmt: skip
+    assert pauses and r.manifest["n_items"] == full.manifest["n_items"] == 20
+    assert r.manifest["merkle_root"] == full.manifest["merkle_root"]
+    none = build_period("p1", secret, BLOCK, FakePool(), RateLimitedLLM(10**6), CFG, n=20, workers=4,
+                        retry_rounds=2, sleep=pauses.append)  # fmt: skip
+    assert none.manifest["n_items"] == 0  # a provider that never recovers: nothing invented

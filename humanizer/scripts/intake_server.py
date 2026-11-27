@@ -16,15 +16,17 @@ skips the registration check. Payments: TAO to per-hotkey deposit addresses, kep
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
 from humanizer_eval.billing import Accounts, BillingService, PriceCard
-from humanizer_eval.budget import SpendLedger
+from humanizer_eval.budget import PoolLimit, SpendLedger
 from humanizer_eval.config import get_settings
 from humanizer_eval.detectors.registry import CROWN_DETECTORS, build_detector
 from humanizer_eval.evaluation import EvalConfig, LiumRunner, ReplayRunner, SubmissionStore, load_period
@@ -53,15 +55,32 @@ from humanizer_eval.publish import HFMirror, KingPublisher, build_payload, load_
 from humanizer_eval.runner.lium import LiumClient, Registry
 from humanizer_eval.scoring.crown import KingState
 
+#: the most we pay per GPU-hour for the evaluation H100 (80GB HBM3, secure tier); measured 2026-11-26:
+#: none at or under $3.0, the cheapest secure one at $3.25, most at $3.75 (spot ones at $2.5 are not used)
+GPU_MAX_PRICE = 4.5
+
+
+def king_state_file(state: Path) -> Path:
+    """One king state whatever the detector set (a change of the set rescores the king from his saved
+    outputs, rules.md; it must never dethrone him). An older per-set file is adopted once."""
+    p = state / "king_state.json"
+    if not p.exists():
+        old = sorted(state.glob("king_state.*.json"), key=lambda f: f.stat().st_mtime)
+        if old:
+            import shutil
+
+            shutil.copy2(old[-1], p)
+    return p
+
 
 def load_or_create_secret(path: Path) -> bytes:
     """A 32-byte secret kept as hex (mode 600), created on first use."""
     import secrets
 
     if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(secrets.token_hex(32))
-        path.chmod(0o600)
+        from humanizer_eval.period.crypto import write_private
+
+        write_private(path, secrets.token_hex(32))
     return bytes.fromhex(path.read_text().strip())
 
 
@@ -121,9 +140,26 @@ def main() -> int:
         raise SystemExit("give exactly one of --replay-map, --lium")
 
     s = get_settings()
-    led = SpendLedger(ledger_path(), s.caps())
     key = load_or_create_key(var_dir() / "keys" / "period.key")
     state = args.state_dir or (var_dir() / "intake")
+    pool = None
+    pool_on = os.environ.get("SPEND_POOL_LIMIT", "true").strip().lower() not in ("0", "false", "no", "off")
+    if (
+        s.soft_limit_since and pool_on
+    ):  # the dynamic limit: miners' money + gap, all paid services (budget.py)
+        import datetime as dt
+
+        since = dt.datetime.fromisoformat(s.soft_limit_since).replace(tzinfo=dt.UTC).timestamp()
+        pool = PoolLimit(
+            state / "billing.sqlite", since, s.soft_limit_gap_usd, weekly_usd=s.soft_limit_weekly_usd
+        )
+    elif args.mode == "prod" and pool_on:
+        raise SystemExit("prod needs SOFT_LIMIT_SINCE (the spend limit: miners' money + gap)")
+    if not pool_on:  # SPEND_POOL_LIMIT=false: only the hard per-service caps (BUDGET_*_USD) limit spending
+        logging.getLogger("budget").warning(
+            "dynamic spend limit off (SPEND_POOL_LIMIT=false): hard caps only"
+        )
+    led = SpendLedger(ledger_path(), s.caps(), pool=pool)
     state.mkdir(parents=True, exist_ok=True)
     base = OpenRouter(s.openrouter_api_key, led, pricing=ModelPricing(var_dir() / "openrouter_models.json"),
                       log_path=var_dir() / "llm_calls.jsonl")  # fmt: skip
@@ -139,9 +175,12 @@ def main() -> int:
         data = json.loads(decrypt_at_rest(key, (pdir / "dataset.enc").read_bytes()))
         want = {h["id"] for h in data["human_ref"]}
         texts = {r["text_id"]: r["text"] for p in pools for r in p.rows if r["text_id"] in want}
-        return load_period(pdir, key, human_texts=texts, detectors=detectors, facts_llm=llm,
-                           workers=args.workers, allow_missing_human=args.allow_missing_human,
-                           human_cache=pdir / f"human_scores.{tag}.enc", watch=watch)  # fmt: skip
+        ctx = load_period(pdir, key, human_texts=texts, detectors=detectors, facts_llm=llm,
+                          workers=args.workers, allow_missing_human=args.allow_missing_human,
+                          human_cache=pdir / f"human_scores.{tag}.enc", watch=watch)  # fmt: skip
+        with contextlib.suppress(OSError):  # the rotation switches only to a period that loads
+            (pdir / "LOADED").touch()
+        return ctx
 
     periods = var_dir() / "periods"
     if args.period:
@@ -190,7 +229,8 @@ def main() -> int:
                           max_evals_per_day=args.max_evals_per_day, submissions_open=not args.closed)  # fmt: skip
     svc = IntakeService(queue, billing, period, store_for, registration, limits=limits,
                         commitment=commitment, hub=hub, secret_key=secret_key,
-                        about={"mode": args.mode, "network": args.network, "netuid": args.netuid})  # fmt: skip
+                        about={"mode": args.mode, "network": args.network, "netuid": args.netuid},
+                        uid=None if args.metagraph is None else snap.uid)  # fmt: skip
 
     if args.replay_map:
         rmap = json.loads(args.replay_map.read_text())
@@ -204,9 +244,15 @@ def main() -> int:
             return ReplayRunner(outs)
     else:
         # one pod per evaluation, plus one for the king's run on the next period (prepare_loop)
-        client = LiumClient(s.lium_api_key, led, Registry(var_dir() / "lium" / "registry.json"), enabled=True,
-                            floor_hours=s.lium_balance_floor_hours, max_price_per_hour=2.6, max_hours=2,
+        client = LiumClient(s.lium_api_key, led, Registry(var_dir() / "lium" / "registry.json"),
+                            enabled=s.lium_enabled,  # LIUM_ENABLED=false stops renting (a kill switch)
+                            auto_topup=s.lium_auto_topup,
+                            floor_hours=s.lium_balance_floor_hours, max_price_per_hour=GPU_MAX_PRICE, max_hours=4,
                             max_concurrent=max(1, args.parallel) + 1)  # fmt: skip
+        # a restart killed the evaluations that owned our live pods: delete them (they would run up to
+        # their scheduled removal and take the rent slots); the evaluations resume on fresh pods
+        for pid in client.sweep_orphans():
+            logging.getLogger("lium").warning("deleted pod %s left by a previous run of the server", pid)
         cheap = None
         if args.cheap_gpu:
             from humanizer_eval.evaluation.runners import rank_executors
@@ -229,7 +275,7 @@ def main() -> int:
         detectors=detectors,
         runner_for=runner_for,
         king_run_path=lambda ctx: state / "periods" / ctx.period_id / f"king_run.{tag}.enc",
-        king_state_path=state / f"king_state.{tag}.json",
+        king_state_path=king_state_file(state),
         key=key,
         cfg=EvalConfig(
             workers=args.workers,
@@ -265,9 +311,12 @@ def main() -> int:
             stop.wait(args.publish_every)
 
     def prepare_loop() -> None:
-        """The next period (NEXT, written by rotate_period.py): load it here and run the king on it."""
+        """The king's run on the current period (so the first challenger does not wait for it; a stored run
+        is only read again) and on the next one (NEXT, written by rotate_period.py), loaded here."""
         while not stop.is_set():
             try:
+                if isinstance(period, CurrentPeriod):
+                    worker.prepare_next(period())
                 nxt = period.upcoming() if isinstance(period, CurrentPeriod) else None
                 if nxt is not None:
                     worker.prepare_next(nxt)
@@ -276,9 +325,20 @@ def main() -> int:
                 alerter.send(f"preparing the next period failed: {type(e).__name__}: {e}", dedupe="prepare")
             stop.wait(300)
 
+    def payments_loop() -> None:
+        """Deposits converted and credited, refunds moved on, paid submissions queued, also while every
+        worker thread is inside an hour-long evaluation (run_once does it only between evaluations)."""
+        while not stop.is_set():
+            try:
+                svc.enqueue_ready()
+            except Exception:
+                logging.getLogger("payments").exception("payments pass failed")
+            stop.wait(30)
+
     if not args.no_worker:
         threading.Thread(target=publish_loop, daemon=True).start()
         threading.Thread(target=prepare_loop, daemon=True).start()
+        threading.Thread(target=payments_loop, daemon=True).start()
     verifier = Verifier(NonceStore(state / "nonces.sqlite", ttl=600), max_skew=300)
     lb_key = load_or_create_signing_key(var_dir() / "keys" / "leaderboard_ed25519.key")
     lb_cache: dict[str, Any] = {}

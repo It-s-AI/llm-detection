@@ -124,13 +124,24 @@ def _usable(e: dict[str, Any], max_price: float, min_reliability: float) -> bool
         and e.get("available_gpu_count", 0) >= 1
         and not e.get("frequent_rent_failures")
         and e.get("disk_health_ok", True) is not False
+        and _one_gpu_rentable(e)
     )
 
 
-#: every evaluation (the king's re-runs and every challenger) runs on exactly this GPU model: Lium also
-#: offers "NVIDIA H100 PCIe", noticeably slower, and with one time limit for everyone a run near the limit
-#: must not depend on which variant it drew (identical conditions, 2026-11-21)
-EVAL_MACHINE = "NVIDIA H100 80GB HBM3"
+def _one_gpu_rentable(e: dict[str, Any]) -> bool:
+    """A single GPU can be rented: Lium rents a multi-GPU node with GPU profiling counters on whole only,
+    and some nodes set a minimum GPU count (both refuse a 1-GPU rent, seen 2026-11-26)."""
+    if (e.get("min_gpu_count_for_rental") or 1) > 1:
+        return False
+    return not (e.get("ncu_profiling_enabled") and (e.get("gpu_count") or 1) > 1)
+
+
+#: the GPU models an evaluation runs on, in order of preference: an H100 80GB HBM3 (SXM) when one GPU of it
+#: can be rented, else an H200 (as fast or faster, 141 GB). Never the slower H100 PCIe: with one time limit
+#: for everyone a run near the limit must not depend on which variant it drew. On 2026-11-26 every secure
+#: HBM3 node rented whole only (8 GPUs), so H200 is the fallback that keeps evaluations running.
+EVAL_MACHINES = ("NVIDIA H100 80GB HBM3", "NVIDIA H200")
+EVAL_MACHINE = EVAL_MACHINES[0]
 
 
 def rank_executors(
@@ -147,7 +158,9 @@ def rank_executors(
         return name in exact if exact is not None else any(g in name for g in gpus)
 
     ok = [e for e in executors if match(e.get("machine_name", "")) and _usable(e, max_price, min_reliability)]
-    return sorted(ok, key=lambda e: (e.get("gpu_count", 1) != 1, float(e["price_per_gpu"])))
+    pref = {m: i for i, m in enumerate(exact or ())}  # with exact: the order given is the preference
+    return sorted(ok, key=lambda e: (pref.get(e.get("machine_name", ""), 0), e.get("gpu_count", 1) != 1,
+                                     float(e["price_per_gpu"])))  # fmt: skip
 
 
 class LiumRunner:
@@ -162,9 +175,9 @@ class LiumRunner:
         client: Any,  # runner.lium.LiumClient
         ssh_key: Path,
         *,
-        max_price: float = 2.6,
+        max_price: float = 4.5,  # secure H100 HBM3 $3.5-3.75, H200 $4.2-4.25 on 2026-11-26
         time_limit_s: int = 3600,
-        max_hours: int = 2,
+        max_hours: int = 4,  # setup + inspect/unpack + 60 min + grace + slack (job deadline); billed as used
         rank: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None,
         rent_attempts: int = 3,
         gpus: bool = True,
@@ -174,7 +187,7 @@ class LiumRunner:
         self.max_price = max_price
         self.time_limit_s = time_limit_s
         self.max_hours = max_hours
-        self.rank = rank or (lambda ex: rank_executors(ex, self.max_price, exact=(EVAL_MACHINE,)))
+        self.rank = rank or (lambda ex: rank_executors(ex, self.max_price, exact=EVAL_MACHINES))
         self.rent_attempts = rent_attempts
         self.gpus = gpus
 
@@ -210,8 +223,11 @@ class LiumRunner:
                 gpus=self.gpus,
             )
             tried.append({"executor": ex.get("id"), "status": r.status, "reason": r.reason[:300]})
-            if not (r.status == "infra_error" and r.reason.startswith("rent failed")):
+            if not (r.status == "infra_error" and r.reason.startswith(("rent failed", "rent refused"))):
                 break
+        reason = r.reason
+        if reason.startswith("rent refused") and any(t["reason"].startswith("rent failed") for t in tried):
+            reason = "rent failed (an earlier executor's rent may have been billed); " + reason
         meta = {
             **r.meta,
             "executor": ex.get("machine_name"),
@@ -220,4 +236,4 @@ class LiumRunner:
             "attempts": tried,
         }
         # the miner pays the pod time of the run that happened, not our refused rents
-        return RunOutput(r.status, r.outputs, r.seconds, r.reason, meta, r.cost_usd)
+        return RunOutput(r.status, r.outputs, r.seconds, reason, meta, r.cost_usd)

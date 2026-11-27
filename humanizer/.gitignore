@@ -28,3 +28,5 @@ build/
 
 # agent worktrees / local tooling
 .claude/
+
+wandb/

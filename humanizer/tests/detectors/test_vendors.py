@@ -106,13 +106,37 @@ def test_retries_on_429_then_succeeds(tmp_path):
     assert det.score(TEXTS[:1])[0].ok
 
 
-def test_persistent_5xx_reports_error_and_commits_estimate(tmp_path):
+def test_persistent_5xx_reports_error_and_books_nothing(tmp_path):
+    """The vendor answered every send with an error status: nothing was billed, the cap is untouched (an
+    outage must not use up the cap)."""
     led = ledger(tmp_path)
     det = GPTZero(http("gptzero", fail_first=100, fail_status=503), ledger=led, cost_fn=gptzero_cost)
     det.max_workers = 1
     s = det.score(TEXTS[:1])[0]
     assert not s.ok and math.isnan(s.score)
-    assert led.spent("gptzero") > 0  # we cannot prove the vendor did not charge
+    assert led.spent("gptzero") == 0 and led.outstanding("gptzero") == 0
+
+
+def test_sends_delivered_with_an_unknown_outcome_are_each_booked(tmp_path):
+    """A send that went out and timed out may have been billed: each one is booked at the estimate, and a
+    later success adds its own (the cap counts every delivered request)."""
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise httpx.ReadTimeout("read timed out", request=request)
+        return httpx.Response(200, json={"documents": [{"class_probabilities": {"ai": 1, "human": 0, "mixed": 0},
+                                                         "completely_generated_prob": 1}]})  # fmt: skip
+
+    led = ledger(tmp_path)
+    client = HttpClient("", transport=httpx.MockTransport(handler),
+                        retry=RetryPolicy(max_attempts=4), sleep=lambda _s: None)  # fmt: skip
+    det = GPTZero(client, ledger=led, cost_fn=gptzero_cost)
+    det.max_workers = 1
+    s = det.score(TEXTS[:1])[0]
+    one = gptzero_cost(len(TEXTS[0].split()))
+    assert calls["n"] == 3 and led.spent("gptzero") == pytest.approx(3 * one), (s, led.spent("gptzero"))
 
 
 def test_malformed_response_is_an_error(tmp_path):
@@ -211,3 +235,16 @@ def test_http_client_has_no_secret_in_transport_error():
     with pytest.raises(RuntimeError) as e:
         c.request("POST", "http://x")
     assert "SECRET" not in str(e.value)
+
+
+def test_an_answer_without_probabilities_is_an_error_not_a_human_score(tmp_path):
+    """A 200 without the probability fields used to score 0.0 (fully human) and be cached (audit 2, C2)."""
+    from humanizer_eval.detectors.base import DetectorError
+    from humanizer_eval.detectors.vendors import Pangram
+
+    g = GPTZero(http("gptzero"), ledger=ledger(tmp_path), cost_fn=gptzero_cost)
+    with pytest.raises(DetectorError):
+        g._extract({"documents": [{"predicted_class": "ai"}]})
+    p = Pangram.__new__(Pangram)
+    with pytest.raises(DetectorError):
+        p._extract({"windows": [{"label": "AI", "word_count": 10}]})

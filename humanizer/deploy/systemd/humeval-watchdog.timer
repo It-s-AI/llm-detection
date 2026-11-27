@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the humanizer evaluation watchdog every 10 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

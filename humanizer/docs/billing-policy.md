@@ -13,20 +13,20 @@ sha256, so a statement can always be recomputed.
 All money here is **USDC** (1 USDC = 1 US dollar on the card): your balance, quotes, holds, charges and
 refunds. You pay in **TAO**; it is converted to USDC when it arrives.
 
-| Item | Unit | Rate (card 2026-11-25) |
+| Item | Unit | Rate (card 2026-11-26) |
 |---|---|---|
 | Pangram | words per output | 0.05 USDC per 100 words, rounded up per text |
 | GPTZero | words | 0.15 USDC per 1,000 words |
 | ZeroGPT | words | 0.069 USDC per 1,000 words |
 | LLM judges | tokens | OpenRouter list price of each judge model |
-| GPU pod (H100) | hours | 2.50 USDC per hour |
+| GPU pod (H100 80GB HBM3, else H200) | hours | 4.50 USDC per hour |
 
 ## How a payment works
 
 1. **Quote.** Before a run you get an upper-bound quote, valid for one hour: detector words are bounded
    by the output length cap (1.3 × input words), judges by a fixed amount per output, the GPU by a fixed
-   number of hours. A typical quote for a period of 500 texts is about 165 USDC; the metered charge is
-   usually lower (about 115 USDC).
+   number of hours. A typical quote for a period of 500 texts is about 167 USDC; the metered charge is
+   usually lower (about 117 USDC).
 2. **Top-up in TAO.** If your balance does not cover the quote, the submit command gives you your
    hotkey's **deposit address** and the TAO to send (see "Paying in TAO" below). Send it within the
    quote's hour, then run `paid` (we also notice it by ourselves). TAO sent in time still counts if it
@@ -72,13 +72,15 @@ refunds. You pay in **TAO**; it is converted to USDC when it arrives.
   128 bytes), then call the API. Only that exact commit is evaluated: branch and tag names such as `main`
   are refused, so pushing to the repo later changes nothing for your submission. The commitment must be
   made after your hotkey's current registration. `scripts/miner_submit.py publish` does all three steps.
-* A private repo works too: give a fine-grained token that can only read that repo. It stays on our
-  server, encrypted, the evaluation pod never sees it, and it is deleted when your evaluation ends.
+* The repo may be private while you submit and pay (nobody can copy it meanwhile), but it must be
+  **public** (no token, not gated) when your evaluation starts: otherwise the submission is refused at
+  that moment, nothing is charged and the registration counts as used.
 * Keep the commit downloadable until your result is final. **A crown counts only after we have copied
   your bundle** from that commit; if the file is gone or changed by then, the crown is not awarded (the
   evaluation is still charged). 48 hours after the coronation the king's bundle is public: your repo at the pinned commit if anyone
   can download it without a token, otherwise our archived copy in a public repo of ours.
-* An identical bundle (same sha256) submitted from another hotkey is refused: it counts once.
+* An identical bundle (same sha256) submitted from another hotkey counts once, for the hotkey that
+  **committed it on chain first**; a later copy is refused, or dropped before it runs (nothing charged).
 * Only hotkeys registered on the subnet can submit, and **each registration of a hotkey can make one
   submission**. To submit again, register a new hotkey (or register the same one again after it was
   deregistered). A submission that was cancelled before it ran, whose quote expired unpaid, or that
@@ -104,12 +106,19 @@ refunds. You pay in **TAO**; it is converted to USDC when it arrives.
   and bridged back to Finney (about 30 minutes: the bridge unstakes). You see the TAO sent and the CCIP
   message id (`refund-status --key K`).
 * The cost of the way back comes out of the refunded amount: the bridge's CCIP fee (about 0.0023 ETH ≈
-  3.8 USDC) plus about 0.05 USDC of gas. What remains must buy at least 0.01 TAO; otherwise the refund
+  3.8 USDC) plus about 0.05 USDC of gas on Base and about 0.0015 TAO of gas on Bittensor EVM (used when
+  the bridge books the TAO for us instead of delivering it: we then claim it and send it on, and the
+  refund shows the stages `claimable` … `forwarding` before `delivered`). What remains must buy at least 0.01 TAO; otherwise the refund
   fails and the money stays on your balance.
+* Refunds are paid from the treasury's USDC. If it is short at that moment, the refund shows "waiting for
+  funds" and is paid within 24 hours; nothing is lost meanwhile.
 * Each refund request has an idempotency key, so retrying it never refunds twice.
 * Amounts already charged for completed runs are not refundable.
-* If a run fails because of us (our infrastructure, a detector outage that cannot be retried), the hold
-  is released in full and nothing is charged.
+* If a run fails because of us (no GPU pod, a lost pod, our infrastructure), **the same submission is run
+  again by itself**, from the same pinned commit, with your hold kept: you never resubmit, and your
+  on-chain commitment keeps its place. If our side stays down past the retries (about 4 hours), the
+  submission is not closed: it waits with its hold until we have looked at it, and we run it again,
+  or close it giving the full hold back, or close it charging only what was already used (at most the hold).
 * If your bundle fails (it cannot be downloaded, its hash does not match, it is not a valid bundle, or
   your code crashes), the run is scored with what it produced (missing outputs count as failed) and you
   are charged the pod time used, plus whatever judges and detectors were actually called.
@@ -117,7 +126,8 @@ refunds. You pay in **TAO**; it is converted to USDC when it arrives.
   as caught, so you do not pay for them.
 * If a judge model or a detector is unavailable, the evaluation pauses with your hold kept and resumes
   from the saved outputs; you are never charged twice for the same call. If it cannot resume within about
-  a day (8 retries), it is abandoned: the hold is released and nothing is charged.
+  4 hours (4 retries), it is not closed: it waits with its hold until we have looked at it, and we either run it
+  again or close it and give the full hold back.
 * A quote that is not paid within its hour expires; money that arrives after that stays on your balance
   (use it for the next submission or ask for a refund).
 

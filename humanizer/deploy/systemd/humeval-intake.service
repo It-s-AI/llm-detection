@@ -2,10 +2,15 @@
 Description=SN32 humanizer evaluation: miner API + queue worker
 After=network-online.target
 Wants=network-online.target
+# a crash loop is not retried forever: each start re-checks the detector canaries (paid); after 10 starts in an
+# hour (deploys count too) the unit stays down and the watchdog reports the API down
+StartLimitIntervalSec=3600
+StartLimitBurst=10
 
 [Service]
 User=humeval
 Group=humeval
+UMask=0077
 WorkingDirectory=/srv/humeval/humanizer_eval
 EnvironmentFile=/etc/humeval/humeval.env
 Environment=HUMEVAL_ENV_FILE=/etc/humeval/humeval.env

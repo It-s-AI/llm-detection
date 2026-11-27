@@ -19,6 +19,7 @@ Payload::
     {"schema": "sn32-humanizer-leaderboard/2", "netuid": 32, "mechid": 1, "seq": <ms>,
      "issued_at": <unix s>, "expires_at": <unix s>,
      "kings": ["<current king hotkey>", "<previous>", "<one before>"],   # 0..3, distinct
+     "king_registered_at": [<block>, <block>, <block>],   # each king's registration block (or null)
      "king": {...current king entry...} | null, "history": [...last coronations, newest first...]}
 """
 
@@ -45,10 +46,10 @@ def load_or_create_signing_key(path: Path | str) -> SigningKey:
     p = Path(path)
     if p.exists():
         return SigningKey(bytes.fromhex(p.read_text().strip()))
-    p.parent.mkdir(parents=True, exist_ok=True)
+    from humanizer_eval.period.crypto import write_private
+
     sk = SigningKey.generate()
-    p.write_text(sk.encode().hex())
-    p.chmod(0o600)
+    write_private(p, sk.encode().hex())
     return sk
 
 
@@ -65,6 +66,14 @@ def build_payload(
     """The kings that still hold their registration (a deregistered king drops out and the others close
     ranks, D-66), newest first; none while the owner's baseline is king."""
     now = time.time() if now is None else now
+    if is_registered is not None and state is not None:  # one reading of the registrations for all three
+        seen = {
+            (e.hotkey, e.registered_at): bool(is_registered(e.hotkey, e.registered_at)) for e in state.history
+        }
+
+        def is_registered(hk, reg, _seen=seen, _f=is_registered):
+            return _seen[(hk, reg)] if (hk, reg) in _seen else bool(_f(hk, reg))
+
     active = state.active_history(is_registered) if state is not None else []
     kings = state.payout_hotkeys(is_registered) if state is not None else []
     cur = active[-1] if active else None
@@ -76,6 +85,7 @@ def build_payload(
         "issued_at": now,
         "expires_at": now + ttl_s,
         "kings": kings,
+        "king_registered_at": state.payout_registrations(is_registered) if state is not None else [],
         "king": None if cur is None or cur.is_baseline else cur.to_dict(),
         "history": [e.to_dict() for e in reversed(active[-history:])],
     }

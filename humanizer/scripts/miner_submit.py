@@ -5,7 +5,7 @@ One command does it all: upload bundle.tar to your Hugging Face model repo, comm
 "<repo>@<commit sha>" on chain from your hotkey, then submit (signed with the same hotkey):
 
     python scripts/miner_submit.py --api https://eval.example --wallet miner --hotkey h1 \
-        publish --repo you/my-humanizer --file bundle.tar [--private --hf-token hf_...read-only...]
+        publish --repo you/my-humanizer --file bundle.tar        (the repo must be public)
 
 Or step by step: upload, commit, submit.
 
@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 
 from humanizer_eval.intake.client import MinerClient, SeedSigner, file_digest
@@ -63,9 +64,32 @@ def upload(repo: str, path: str, token: str | None, private: bool) -> str:
     except Exception:  # a token limited to existing repos may not create one: upload into it as it is
         if not api.repo_exists(repo, repo_type="model"):
             raise
+    if private:  # an existing repo keeps its visibility: a public one would expose the commit before the
+        # on-chain commitment (anyone could copy it), so it is made private for the upload
+        try:
+            if hasattr(api, "update_repo_settings"):
+                api.update_repo_settings(repo, private=True, repo_type="model")
+            else:
+                api.update_repo_visibility(repo, private=True, repo_type="model")
+        except Exception as e:
+            raise SystemExit(
+                f"could not make {repo} private before the upload ({e}); use a new repo, or "
+                "pass --public if you accept that the commit is visible before it is on chain"
+            ) from e
     info = api.upload_file(path_or_fileobj=path, path_in_repo=BUNDLE_PATH, repo_id=repo, repo_type="model",
                            commit_message="humanizer bundle")  # fmt: skip
     return info.oid
+
+
+def make_public(repo: str, token: str | None) -> None:
+    """The evaluation reads the bundle when it starts: a repo still private then is refused."""
+    from huggingface_hub import HfApi
+
+    api = HfApi(token=token)
+    if hasattr(api, "update_repo_settings"):
+        api.update_repo_settings(repo, private=False, repo_type="model")
+    else:
+        api.update_repo_visibility(repo, private=False, repo_type="model")
 
 
 def _bt():
@@ -79,6 +103,7 @@ def _bt():
 
 def commit_on_chain(args, repo: str, commit: str) -> str:
     bt = _bt()
+
     data = commitment_for(repo, commit)
     st = bt.Subtensor(network=args.network)
     r = st.set_commitment(wallet(args), args.netuid, data)
@@ -130,9 +155,11 @@ def main() -> int:
     for p in (pub, up):
         p.add_argument("--repo", required=True, help="your model repo, e.g. you/my-humanizer")
         p.add_argument("--file", required=True)
-        p.add_argument("--private", action="store_true")
+        p.add_argument("--public", action="store_true",
+                       help="create the repo public (default: private until you have paid; make it public "
+                       "then, before the evaluation starts)")  # fmt: skip
         p.add_argument("--hf-write-token", default=None, help="for the upload (default: your HF login)")
-    pub.add_argument("--hf-token", default=None, help="read-only token for a private repo (given to us)")
+    pub.add_argument("--hf-token", default=None, help=argparse.SUPPRESS)  # private repos are refused
     pub.add_argument("--name", default="")
     pub.add_argument("--wait", action="store_true")
 
@@ -172,7 +199,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.cmd == "upload":
-        print(upload(args.repo, args.file, args.hf_write_token, args.private))
+        print(upload(args.repo, args.file, args.hf_write_token, not args.public))
         return 0
     if args.cmd == "commit":
         print(commit_on_chain(args, args.repo, args.revision))
@@ -184,7 +211,7 @@ def main() -> int:
         commitment = getattr(args, "commitment", None)
         if args.cmd == "publish":
             sha, size = file_digest(args.file)
-            commit = upload(args.repo, args.file, args.hf_write_token, args.private)
+            commit = upload(args.repo, args.file, args.hf_write_token, not args.public)
             commitment = commit_on_chain(args, args.repo, commit)
             print(f"uploaded {size} bytes (sha256 {sha}) as {commitment}")
         out = cli.submit_hf(commitment, args.hf_token, args.name)
@@ -192,8 +219,25 @@ def main() -> int:
         pay = out.get("payment") or {}
         if args.send and out.get("state") == "awaiting_payment" and pay.get("amount_tao"):
             send_tao(args, pay["address"], pay["amount_tao"])
+            if args.cmd == "publish" and not args.public:  # paid: open it now (the server waits 15 min)
+                make_public(args.repo, args.hf_write_token)
+                print(f"paid: the repo {args.repo} is now public", file=sys.stderr)
             time.sleep(15)  # a block or two
             out = cli.paid(out["submission_id"])
+        if args.cmd == "publish" and not args.public and out.get("state") in ("queued", "running", "paused"):
+            make_public(args.repo, args.hf_write_token)  # paid from the balance: open it now
+            print(f"paid: the repo {args.repo} is now public", file=sys.stderr)
+        elif args.cmd == "publish" and not args.public and not args.send:
+            if args.wait:  # paid (or waiting for it): open the repo before the evaluation starts
+                while out.get("state") == "awaiting_payment":
+                    time.sleep(15)
+                    out = cli.status(out["submission_id"])
+                if out.get("state") in ("queued", "running", "paused"):
+                    make_public(args.repo, args.hf_write_token)
+                    print(f"paid: the repo {args.repo} is now public", file=sys.stderr)
+            else:
+                print(f"the repo {args.repo} is private: make it PUBLIC as soon as you have paid (a private "
+                      "repo is refused when the evaluation starts)", file=sys.stderr)  # fmt: skip
         if args.wait:
             out = cli.wait(out["submission_id"])
     elif args.cmd == "paid":

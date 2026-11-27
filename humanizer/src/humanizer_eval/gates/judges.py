@@ -249,6 +249,15 @@ _PUNCT_MAP = str.maketrans(
 _ELLIPSIS = re.compile(r"\s*(?:\.\.\.|\[\.\.\.\]|\(\.\.\.\))\s*")
 
 
+#: output sentences per input sentence beyond which an output is level 0 without a judge call
+MAX_SENTENCE_RATIO = 3
+
+
+def _cased(s: str) -> str:
+    """Like ``_norm_ws`` but keeping the letter case: case-only rewrites are judged like any other."""
+    return re.sub(r"\s+", " ", s.translate(_PUNCT_MAP)).strip()
+
+
 def _norm_ws(s: str) -> str:
     """Normalise only what does not change content: case, whitespace, typographic quotes/dashes."""
     s = s.translate(_PUNCT_MAP)
@@ -468,8 +477,14 @@ class GateRunner:
         res = GateResult(status="pass")
         if not output.strip():
             return GateResult("fail", {"G0": False}, level=0.0, levels={"G0": 0.0}, reasons=["empty output"])
-        if _norm_ws(output) == _norm_ws(source):
-            # unchanged text (up to case, whitespace, typography): every gate passes, no judge is asked
+        from humanizer_eval.gates.meaning import split_sentences
+
+        n_in, n_out = len(split_sentences(source)), len(split_sentences(output))
+        if n_out > MAX_SENTENCE_RATIO * n_in + 3:  # e.g. "Word. Word. Word.": more than a judge reply holds
+            why = f"{n_out} sentences for {n_in} in the input"
+            return GateResult("fail", {"G0": False}, level=0.0, levels={"G0": 0.0}, reasons=[why])
+        if _cased(output) == _cased(source):
+            # unchanged text (up to whitespace and typography, same letter case): every gate passes, no judge
             ones = {"G1": 1.0, "G2": 1.0, "G3": 1.0}
             return GateResult(
                 "pass", dict.fromkeys(ones, True), level=1.0, levels=ones, detail={"unchanged": True}

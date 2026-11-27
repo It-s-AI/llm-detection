@@ -151,3 +151,40 @@ def test_source_has_no_payment_endpoints():
     src = Path(__import__("humanizer_eval.runner.lium", fromlist=["x"]).__file__).read_text()
     # no string literal in the client may reference a money-moving endpoint
     assert not re.search(r"[\"']/(payments|stripe|tao/pay|users/me/(auto-top-up|transfer-credits))", src)
+
+
+def test_a_pod_whose_delete_failed_frees_its_slot_once_lium_removed_it(tmp_path):
+    """A delete that failed (API blip) left the registry counting the pod forever: no rent was possible
+    after max_concurrent such blips. The next rent reconciles with the pods Lium still lists."""
+    fake = FakeLium()
+    c, led = client(tmp_path, fake)
+    c.rent(EXEC, purpose="a", ssh_public_key="k")
+    fake.pods = [x for x in fake.pods if x["id"] != NEW_ID]  # Lium's scheduled removal; our delete never ran
+    c.rent(EXEC, purpose="b", ssh_public_key="k")  # not refused as "already 1 own pod"
+    assert led.spent("lium") == pytest.approx(0.12)  # the first pod's reservation settled at its statement
+
+
+def test_pods_left_by_a_restart_are_deleted_at_startup(tmp_path):
+    """A restart kills the evaluation threads, whose `finally` would delete their pods: the next start
+    deletes them, or they run up to 3 h and take the rent slots (audit 2, B9)."""
+    fake = FakeLium()
+    c, led = client(tmp_path, fake)
+    pod = c.rent(EXEC, purpose="a", ssh_public_key="k")
+    c2, _ = client(tmp_path, fake)  # the server after a restart
+    assert c2.sweep_orphans() == [pod.pod_id]
+    assert all(p["id"] != pod.pod_id for p in fake.pods) and ("DELETE", f"/pods/{pod.pod_id}") in fake.calls
+    assert c2.sweep_orphans() == [] and led.outstanding("lium") == 0
+
+
+def test_with_auto_top_up_a_positive_balance_is_enough_to_rent(tmp_path):
+    """The account refills as it is spent: requiring the pod's whole cost up front refused every rent on a
+    small balance and the top-up never triggered."""
+    fake = FakeLium(balance=3.0, burn=0.0)
+    c, _ = client(tmp_path, fake, max_price_per_hour=4.0, max_hours=3)
+    with pytest.raises(GuardError, match="balance floor"):
+        c.check_can_rent(3.75, 3)
+    c.auto_topup = True
+    assert c.check_can_rent(3.75, 3)["balance"] == 3.0
+    fake.balance = 0.0
+    with pytest.raises(GuardError, match="balance floor"):  # an empty account is still refused
+        c.check_can_rent(3.75, 3)

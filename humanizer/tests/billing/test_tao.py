@@ -9,6 +9,7 @@ from humanizer_eval.billing import Accounts, BillingService
 from humanizer_eval.billing.evm import SignedTx
 from humanizer_eval.billing.tao import (
     CENT_USDC,
+    MAX_REVERTS,
     WEI,
     TaoConfig,
     TaoRail,
@@ -26,6 +27,7 @@ PRICE = 200.0  # USDC per TAO (small trade)
 ETH = 2000.0
 BRIDGE_OUT_COST = 5 * 10**15  # 0.005 TAO kept back by a deposit for the bridge
 BRIDGE_IN_FEE = 2 * 10**15  # 0.002 ETH for a refund's CCIP message
+FINNEY_GAS = 10**15  # 0.001 TAO of Bittensor EVM gas to claim a booked exit and send it on
 
 
 class FakeRoute:
@@ -41,10 +43,16 @@ class FakeRoute:
         self.mine_after = 0
         self.lag = 0
         self.revert_next = False
+        self.revert_always = False
+        self.send_fails = 0
         self.paused = False
         self.messages = {}  # message id -> [looks left, wei, pubkey or None, delivered]
         self.delivered = []  # (pubkey, wei) delivered on Finney
         self.n = 0
+        self.liquid_exit = True  # False: the hub books the TAO for the treasury to claim (as on mainnet)
+        self.claimable = 0
+        self.bt_treasury = 0  # the treasury's TAO on Bittensor EVM
+        self.treasury = "0x" + "54" * 20
 
     def address_of(self, key):
         return "0x" + hashlib.sha256(key).hexdigest()[:40]
@@ -77,7 +85,7 @@ class FakeRoute:
         self.n += 1
         h = f"0x{self.n:064x}"
         self.txs[h] = {"chain": chain, **kw}
-        return SignedTx(h, "raw")
+        return SignedTx(h, "raw" + h)
 
     def bridge_out_tx(self, key, amount):
         return self._tx("bittensor", kind="out", frm=self.address_of(key), wei=amount)
@@ -92,11 +100,14 @@ class FakeRoute:
         return self._tx("base", kind="in", wei=wei, pub=pub)
 
     def send(self, chain, tx):
+        if self.send_fails:
+            self.send_fails -= 1
+            raise RuntimeError("RPC 503")
         t = self.txs[tx.hash]
         assert t["chain"] == chain
         if "result" in t:
             return
-        ok, out = not self.revert_next, {"usdc_in": 0, "tao_in": 0}
+        ok, out = not (self.revert_next or self.revert_always), {"usdc_in": 0, "tao_in": 0}
         self.revert_next = False
         if ok and t["kind"] == "out":
             ok = self.bt.get(t["frm"], 0) >= t["wei"] + BRIDGE_OUT_COST
@@ -118,6 +129,16 @@ class FakeRoute:
                 self.usdc -= t["usdc"]
                 self.tao += got
                 out["tao_in"] = got
+        elif ok and t["kind"] == "claim":
+            ok = self.claimable >= t["wei"] and self.bt_treasury >= FINNEY_GAS // 2
+            if ok:
+                self.bt_treasury += self.claimable - FINNEY_GAS // 2
+                self.claimable = 0
+        elif ok and t["kind"] == "fwd":
+            ok = self.bt_treasury >= t["wei"] + FINNEY_GAS // 2
+            if ok:
+                self.bt_treasury -= t["wei"] + FINNEY_GAS // 2
+                self.delivered.append((t["pub"], t["wei"]))
         elif ok and t["kind"] == "in":
             ok = self.tao >= t["wei"]
             if ok:
@@ -155,15 +176,40 @@ class FakeRoute:
             m[3] = True
             if m[2] is None:
                 self.tao += m[1]  # arrived on Base
-            else:
+            elif self.liquid_exit:
                 self.delivered.append((m[2], m[1]))  # arrived on Finney
+            else:
+                self.claimable += m[1]
+            m.append("liquid" if self.liquid_exit else "claimable")
         return True
 
     def arrived_on_base(self, mid, from_block):
         return self._deliver(mid)
 
-    def delivered_on_finney(self, mid, from_block):
-        return self._deliver(mid)
+    def treasury_usdc(self):
+        return self.usdc
+
+    def finney_outcome(self, mid, from_block):
+        return None if self._deliver(mid) is None else self.messages[mid][4]
+
+    def claimable_tao(self):
+        return self.claimable
+
+    def claim_tx(self, wei):
+        return self._tx("bittensor", kind="claim", wei=wei)
+
+    def forward_tx(self, wei, pub):
+        return self._tx("bittensor", kind="fwd", wei=wei // 10**9 * 10**9, pub=pub)
+
+    def bt_tx_ok(self, h):
+        r = self._mined(h)
+        return None if r is None else r["ok"]
+
+    def treasury_bt_balance(self):
+        return self.bt_treasury
+
+    def finney_gas_wei(self):
+        return FINNEY_GAS
 
 
 def rail(tmp_path, route=None, **cfg):
@@ -260,6 +306,34 @@ def test_reverted_swap_is_retried(tmp_path):
     assert settle_all(r, HK) > 0
 
 
+def test_a_swap_that_always_reverts_stops_after_max_reverts(tmp_path):
+    """Every revert costs gas: a swap that keeps reverting is not sent on every pass forever."""
+    r, route, acc, _ = rail(tmp_path)
+    alerts = []
+    r._alert = alerts.append
+    send(r, route, HK, 1.0)
+    r.collect(HK)  # the bridge goes through
+    route.revert_always = True
+    settle_all(r, HK, n=30)
+    swaps = [t for t in route.txs.values() if t["kind"] == "sell"]
+    assert len(swaps) == MAX_REVERTS and acc.balance(HK) == 0
+    assert r.inbound(HK)[0]["stage"] == "stuck" and any("reverted 3 times" in a for a in alerts)
+
+
+def test_a_refund_whose_buy_always_reverts_stops_after_max_reverts(tmp_path):
+    b, r, route, _acc = _billing(tmp_path)
+    send(r, route, HK, 1.0)
+    settle_all(r, HK)
+    route.revert_always = True
+    with contextlib.suppress(Exception):
+        b.refund(HK, "k-r", COLD, 5_000)  # drives the refund at once
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            r.drive_refund("k-r")
+    buys = [t for t in route.txs.values() if t["kind"] == "buy"]
+    assert len(buys) == MAX_REVERTS and r.refund_state("k-r")["stage"] == "stuck"
+
+
 def _billing(tmp_path, **cfg):
     r, route, acc, t = rail(tmp_path, **cfg)
     return BillingService(CARD, acc, r, now=lambda: t[0]), r, route, acc
@@ -269,7 +343,7 @@ def test_refund_at_the_current_rate_to_the_coldkey_minus_the_way_back(tmp_path):
     b, r, route, acc = _billing(tmp_path)
     send(r, route, HK, 1.0)
     credited = settle_all(r, HK)
-    cost = BRIDGE_IN_FEE / WEI * ETH + 0.05  # the CCIP fee in ETH at its rate + Base gas
+    cost = BRIDGE_IN_FEE / WEI * ETH + FINNEY_GAS / WEI * PRICE + 0.05  # CCIP fee, claim gas, Base gas
     assert float(b.refund_quote(HK, COLD, 5_000)["cost_usdc"]) == pytest.approx(cost, abs=0.01)
     b.refund(HK, "k-1", COLD, 5_000)  # 50 USDC
     for _ in range(5):
@@ -283,6 +357,49 @@ def test_refund_at_the_current_rate_to_the_coldkey_minus_the_way_back(tmp_path):
     assert acc.available(HK) == credited - 5_000
     assert b.refund(HK, "k-1", COLD, 5_000)["stage"] == "delivered"  # the same key: nothing new
     assert len(route.delivered) == 1
+
+
+def test_refund_booked_by_the_bridge_is_claimed_and_sent_on(tmp_path):
+    """Mainnet 2026-11-25: the hub booked the refund for the treasury instead of making the liquid exit."""
+    b, r, route, _ = _billing(tmp_path)
+    alerts = []
+    r._alert = alerts.append
+    route.liquid_exit = False
+    send(r, route, HK, 1.0)
+    settle_all(r, HK)
+    route.mine_after = 1
+    b.refund(HK, "k-c", COLD, 5_000)
+    for _ in range(12):
+        r.watch()
+    # no TAO for gas on Bittensor EVM yet: it waits, says so once
+    assert r.refund_state("k-c")["stage"] == "claimable" and len(alerts) == 1 and route.claimable > 0
+    route.bt_treasury = 20 * FINNEY_GAS
+    for _ in range(12):
+        r.watch()
+    st = r.refund_state("k-c")
+    assert st["stage"] == "delivered" and route.claimable == 0
+    ((pub, wei),) = route.delivered
+    assert pub == ss58_pubkey(COLD) and wei == int(st["tao_sent"] * WEI) // 10**9 * 10**9
+    assert route.bt_treasury >= 18 * FINNEY_GAS  # the gas float minus one claim and one transfer, plus dust
+    assert len(alerts) == 1 and r.summary()["refunds"] == 1
+
+
+def test_a_claim_taken_with_an_earlier_refund_is_sent_on_from_the_account(tmp_path):
+    b, r, route, _ = _billing(tmp_path)
+    route.liquid_exit, route.bt_treasury = False, 20 * FINNEY_GAS
+    send(r, route, HK, 1.0)
+    settle_all(r, HK)
+    b.refund(HK, "k-a", COLD, 2_000)
+    b.refund(HK, "k-b", COLD, 2_000)
+    for k in ("k-a", "k-b"):  # both delivered (booked) before either is claimed
+        while r.refund_state(k)["stage"] in ("sent", "bridging", "bought", "buying", "new"):
+            r.drive_refund(k)
+            if r.refund_state(k)["stage"] == "claimable":
+                break
+    for _ in range(6):
+        r.watch()
+    assert [r.refund_state(k)["stage"] for k in ("k-a", "k-b")] == ["delivered", "delivered"]
+    assert len(route.delivered) == 2 and route.claimable == 0
 
 
 def test_refund_too_small_for_the_way_back_fails_and_keeps_the_money(tmp_path):
@@ -343,3 +460,64 @@ def test_intake_submission_paid_in_tao(tmp_path):
     assert w.svc.refund_status(HK, "all-of-it")["stage"] == "delivered"
     assert route.delivered[0][0] == ss58_pubkey(COLD) and res["refund"]["to"] == COLD
     assert w.svc.balance(HK)["available_usdc"] == "0.00"
+
+
+def test_a_swap_whose_broadcast_was_lost_is_sent_again_and_credited(tmp_path):
+    """Signed and recorded, then the RPC failed: nothing would ever send it again (the row only had the
+    hash) and the miner's deposit stayed uncredited forever. The raw tx is kept and rebroadcast."""
+    r, route, acc, t = rail(tmp_path)
+    alerts = []
+    r._alert = alerts.append
+    send(r, route, HK, 1.0)
+    r.collect(HK)  # bridged
+    route.send_fails = 1  # the swap's broadcast is lost
+    settle_all(r, HK, n=1)
+    assert r.inbound(HK)[0]["stage"] == "swapping" and acc.balance(HK) == 0
+    t[0] += 3600  # long enough to be reported
+    assert settle_all(r, HK) > 0 and acc.balance(HK) > 0
+
+
+def test_a_refund_that_waited_a_day_before_bridging_is_still_watched_after_it_is_sent(tmp_path):
+    """The 24 h give-up counted from the request: a refund that waited for the pools went straight to the
+    silent 'sent_unconfirmed' on its first check and a booked exit was never claimed (audit 2, B3)."""
+    b, r, route, _acc = _billing(tmp_path)
+    send(r, route, HK, 1.0)
+    settle_all(r, HK)
+    t = r._now
+    clock = [t()]
+    r._now = lambda: clock[0]
+    route.lag = 3  # CCIP takes a few checks to show the delivery
+    impact, route.impact = route.impact, 0.5  # the pools are far off: the refund waits in 'new'
+    with contextlib.suppress(Exception):
+        b.refund(HK, "k-late", COLD, 5_000)
+    assert r.refund_state("k-late")["stage"] == "new"
+    clock[0] += 2 * 86400  # two days later the pools are back and it is bridged
+    route.impact = impact
+    st = None
+    for _ in range(3):
+        with contextlib.suppress(Exception):
+            st = r.drive_refund("k-late")
+    assert st != "sent_unconfirmed"
+    for _ in range(5):
+        st = r.drive_refund("k-late")
+    assert st == "delivered"
+
+
+def test_a_refund_waits_while_the_treasury_lacks_the_usdc(tmp_path):
+    """The earnings are paid out to the owner: a refund larger than what the treasury holds waits, with a
+    'within 24 hours' note for the miner and an alert for the owner, and goes through once topped up."""
+    b, r, route, _acc = _billing(tmp_path)
+    send(r, route, HK, 1.0)
+    settle_all(r, HK)
+    alerts = []
+    r._alert = alerts.append
+    kept, route.usdc = route.usdc, 100  # paid out: 1 USDC left
+    with contextlib.suppress(Exception):
+        b.refund(HK, "k-w", COLD, 5_000)
+    st = r.refund_state("k-w")
+    assert st["stage"] == "new" and "24 hours" in (st.get("note") or "") and alerts
+    route.usdc = kept
+    for _ in range(8):
+        with contextlib.suppress(Exception):
+            r.drive_refund("k-w")
+    assert r.refund_state("k-w")["stage"] == "delivered"

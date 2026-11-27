@@ -60,6 +60,9 @@ def build_period(
     *,
     human_factor: float = 1.0,
     workers: int = 8,
+    retry_rounds: int = 3,
+    retry_pause_s: float = 60.0,
+    sleep: Any = time.sleep,
 ) -> PeriodResult:
     seed = derive_seed(secret, block_hash)
     slots = pool.sample_slots(n, cfg.genre_proportions, subseed(seed, "slots"))
@@ -105,16 +108,27 @@ def build_period(
     def _facts(i: int):
         g = gens[i]
         if not g.ok:
-            return i, None, 0.0
+            return i, None, 0.0, False
         if validators:
             f, rep = prepare_facts(llm, facts_judge, validators, g.text)
-            c = rep.cost_usd
+            c, failed = rep.cost_usd, bool(rep.error)  # an error of a call (429, timeout), not a verdict
         else:
             f, c = extract_facts_v2(llm, facts_judge, g.text)
-        return i, [x.to_dict() for x in f] if f else None, c
+            failed = f is None
+        return i, [x.to_dict() for x in f] if f else None, c, failed
 
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        facts = {i: (f, c) for i, f, c in ex.map(_facts, range(len(slots)))}
+    facts: dict[int, tuple[Any, float]] = {}
+    todo = list(range(len(slots)))
+    for rnd in range(1 + retry_rounds):  # a rate-limited provider must not shrink the period: wait, retry
+        if rnd:
+            sleep(retry_pause_s * 2 ** (rnd - 1))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            out = list(ex.map(_facts, todo))
+        for i, f, c, _ in out:
+            facts[i] = (f, facts.get(i, (None, 0.0))[1] + c)
+        todo = [i for i, _, _, failed in out if failed]
+        if not todo:
+            break
     items = []
     for i, s in enumerate(slots):
         g = gens[i]

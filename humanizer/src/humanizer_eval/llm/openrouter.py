@@ -260,10 +260,21 @@ class OpenRouter:
         rhash = _req_hash(payload)
         res = self.ledger.reserve(self.service, est, ref=f"chat:{purpose}:{rhash}")
         t0 = time.time()
+        counting = hasattr(self.http, "begin_paid")
+        if counting:
+            self.http.begin_paid()
+
+        def extra() -> int:  # earlier sends of this call delivered with an unknown outcome (billed)
+            return max(0, self.http.paid_sends() - 1) if counting else 0
+
         try:
             resp = self.http.request("POST", "/chat/completions", json=payload)
         except RuntimeError:
-            res.release({"error": "transport"})  # never reached OpenRouter -> not billed
+            n = self.http.paid_sends() if counting else 0
+            if n:  # delivered and timed out: OpenRouter generated (and billed) the reply
+                res.commit(est * n, {"error": "transport", "sends": n})
+            else:
+                res.release({"error": "transport"})  # never reached OpenRouter -> not billed
             raise
         except Exception as e:
             res.commit(est, {"error": type(e).__name__})
@@ -273,13 +284,17 @@ class OpenRouter:
         except ValueError:
             body = {}
         if resp.status_code >= 400 or "error" in body or not body:
-            res.release({"status": resp.status_code})  # failed requests are not billed
+            n = self.http.paid_sends() if counting else 0
+            if n:
+                res.commit(est * n, {"status": resp.status_code, "sends": n})
+            else:
+                res.release({"status": resp.status_code})  # failed requests are not billed
             err = body.get("error") if isinstance(body, dict) else None
             msg = err.get("message") if isinstance(err, dict) else err
             raise RuntimeError(f"openrouter HTTP {resp.status_code}: {str(msg)[:300]}")
         usage = body.get("usage") or {}
         cost = float(usage.get("cost", est))
-        res.commit(cost, {"model": model, "provider": body.get("provider")})
+        res.commit(cost + est * extra(), {"model": model, "provider": body.get("provider")})
         choice = (body.get("choices") or [{}])[0]
         text = (choice.get("message") or {}).get("content") or ""
         parsed = None

@@ -86,9 +86,10 @@ def test_reveal_round_trip_recomputes_every_decision(tmp_path):
     w, pdir, sdir, hs, (sa, sb) = _period_world(tmp_path)
     out = tmp_path / "reveal" / w.ctx.period_id
     rec, chain = _schedule(json.loads((pdir / "manifest.json").read_text()))
+    texts = {i: f"human text {i}" for i in w.ctx.human_ids}
     info = write_reveal(w.ctx.period_id, period_dir=pdir, **sdir, human_scores=hs, key=KEY, out_dir=out,
-                        schedule_record=rec)  # fmt: skip
-    assert info["submissions"] == 3  # two miners and the owner's baseline run
+                        schedule_record=rec, human_texts=texts, code_commit="abc123")  # fmt: skip
+    assert info["submissions"] == 2  # two miners (the baseline king is fixed, never run)
     rec = json.loads((out / "submissions" / f"{sa}.json").read_text())["record"]
     assert rec["outputs"] and rec["crown"]["king"] == "baseline-identity"
     assert (out / "secret.hex").read_text().strip() == SECRET.hex() and (out / "king_run.t.json").exists()
@@ -100,6 +101,9 @@ def test_reveal_round_trip_recomputes_every_decision(tmp_path):
         f"remarks signed by {SIGNER_SS58}" in text and "commitment block 9526400 < seed block 9526464" in text
     )
     assert "H(secret) equals" in text and "Merkle root" in text
+    assert "every scored human text is published" in text
+    ev = json.loads((out / "evaluator.json").read_text())
+    assert ev["code_commit"] == "abc123" and "scoring_fingerprints" in ev  # (no fingerprint in this test world)
     assert f"{sa}: crown test against baseline-identity recomputed" in text
     assert f"{sb}: crown test against {sa} recomputed" in text
 
@@ -183,3 +187,30 @@ def test_a_period_without_a_seed_block_fails_cleanly(tmp_path):
         f"{m['period_id']}: the manifest names no seed block"
     ]
     assert verify_notary({}, {"period_id": "pilot-1"}, chain)[1][0].endswith("were not notarized on chain")
+
+
+def test_a_reveal_after_a_mid_period_detector_rescore_verifies_every_record_against_its_own_h(tmp_path):
+    """rescore_period.py moves H aside and the server scores it again under the new detector model; the
+    records made before keep their results. The reveal publishes every scoring of H and each record names
+    the one it was scored against (h_id), so the whole period verifies."""
+    import numpy as np
+
+    from evaluation.test_pipeline import _outputs
+    from humanizer_eval.intake.client import SeedSigner
+    from intake.test_intake import _sha
+
+    w, pdir, sdir, hs_old, _ = _period_world(tmp_path)
+    new = dict(w.ctx.human_scores)
+    new["zerogpt"] = list(np.asarray(new["zerogpt"]) * 0.05)
+    w.ctx = replace(w.ctx, human_scores=new)
+    c = SeedSigner(b"\x07" * 32).ss58_address
+    w.pay(c)
+    url = "https://huggingface.co/m/b3/resolve/main/b.tar"
+    w.bundles[url] = _outputs(w.ctx)
+    sc = w.svc.submit(c, bundle_url=url, bundle_sha256=_sha(c), bundle_bytes=10)["submission_id"]
+    assert w.worker.run_once()["submission_id"] == sc
+    out = tmp_path / "reveal" / w.ctx.period_id
+    write_reveal(w.ctx.period_id, period_dir=pdir, **sdir, human_scores={"ids": w.ctx.human_ids, "scores": new},
+                 key=KEY, out_dir=out, older_human_scores=[hs_old])  # fmt: skip
+    rep = verify_reveal(out)
+    assert rep["ok"], rep["failures"]

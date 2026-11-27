@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import time
 from pathlib import Path
@@ -20,6 +21,21 @@ from typing import Any
 import httpx
 
 log = logging.getLogger(__name__)
+
+
+class _RedactKey(logging.Filter):
+    """httpx logs every request URL at INFO; the alarm key travels in the query (?key=...): mask it."""
+
+    _rx = re.compile(r"([?&]key=)[^&\s\"']+")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if "key=" in str(record.msg) or any("key=" in str(a) for a in (record.args or ())):
+            record.msg = self._rx.sub(r"\1***", record.getMessage())
+            record.args = None
+        return True
+
+
+logging.getLogger("httpx").addFilter(_RedactKey())
 
 URL = "https://alarmerbot.ru/"
 MAX_CHARS = 3500
@@ -80,12 +96,30 @@ class Alerter:
             self.sent.append(message)
             if dedupe:
                 state[dedupe] = self.now()
-                if self.state_path:
-                    self.state_path.parent.mkdir(parents=True, exist_ok=True)
-                    tmp = self.state_path.with_suffix(".tmp")
-                    tmp.write_text(json.dumps(state))
-                    tmp.replace(self.state_path)
+                if self.state_path:  # several Alerters and processes share it: a file lock, a private tmp
+                    try:
+                        self._save_key(dedupe, state[dedupe])
+                    except Exception as e:
+                        log.warning("alert state not saved: %s", e)
             return True
+
+    def _save_key(self, key: str, ts: float) -> None:
+        import fcntl
+        import os
+        import threading
+
+        p = Path(self.state_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p.with_name(p.name + ".lock"), "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                cur = self._state()  # re-read under the lock: other writers' keys are kept
+                cur[key] = ts
+                tmp = p.with_name(f"{p.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+                tmp.write_text(json.dumps(cur))
+                tmp.replace(p)
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def from_settings(state_path: Path | str | None = None, **kw: Any) -> Alerter:
