@@ -1,4 +1,5 @@
-"""Submit a humanizer to the evaluation API (needs `pip install bittensor huggingface_hub`).
+"""Submit a humanizer to the evaluation API (needs `pip install "bittensor==10.5.0" huggingface_hub`:
+bittensor 11 changed its API; 10.5.0 is the version the SN32 validators run).
 
 One command does it all: upload bundle.tar to your Hugging Face model repo, commit
 "<repo>@<commit sha>" on chain from your hotkey, then submit (signed with the same hotkey):
@@ -67,9 +68,17 @@ def upload(repo: str, path: str, token: str | None, private: bool) -> str:
     return info.oid
 
 
-def commit_on_chain(args, repo: str, commit: str) -> str:
+def _bt():
     import bittensor as bt
 
+    if not hasattr(bt.Subtensor, "set_commitment"):
+        raise SystemExit(f"bittensor {getattr(bt, '__version__', '?')} is not supported (its API changed): "
+                         'pip install "bittensor==10.5.0"')  # fmt: skip
+    return bt
+
+
+def commit_on_chain(args, repo: str, commit: str) -> str:
+    bt = _bt()
     data = commitment_for(repo, commit)
     st = bt.Subtensor(network=args.network)
     r = st.set_commitment(wallet(args), args.netuid, data)
@@ -80,7 +89,7 @@ def commit_on_chain(args, repo: str, commit: str) -> str:
 
 def send_tao(args, dest: str, amount_tao: str) -> None:
     """Transfer the TAO from the wallet's coldkey (asks for its password)."""
-    import bittensor as bt
+    bt = _bt()
 
     st = bt.Subtensor(network=args.network)
     r = st.transfer(wallet(args), dest, bt.Balance.from_tao(float(amount_tao)))

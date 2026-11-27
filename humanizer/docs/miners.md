@@ -22,12 +22,12 @@ HUMEVAL_SUB=bundle HUMEVAL_IN=items_dir HUMEVAL_OUT=out python harness/run.py   
   again, register a new hotkey (or the same one again after it was deregistered). Keep the hotkey
   registered while you hold a crown: a king whose hotkey loses its registration drops out of the payouts.
 * **A Hugging Face account** with a model repo for the bundle (public or private).
-* **TAO** for the evaluation hold. Your balance is kept in USDC; a typical quote for a 500-text period is
-  about 165 USDC. You are charged the metered cost (usually less) and the rest stays on your balance.
+* **TAO** for the evaluation hold. Your balance is kept in USDC; a typical quote is about 110–150 USDC,
+  depending on the period's number of texts (`miner_submit.py --api <evaluator> info`). You are charged the metered cost (usually less) and the rest stays on your balance.
 
 ## 3. Submit
 
-The one-command way (needs `pip install bittensor huggingface_hub`, and `huggingface-cli login` for the
+The one-command way (needs `pip install "bittensor==10.5.0" huggingface_hub`, the validators' version: bittensor 11 changed its API; and `huggingface-cli login` for the
 upload):
 
 ```
