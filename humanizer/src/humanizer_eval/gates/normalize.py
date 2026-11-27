@@ -125,14 +125,20 @@ def _fix_homoglyph_word(word: str) -> str:
     return word
 
 
+#: variation selectors, Mongolian free variation selectors, the braille blank: invisible to a reader
+_SELECTORS = re.compile("[\ufe00-\ufe0f\U000e0100-\U000e01ef\u180b-\u180f\u2800]")
+
+
 def normalize(text: str, lang: str = "en") -> tuple[str, NormalizationReport]:
     rep = NormalizationReport()
     original = text
     s = unicodedata.normalize("NFKC", text)
     s, rep.removed_invisible = _INVISIBLE.subn("", s)
+    s, n_sel = _SELECTORS.subn("", s)  # invisible, category Mn/So: not caught by the Cf filter below
+    rep.removed_invisible += n_sel
     s = s.replace("\r\n", "\n").replace("\r", "\n")
     # remaining format characters (category Cf) other than newlines/tabs
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Cf")
+    s = "".join(ch for ch in s if unicodedata.category(ch) not in ("Cf", "Cs"))  # Cs: lone surrogates
     if lang == "ar":
         s = s.replace(_AR_TATWEEL, "")
         s = _AR_DIACRITICS.sub("", s)
@@ -153,15 +159,36 @@ def normalize(text: str, lang: str = "en") -> tuple[str, NormalizationReport]:
 _SENT_END = re.compile(r"(?<=[.!?…])\s+")
 
 
-def apply_length_limit(output: str, input_text: str, max_ratio: float = 1.3) -> tuple[str, bool]:
-    """Truncate `output` to at most `max_ratio` x the input's word count, preferring a sentence end.
-    Returns (text, truncated)."""
-    limit = max(1, int(len(input_text.split()) * max_ratio))
-    words = output.split()
-    if len(words) <= limit:
+#: characters per output relative to the input's (on top of the word cap): long "words" (joined by
+#: non-space characters) would otherwise make the judges' cost per output unbounded
+CHAR_RATIO_OVER_WORDS = 1.25
+#: lines per output relative to the input's: one word per line made hundreds of "sentences", more than a
+#: judge reply can hold, and the judge failure counted as our outage
+LINE_RATIO = 2
+
+
+def _limit_lines(output: str, input_text: str) -> tuple[str, bool]:
+    n_in = len([ln for ln in input_text.split("\n") if ln.strip()])
+    cap = LINE_RATIO * n_in + 2
+    if len([ln for ln in output.split("\n") if ln.strip()]) <= cap:
         return output, False
-    clipped = " ".join(words[:limit])
+    paras = [" ".join(p.split()) for p in re.split(r"\n\s*\n", output) if p.strip()]  # single newlines joined
+    if len(paras) > cap:
+        paras = [" ".join(paras)]
+    return "\n\n".join(paras), True
+
+
+def apply_length_limit(output: str, input_text: str, max_ratio: float = 1.3) -> tuple[str, bool]:
+    """Truncate `output` to at most `max_ratio` x the input's word count (and characters), preferring a
+    sentence end; more lines than ``LINE_RATIO`` x the input's are joined. Returns (text, truncated)."""
+    output, relined = _limit_lines(output, input_text)
+    limit = max(1, int(len(input_text.split()) * max_ratio))
+    char_limit = max(200, int(len(input_text) * max_ratio * CHAR_RATIO_OVER_WORDS))
+    words = output.split()
+    if len(words) <= limit and len(output) <= char_limit:
+        return output, relined
+    clipped = " ".join(words[:limit])[:char_limit]
     parts = _SENT_END.split(clipped)
-    if len(parts) > 1 and len(" ".join(parts[:-1]).split()) >= 0.8 * limit:
+    if len(parts) > 1 and len(" ".join(parts[:-1])) >= 0.8 * len(clipped):
         clipped = " ".join(parts[:-1])
     return clipped, True

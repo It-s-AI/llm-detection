@@ -1,0 +1,14 @@
+[Unit]
+Description=SN32 humanizer evaluation: watchdog (alerts: API, TLS, disk, stuck runs, balances, soft spend limit)
+
+[Service]
+Type=oneshot
+User=humeval
+Group=humeval
+UMask=0077
+WorkingDirectory=/srv/humeval/humanizer_eval
+EnvironmentFile=/etc/humeval/humeval.env
+Environment=HUMEVAL_ENV_FILE=/etc/humeval/humeval.env
+ExecStart=/srv/humeval/humanizer_eval/.venv/bin/python scripts/watchdog.py --state /srv/humeval/var/intake --public-url ${HUMEVAL_PUBLIC_URL} --backups /srv/humeval/backups --notary ${HUMEVAL_NOTARY_SS58}
+TimeoutStartSec=180
+NoNewPrivileges=true

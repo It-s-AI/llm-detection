@@ -51,7 +51,21 @@ class Settings(BaseSettings):
     budget_openrouter_usd: float = 25.0
     budget_lium_usd: float = 50.0
     budget_phrasly_usd: float = 15.0
+    #: the soft limit (scripts/watchdog.py): since this UTC time (ISO 8601) our spend on every paid service
+    #: should stay under what miners paid in plus this gap; past it the owner gets an alert, nothing stops
+    soft_limit_since: str = ""
+    soft_limit_gap_usd: float = 300.0
+    #: and this much more for every period begun since then (our own spend: H and the king's run)
+    soft_limit_weekly_usd: float = 300.0
+    #: automatic payout of the earnings (scripts/tao_treasury.py --payout, a timer): USDC on Base above what
+    #: miners are owed (balances, open holds, refunds not bought yet) and a reserve goes to this address.
+    #: Empty: off.
+    payout_address: str = ""
+    payout_reserve_usdc: float = 50.0  # kept for refund fees and slippage
+    payout_min_usdc: float = 20.0  # smaller amounts wait (fees per transfer on the receiving side)
     lium_balance_floor_hours: float = 48.0
+    #: the Lium account tops itself up: a rent then needs a positive balance only, not the pod's whole cost
+    lium_auto_topup: bool = False
 
     var_dir: Path = Field(default=Path("var"), validation_alias="HUMEVAL_VAR_DIR")
 

@@ -231,6 +231,14 @@ class KingState:
             return []
         return [e.hotkey for e in slots if not e.is_baseline]
 
+    def payout_registrations(self, is_registered: IsRegistered | None = None) -> list[int | None]:
+        """The registration block each of ``payout_hotkeys`` was crowned under, same order: a validator
+        drops a king whose hotkey registered again since (D-66), even from a stale leaderboard."""
+        slots = self.payout_slots(is_registered)
+        if not slots or slots[0].is_baseline:
+            return []
+        return [e.registered_at for e in slots if not e.is_baseline]
+
     def payout_weights(self, is_registered: IsRegistered | None = None) -> dict[str, float]:
         """``{hotkey: share}`` of the competition (summing to 1, or empty while the baseline is king):
         the same rule as the validator's (D-12): 85/10/5, missing slots roll to the current king."""

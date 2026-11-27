@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=oneshot
 User=humeval
 Group=humeval
+UMask=0077
 WorkingDirectory=/srv/humeval/humanizer_eval
 EnvironmentFile=/etc/humeval/humeval.env
 Environment=HUMEVAL_ENV_FILE=/etc/humeval/humeval.env

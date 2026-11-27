@@ -1,0 +1,14 @@
+[Unit]
+Description=SN32 humanizer evaluation: send the treasury's earnings to PAYOUT_ADDRESS (USDC on Base)
+
+[Service]
+Type=oneshot
+User=humeval
+Group=humeval
+UMask=0077
+WorkingDirectory=/srv/humeval/humanizer_eval
+EnvironmentFile=/etc/humeval/humeval.env
+Environment=HUMEVAL_ENV_FILE=/etc/humeval/humeval.env
+ExecStart=/srv/humeval/humanizer_eval/.venv/bin/python scripts/tao_treasury.py --state-dir /srv/humeval/var/intake --payout
+TimeoutStartSec=300
+NoNewPrivileges=true

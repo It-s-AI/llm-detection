@@ -16,6 +16,7 @@ import hashlib
 import json
 import sqlite3
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +40,49 @@ def _request_key(model: str, messages: list[dict[str, str]], kw: dict[str, Any])
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
 
+_fresh = threading.local()
+
+
+@contextmanager
+def fresh():
+    """Within this block (this thread) the cache is not read: replies are asked again and stored. For a
+    retry of an output whose judges failed: a cached reply that parsed but was unusable would otherwise
+    come back on every retry and make the failure permanent."""
+    prev = getattr(_fresh, "on", False)
+    _fresh.on = True
+    try:
+        yield
+    finally:
+        _fresh.on = prev
+
+
+class Refresh:
+    """An LLM view whose calls skip the cache read (passed down as ``cache_refresh``): for the retry of an
+    output whose judges failed. Unlike ``fresh()`` it reaches calls the judges make from their own threads."""
+
+    supports_refresh = True
+
+    def __init__(self, llm: Any, strict: bool = False):
+        self.llm = llm
+        #: strict: never read the cache (the last retry round: a cached reply the gate rejected though it
+        #: had the schema's keys is asked again); else a cached usable reply is reused (never bought twice)
+        self.strict = strict
+
+    def chat(self, model: str, messages: list[dict[str, str]], **kw: Any) -> Any:
+        return self.llm.chat(model, messages, cache_refresh="all" if self.strict else True, **kw)
+
+
+def _usable(hit: dict[str, Any] | None, schema: dict[str, Any] | None) -> bool:
+    """A cached reply a retry may reuse: a JSON object with every key the schema requires."""
+    if hit is None or not isinstance(hit.get("json"), dict):
+        return False
+    need = (schema or {}).get("required") or []
+    return all(k in hit["json"] for k in need)
+
+
 class CachedLLM:
+    supports_refresh = True
+
     def __init__(self, llm: Any, path: Path | str, key: bytes | None = None, cache_all: bool = False):
         self.llm = llm
         self.box = SecretBox(key) if key else None
@@ -74,8 +117,11 @@ class CachedLLM:
         )
         if not cacheable:
             return self.llm.chat(model, messages, **kw)
+        refresh = kw.pop("cache_refresh", False) or getattr(_fresh, "on", False)
         k = _request_key(model, messages, kw)
         hit = self._get(k)
+        if refresh == "all" or (refresh and not _usable(hit, kw.get("json_schema"))):
+            hit = None  # a retry re-asks only what has no usable verdict; a usable one is never bought again
         if hit is not None:
             self.hits += 1
             return ChatResult(

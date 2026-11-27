@@ -25,7 +25,8 @@
   code, and validators apply them without running anything new. While no miner is king, the 20% goes to
   detection. The evaluator's code, rules and miner guide are in
   [`humanizer/`](humanizer) ([rules](humanizer/docs/rules.md), [miners](humanizer/docs/miners.md),
-  [validators](humanizer/docs/validators.md)).
+  [validators](humanizer/docs/validators.md)). A one-page overview of the subnet:
+  [`overview.pdf`](humanizer/docs/overview/overview.pdf).
 
 # About
 

@@ -34,7 +34,6 @@ Branch `integration` = all phases together, offline tests green. PRs by phase: #
 ## Remaining
 Waiting for the owner:
 - company accounts (Lium, OpenRouter, detectors) and top-ups;
-- the first payment and refund with real TAO; ~0.02 ETH on the treasury on Base;
 - production server; state migration — per `deploy/README.md`, section "Moving to the production server";
 - launch on finney: a second mechanism is not needed (v4 — a single weight vector); the owner releases v4 with the leaderboard key and URL built in (`release_validator.py`), validators update;
 - merge the validator branch into llm-detection, after first writing in the URL and key with the `release_validator.py` script;

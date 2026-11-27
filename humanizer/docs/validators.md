@@ -30,8 +30,9 @@ validator:
    - the expiry (an envelope is valid for 3 hours);
    - that the sequence number never goes back, so an older leaderboard replayed later is refused;
    - that `kings` is a list of at most 3 distinct hotkeys.
-3. **Pays the kings.** Kings whose hotkeys are not in the metagraph are dropped and the rest close
-   ranks; they get 85% / 10% / 5% in their order, and the shares of missing slots go to the current king.
+3. **Pays the kings.** Kings whose hotkeys are not in the metagraph, or registered again since they were
+   crowned (the signed `king_registered_at` against the metagraph's registration block), are dropped and
+   the rest close ranks; they get 85% / 10% / 5% in their order, and the shares of missing slots go to the current king.
 4. **Blends** the two competitions: `weights = 0.8 × detection + 0.2 × humanizer`. The detection part is
    your normalized scores as in v3. The result then goes through the usual weight processing and
    commit-reveal.

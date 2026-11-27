@@ -31,7 +31,8 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
   its share goes entirely to the current king (as in SN34). The shares are constants of the validator code
   (`KING_SHARES`, owner's decision 2026-11-25); the leaderboard carries only the kings' hotkeys, newest first
   (D-92). A king not in the metagraph is dropped by the validator and the others close ranks. Nothing is burned.
-- **D-13 🟡** The starting king is the owner's baseline; it is paid nothing: while it is king the leaderboard
+- **D-13 🟡** The starting king is the owner's baseline, fixed without any run: every output caught by every
+  detector (score 1.0) and every gate passed, i.e. S = 0 (owner's decision 2026-11-26). It is paid nothing: while it is king the leaderboard
   lists no kings and validators give the humanizer share to detection. No burn and no launch window (owner's
   decision 2026-11-25; previously: the baseline's share burned, and for 3 days after the first miner coronation
   the kings got 25% of the share with 75% burned).
@@ -73,7 +74,7 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
   when it changes and runs with different fingerprints never compared; detector models checked by the
   reported version on every text and by two mid-range H texts per detector (canaries) at period load and
   before each evaluation, with a pause until H and the king are rescored when they differ; every pod an
-  NVIDIA H100 80GB HBM3 (`evaluation/conditions.py`, `evaluation/runners.py:EVAL_MACHINE`).
+  NVIDIA H100 80GB HBM3, else an H200 (`evaluation/conditions.py`, `evaluation/runners.py:EVAL_MACHINES`).
 
 ## Detectors
 
@@ -150,7 +151,7 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
   ~500 fresh texts + ~500 from the cache of already scored ones. Detector responses are cached.
 - **D-55 🟡** Text length **150–350 words** (owner's decision 2026-11-09), ~230 on average in the pool; 4 ranges
   of 50 words each. Genres and proportions — Q-2.
-- **D-56 ✅** A period is 4 days. D_t is hidden until D_{t+1} is assembled; then it is published (inputs, facts,
+- **D-56 ✅** A period is 7 days (owner's decision 2026-11-27; previously 4). D_t is hidden until D_{t+1} is assembled; then it is published (inputs, facts,
   IDs of the human texts, seed, outputs of all submissions, raw detector and judge responses, verdicts,
   receipts).
 - **D-57 ✅** Seed: at the start of period t−1, `c_t = H(secret_t)` and the number of block B_t, roughly half a day
@@ -238,7 +239,8 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
     TAO → WETH (Uniswap V3 0.3%) → USDC (0.05%), ~0.4% on 1 TAO; the USDC that came out is credited. A
     swap more than 2% under the small-trade price waits. After that nobody carries exchange-rate risk.
   - *Treasury.* One EVM account (`var/keys/tao_treasury.key`, the same address on both chains) holds the
-    USDC (native Circle USDC on Base) and some ETH on Base for refund fees. The owner sees the balances,
+    USDC (native Circle USDC on Base), some ETH on Base for refund fees and a little TAO on Bittensor EVM
+    for claiming refunds the bridge books instead of delivering (see Refunds). The owner sees the balances,
     what miners are owed and the free USDC with `scripts/tao_treasury.py`, and sends free USDC on Base
     (e.g. to Coinbase) with `--withdraw-usdc X --to 0x...`.
   - *Refunds* only on request, any time except while a hold is open (`POST /v1/refunds {key, to,
@@ -247,8 +249,12 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
     named in the request** (owner's decision 2026-11-25: a deregistered or lost hotkey must not lock the
     money in; deposits come from any wallet too; a stolen hotkey can withdraw its balance, an accepted
     risk for balances of this size). The way back's cost (CCIP fee ~0.0023 ETH ≈ $3.8, paid in ETH by the treasury, plus ~$0.05
-    gas) is deducted from the refund; if what remains buys less than 0.01 TAO the refund fails and the
-    money stays. The miner sees the TAO sent and the CCIP message id.
+    gas, plus ~0.0015 TAO of Bittensor EVM gas for a claim) is deducted from the refund; if what remains
+    buys less than 0.01 TAO the refund fails and the money stays. The bridge moves whole RAO and the exit
+    asks for at least 0.5% under it (the hub's exit pays a few thousand wei under the amount: asking for
+    exactly the amount fails it). If the hub still cannot make the exit it books the TAO for the
+    treasury, which claims it (`claimLiquid`) and sends it to the address through the balance-transfer
+    precompile. The miner sees the TAO sent and the CCIP message id.
   - *Risks.* ForeverMoney is young (live since 2026-08-20); admin is a 2-of-3 Safe; audited by Hackerbane
     in Sept 2026 (0 critical/high/medium); bridged TAO on Base is backed by root-staked TAO in their vault.
     A paused bridge makes deposits wait on the deposit address.

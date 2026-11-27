@@ -6,6 +6,8 @@
     secret.hex           the committed secret: H(secret) = commitment, seed = H(secret || blockhash(B))
     dataset.json         the hidden inputs with their facts and slots; the human reference ids and strata
     human_scores.json    crown detectors' scores of the human reference texts
+    human_texts.json     the human reference texts themselves (anyone can score them with the detectors)
+    evaluator.json       the evaluator's code commit and the scoring fingerprints the records were made under
     king_run.json        the king's run on this period's inputs (the last one, if the king changed)
     schedule.json        when the commitment was published and the two notary remarks (period/notary.py)
     submissions/<id>.json  per submission: the public status, the statement and the full record (outputs,
@@ -36,6 +38,9 @@ from humanizer_eval.period.seed import derive_seed, subseed, verify_commitment
 RUN_META_KEEP = ("executor", "price_per_hour", "replay", "gpu", "seconds")
 
 
+BASELINE_ID = "baseline-identity"  # intake/worker.py: the owner's baseline king (D-13)
+
+
 def _stratum(slot: Mapping[str, Any]) -> str:
     return f"{slot['genre']}|{slot['length_bin']}"
 
@@ -64,6 +69,9 @@ def write_reveal(
     key: bytes,
     out_dir: Path,
     schedule_record: Mapping[str, Any] | None = None,  # lifecycle: commitment time, notary remarks
+    older_human_scores: list[Mapping[str, Any]] = (),  # H as scored before a mid-period detector rescore
+    human_texts: Mapping[str, str] | None = None,  # id -> text of the human reference set
+    code_commit: str | None = None,  # the evaluator's git commit that scored the period
 ) -> dict[str, Any]:
     """Write the reveal of ``pid`` to ``out_dir`` (replaced if it exists); returns a short summary."""
     tmp = out_dir.with_name(out_dir.name + ".tmp")
@@ -75,12 +83,20 @@ def write_reveal(
     (tmp / "secret.hex").write_text((period_dir / "secret.hex").read_text().strip() + "\n")
     _dump(tmp / "dataset.json", {"period_id": pid, "items": data["items"], "human_ref": data["human_ref"]})
     _dump(tmp / "human_scores.json", dict(human_scores))
+    from humanizer_eval.evaluation.context import human_id
+
+    for old in older_human_scores:  # each record names the H it was scored against (h_id)
+        _dump(tmp / f"human_scores.{human_id(old['scores'])}.json", dict(old))
     if schedule_record is not None:
         _dump(tmp / "schedule.json", {"period_id": pid, **schedule_record})
+    if human_texts is not None:
+        ids = [h["id"] for h in data["human_ref"]]
+        _dump(tmp / "human_texts.json", {i: human_texts[i] for i in ids if i in human_texts})
     for kp in sorted(king_runs):
         tag = kp.name.removeprefix("king_run.").removesuffix(".enc")
         _dump(tmp / f"king_run.{tag}.json", json.loads(decrypt_at_rest(key, kp.read_bytes())))
     n = 0
+    fps: Any = set()
     subs = submissions_dir
     for d in sorted(subs.iterdir()) if subs.exists() else ():
         if not d.is_dir():
@@ -91,9 +107,15 @@ def write_reveal(
         if (d / "statement.json").exists():
             entry["statement"] = json.loads((d / "statement.json").read_text())
         if (d / "record.enc").exists():
-            entry["record"] = public_record(json.loads(decrypt_at_rest(key, (d / "record.enc").read_bytes())))
+            raw = json.loads(decrypt_at_rest(key, (d / "record.enc").read_bytes()))
+            if raw.get("fingerprint"):
+                fps.add(raw["fingerprint"])
+            entry["record"] = public_record(raw)
         _dump(tmp / "submissions" / f"{d.name}.json", entry)
         n += 1
+    fps = sorted(fps)
+    _dump(tmp / "evaluator.json", {"code_commit": code_commit, "scoring_fingerprints": fps,
+                                   "repository": "https://github.com/It-s-AI/llm-detection/tree/main/humanizer"})  # fmt: skip
     files = {str(p.relative_to(tmp)): hashlib.sha256(p.read_bytes()).hexdigest()
              for p in sorted(tmp.rglob("*")) if p.is_file()}  # fmt: skip
     _dump(tmp / "files.json", files)
@@ -146,8 +168,23 @@ def verify_reveal(root: Path, chain: Any = None, notary_address: str | None = No
     hs = json.loads((root / "human_scores.json").read_text())
     by_id = {h["id"]: h for h in human_ref}
     check(set(hs["ids"]) <= set(by_id), "scored human texts belong to the period's reference set")
+    ht = root / "human_texts.json"
+    if ht.exists():
+        texts = json.loads(ht.read_text())
+        check(set(hs["ids"]) <= set(texts), "every scored human text is published (human_texts.json)")
+    else:
+        checks.append("human_texts.json absent: the human scores cannot be re-scored independently")
     human = HumanReference({d: np.asarray(v, float) for d, v in hs["scores"].items()},
                            [_stratum(by_id[i]) for i in hs["ids"]])  # fmt: skip
+    from humanizer_eval.evaluation.context import human_id
+
+    humans = {human_id(hs["scores"]): human}  # every scoring of H published (a mid-period rescore)
+    for p in sorted(root.glob("human_scores.*.json")):
+        h2 = json.loads(p.read_text())
+        humans[human_id(h2["scores"])] = HumanReference(
+            {d: np.asarray(v, float) for d, v in h2["scores"].items()},
+            [_stratum(by_id[i]) for i in h2["ids"]],
+        )
     strata = [_stratum(it["slot"]) for it in items]
     ids = [it["id"] for it in items]
 
@@ -164,17 +201,26 @@ def verify_reveal(root: Path, chain: Any = None, notary_address: str | None = No
         runs[e["submission_id"]] = SubmissionRun(sc, np.asarray(rec["levels"], float), strata, ids)
         subs[e["submission_id"]] = rec
     for sid, rec in subs.items():
-        got = submission_score(runs[sid], human).s
+        h_rec = humans.get(rec.get("h_id") or "", human)  # the H this record was scored against
+        got = submission_score(runs[sid], h_rec).s
         check(_close(got, rec["score"]["S"]), f"{sid}: S = {rec['score']['S']:.6f} recomputed")
         cr = rec.get("crown")
         if not cr:
             continue
         king_id = cr.get("king")
-        king = runs.get(f"{king_id}-kingrun", runs.get(king_id)) if king_id else None
+        # the exact run the decision used (recorded since 2026-11-26), else the older naming
+        king = runs.get(cr.get("king_run") or "") or (
+            runs.get(f"{king_id}-kingrun", runs.get(king_id)) if king_id else None
+        )
+        if (
+            king is None and king_id == BASELINE_ID
+        ):  # fixed, never run: every output caught, every gate passed
+            n = len(ids)
+            king = SubmissionRun({d: np.ones(n) for d in rec["scores"]}, np.ones(n), strata, ids)
         if king is None:
             checks.append(f"{sid}: crown test not recomputed (the king's run is not in this period)")
             continue
-        dec = crown_decision(king, runs[sid], human, seed=subseed(seed, f"crown:{sid}"), n_boot=cr["n_boot"],
+        dec = crown_decision(king, runs[sid], h_rec, seed=subseed(seed, f"crown:{sid}"), n_boot=cr["n_boot"],
                              alpha=cr["alpha"], delta_min=cr["delta_min"], min_gate_pass=cr["min_gate_pass"])  # fmt: skip
         check(dec.crown == cr["crown"] and _close(dec.lower, cr["lower"]),
               f"{sid}: crown test against {king_id} recomputed (lower bound {cr['lower']:+.4f}, "

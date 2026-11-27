@@ -21,7 +21,7 @@ keys: the humanizer half comes from a leaderboard signed by the subnet owner and
 Details: `humanizer/docs/validators.md`.
 
 **Miners**
-• One king. Your submission runs on the same ~500 hidden texts as the king (a new set every 4 days); beat
+• One king. Your submission runs on the same ~500 hidden texts as the king (a new set every 7 days); beat
   it with statistical confidence and you are the new king.
 • Payouts: 85% to the king, 10% and 5% to the two previous kings. For the first 3 days after the first
   crown, the kings get a quarter of that.

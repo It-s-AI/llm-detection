@@ -38,3 +38,19 @@ def test_length_limit():
     assert cut and len(clipped.split()) <= 130 and clipped.endswith(".")
     same, cut2 = apply_length_limit("short text.", src)
     assert not cut2 and same == "short text."
+
+
+def test_one_word_per_line_and_huge_words_are_bounded():
+    from humanizer_eval.gates.normalize import apply_length_limit
+
+    src = "The council approved the budget. It funds buses.\n\nResidents welcomed it."
+    joined, cut = apply_length_limit("\n".join(src.split()), src)
+    assert cut and "\n" not in joined.replace("\n\n", "")
+    big, cut = apply_length_limit("x" * 50_000, src)
+    assert cut and len(big) <= max(200, int(len(src) * 1.3 * 1.25))
+
+
+def test_variation_selectors_and_braille_blank_are_removed():
+    from humanizer_eval.gates.normalize import normalize
+
+    assert normalize("T\ufe0fh\u2800e c\U000e0100ity")[0] == "The city"

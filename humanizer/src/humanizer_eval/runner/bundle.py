@@ -22,6 +22,8 @@ from pathlib import Path, PurePosixPath
 
 ALLOWED_LICENSES = {"MIT", "Apache-2.0", "BSD-3-Clause", "OWNER-GRANT"}
 MAX_BUNDLE_BYTES = 50 * 1024**3  # D-61 (100 GB until 2026-11-17)
+MAX_HEADER_RECORD = 64 * 1024  # one pax/long-name record
+MAX_HEADER_BYTES = 512 * 2**20  # all headers of the archive
 MAX_MEMBERS = 200_000
 MAX_MANIFEST_BYTES = 64 * 1024
 
@@ -92,7 +94,12 @@ def inspect_bundle(path: Path | str, max_bytes: int = MAX_BUNDLE_BYTES) -> Bundl
     manifest_raw = None
     n = 0
     total = 0
-    with tarfile.open(path, "r:*") as tf:
+    with path.open("rb") as f:  # plain tar or gzip only: bz2/xz decompress slowly enough to stall the pod
+        magic = f.read(512)
+    gz = magic[:2] == b"\x1f\x8b"
+    if not gz and magic[257:262] != b"ustar":
+        raise BundleError("the bundle must be a plain .tar or a .tar.gz")
+    with tarfile.open(path, "r:gz" if gz else "r:") as tf:
         for m in tf:
             n += 1
             if n > MAX_MEMBERS:
@@ -104,6 +111,11 @@ def inspect_bundle(path: Path | str, max_bytes: int = MAX_BUNDLE_BYTES) -> Bundl
             total += m.size
             if total > max_bytes * 2:
                 raise BundleError("uncompressed size too large (possible archive bomb)")
+            # header records (pax, GNU long names) count too: inflated and parsed, never in m.size
+            if any(len(str(v)) > MAX_HEADER_RECORD for v in (m.pax_headers or {}).values()) or (
+                tf.offset - total > MAX_HEADER_BYTES
+            ):
+                raise BundleError("archive headers too large (possible archive bomb)")
             if m.name.lstrip("./") == "submission.json" and m.isfile():
                 fobj = tf.extractfile(m)
                 manifest_raw = fobj.read(MAX_MANIFEST_BYTES + 1) if fobj else None

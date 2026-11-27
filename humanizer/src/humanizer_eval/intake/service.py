@@ -26,6 +26,7 @@ import ipaddress
 import json
 import logging
 import re
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -107,6 +108,10 @@ def check_bundle_url(url: str, max_len: int = 2048) -> str:
     return url
 
 
+SUBMITS_PER_HOUR = 20
+PRIVATE_REFUSED = "no tokens: the repo may be private while you pay, but must be public when evaluated"
+
+
 class IntakeService:
     def __init__(
         self,
@@ -123,7 +128,9 @@ class IntakeService:
         secret_key: bytes | None = None,  # encrypts miners' read tokens at rest
         about: dict[str, Any]
         | None = None,  # shown in /v1/info: {"mode": "test", "network": ..., "netuid": ...}
+        uid: Callable[[str], int | None] | None = None,  # hotkey -> UID (the public queue shows it)
     ):
+        self.uid = uid
         self.queue = queue
         self.billing = billing
         self.period = period
@@ -131,6 +138,9 @@ class IntakeService:
         self.registration = registration
         self.limits = limits or IntakeLimits()
         self._now = now
+        self._enqueue_lock = threading.Lock()
+        self._submits: dict[str, list[float]] = {}  # hotkey -> recent submit requests
+        self._bundle_infos: dict[tuple[str, str], tuple[float, Any]] = {}  # (repo, commit) -> (at, HFBundle)
         self._polled: dict[str, float] = {}
         self.commitment = commitment
         self.hub = hub
@@ -165,7 +175,7 @@ class IntakeService:
             **self.about,
         }
 
-    _COUNTED = ("awaiting_payment", "queued", "running", "paused", "done")
+    _COUNTED = ("queued", "running", "paused", "done")  # paid work only: unpaid quotes cost nothing to make
 
     def _evals_last_24h(self) -> int:
         return self.queue.created_since(self._now() - 86400, self._COUNTED)
@@ -200,17 +210,27 @@ class IntakeService:
         """A bundle pinned by the hotkey's on-chain commitment ``<repo>@<commit>`` (intake/hf.py).
 
         ``commitment``, when given, must equal what the chain shows (it tells a stale snapshot from a
-        typo); ``hf_token`` is a read-only token for a private repo.
+        typo). The repo may still be private when the miner submits and pays (so nobody can copy it in
+        the meantime); it must be public when the evaluation starts: the bundle is read then (worker.py).
+        ``hf_token`` is refused (owner decision 2026-11-26).
         """
-        from humanizer_eval.intake.hf import parse_commitment
+        from humanizer_eval.intake.hf import HubNotReadable, parse_commitment
 
         self._check_name(name)
-        if hf_token is not None and (not isinstance(hf_token, str) or not re.match(r"^hf_[A-Za-z0-9]{20,80}$",
-                                                                                   hf_token)):  # fmt: skip
-            raise ValueError("hf_token: a Hugging Face token (hf_...) that can read the repo")
+        if hf_token:  # owner decision 2026-11-26: public repos only (the pod downloads without a token)
+            raise ValueError(PRIVATE_REFUSED)
         if self.commitment is None or self.hub is None:
             raise Unavailable("Hugging Face submissions are not configured here")
         reg_block = self._registration(hotkey)
+        # cheap refusals first: what follows calls Hugging Face (up to a 50 MB read) and writes a quote
+        self._check_open()
+        self._check_capacity()
+        self.queue.precheck(hotkey, reg_block, self.limits.max_waiting)
+        now = self._now()
+        recent = [t for t in self._submits.get(hotkey, []) if now - t < 3600]
+        if len(recent) >= SUBMITS_PER_HOUR:  # submit + cancel in a loop: each may read Hugging Face
+            raise QueueError(f"at most {SUBMITS_PER_HOUR} submission requests per hour per hotkey")
+        self._submits[hotkey] = [*recent, now]
         try:
             c = self.commitment(hotkey)
         except Exception as e:
@@ -223,30 +243,29 @@ class IntakeService:
         if block < reg_block:
             raise QueueError("the commitment predates this registration; commit again from it")
         repo, rev = parse_commitment(data)
-        info = self.hub.bundle_info(repo, rev, hf_token)
-        if not 0 < info.size <= self.limits.max_bundle_bytes:
+        try:
+            hit = self._bundle_infos.get((repo, rev))
+            info = hit[1] if hit and now - hit[0] < 3600 else self.hub.bundle_info(repo, rev)
+            self._bundle_infos[(repo, rev)] = (now, info)  # a pinned commit's bundle never changes
+        except HubNotReadable:
+            info = None  # private for now: read when the evaluation starts
+        if info is not None and not 0 < info.size <= self.limits.max_bundle_bytes:
             raise ValueError(f"bundle size {info.size} outside 1..{self.limits.max_bundle_bytes} bytes")
-        if info.private and not hf_token:
-            raise ValueError("the repo is private: give a read-only hf_token")
-        secret = None
-        if hf_token:
-            if self.secret_key is None:
-                raise Unavailable("private repos are not accepted here")
-            from humanizer_eval.period.crypto import encrypt_at_rest
-
-            secret = encrypt_at_rest(self.secret_key, hf_token.encode()).hex()
+        sha, size = (info.sha256, info.size) if info is not None else ("", None)
+        bundle: dict[str, Any] = {"repo": repo, "commit": rev, "sha256": sha or None, "bytes": size}
+        if info is None or info.private or info.gated:
+            bundle["note"] = "make the repo public before the evaluation starts: a private one is refused"
         return self._open(
             hotkey,
             reg_block,
             bundle_url=self.hub.resolve_url(repo, rev),
-            bundle_sha256=info.sha256,
-            bundle_bytes=info.size,
+            bundle_sha256=sha,
+            bundle_bytes=size,
             name=name,
             hf_repo=repo,
             hf_revision=rev,
             commit_block=block,
-            secret=secret,
-            extra={"bundle": {"repo": repo, "commit": rev, "sha256": info.sha256, "bytes": info.size}},
+            extra={"bundle": bundle},
         )
 
     def submit(
@@ -305,7 +324,12 @@ class IntakeService:
         try:
             pay = self.billing.payment(q["id"])
         except Exception:
-            self.queue.update(sid, state="cancelled", finished_ts=self._now(), note="no payment address")
+            try:  # only if still unpaid: the payments loop may have queued it meanwhile (then it stands)
+                now = self._now()
+                self.queue.update(sid, expect=("awaiting_payment",), state="cancelled", finished_ts=now,
+                                  note="no payment address")  # fmt: skip
+            except QueueError:
+                return {**out, "state": self.queue.get(sid).state, "payment": None}  # type: ignore[union-attr]
             raise
         out.update(state="awaiting_payment", payment={**pay, "then": f"POST /v1/submissions/{sid}/paid"})
         return out
@@ -313,12 +337,26 @@ class IntakeService:
     def _try_enqueue(self, row: Row) -> Row:
         """awaiting_payment -> queued once the balance covers the hold; -> expired past the window (plus
         ``LATE_GIVE_UP_S`` while TAO sent in time is still on its way)."""
+        with self._enqueue_lock:  # the status poll and the worker loop must not both open and release it
+            row = self.queue.get(row.id) or row
+            return self._try_enqueue_locked(row)
+
+    def _try_enqueue_locked(self, row: Row) -> Row:
         if row.state != "awaiting_payment":
             return row
+        h = self.billing.accounts.hold(row.id)
+        if (
+            h is not None and h.status == "open"
+        ):  # paid and held, the enqueue was cut off (a crash): finish it
+            try:
+                return self.queue.enqueue(row.id)
+            except QueueError:
+                return self.queue.get(row.id)  # type: ignore[return-value]
         now = self._now()
         late = row.expires_ts is not None and now > row.expires_ts
         if self.billing.amount_due(row.quote_id) > 0:
-            if late and (now > row.expires_ts + LATE_GIVE_UP_S or not self._converting(row.hotkey)):  # type: ignore[operator]
+            # never while the miner's TAO is on its way (a slow or paused bridge is not the miner's doing)
+            if late and not self._converting(row.hotkey):
                 return self._expire(row)
             return row
         try:
@@ -327,19 +365,39 @@ class IntakeService:
             return row  # spent elsewhere in the meantime (e.g. a refund)
         try:
             return self.queue.enqueue(row.id)
-        except QueueError:  # cancelled concurrently: give the money back
-            self.billing.fail(row.id)
-            return self.queue.get(row.id)  # type: ignore[return-value]
+        except QueueError:  # cancelled or expired concurrently: give the money back (never for a live row)
+            cur = self.queue.get(row.id)
+            if cur is not None and cur.state in ("cancelled", "expired"):
+                self.billing.fail(row.id)
+            return cur  # type: ignore[return-value]
+
+    def _release_orphan_holds(self) -> None:
+        """A hold still open for a row that is over without a run (cancelled, expired, failed): a crash
+        between two steps left it; it would lock the miner's money and block every refund."""
+        try:
+            ids = self.billing.accounts.open_hold_ids()
+        except Exception as e:
+            log.warning("open holds not listed: %s", e)
+            return
+        for sid in ids:
+            row = self.queue.get(sid)
+            if row is not None and row.state in ("cancelled", "expired", "failed"):
+                log.warning("releasing the orphan hold of %s (%s)", sid, row.state)
+                self.billing.fail(sid)
 
     def _converting(self, hotkey: str) -> bool:
         tao = getattr(self.billing, "tao", None)
-        return tao is not None and tao.pending_cents(hotkey) > 0
+        return tao is not None and tao.incoming(hotkey)
 
     def _expire(self, row: Row) -> Row:
         try:
-            return self.queue.update(row.id, expect=("awaiting_payment",), state="expired", payment_url=None)
+            out = self.queue.update(row.id, expect=("awaiting_payment",), state="expired", payment_url=None)
         except QueueError:
             return self.queue.get(row.id)  # type: ignore[return-value]
+        h = self.billing.accounts.hold(row.id)  # opened, but the enqueue never happened: give it back
+        if h is not None and h.status == "open":
+            self.billing.fail(row.id)
+        return out
 
     def enqueue_ready(self) -> list[str]:
         """Called by the worker loop: deposits converted and refunds moved on (billing housekeeping), then
@@ -348,10 +406,14 @@ class IntakeService:
             self.billing.housekeeping()
         except Exception as e:
             log.warning("payments housekeeping failed: %s", e)
+        self._release_orphan_holds()
         moved = []
         for row in self.queue.by_state("awaiting_payment"):
-            if self._try_enqueue(row).state != "awaiting_payment":
-                moved.append(row.id)
+            try:  # one row's trouble (an RPC error) must not stall everyone's queue
+                if self._try_enqueue(row).state != "awaiting_payment":
+                    moved.append(row.id)
+            except Exception as e:
+                log.warning("submission %s not moved on: %s", row.id, e)
         return moved
 
     def _collect(self, row: Row, min_interval: float) -> dict[str, Any] | None:
@@ -370,6 +432,23 @@ class IntakeService:
             log.warning("deposit of %s not checked: %s", row.hotkey, e)
             return None
 
+    def public_queue(self) -> dict[str, Any]:
+        """The paid submissions waiting or running, in queue order: who (UID, hotkey, name) and when. Never
+        the bundle (a repo stays unknown until its evaluation is over) nor money."""
+        out = []
+        for r in self.queue.by_state("running", "queued", "paused"):
+            if r.owner_job:
+                continue
+            try:
+                uid = self.uid(r.hotkey) if self.uid else None
+            except Exception:  # a stale metagraph: the queue is still shown
+                uid = None
+            out.append({"submission_id": r.id, "uid": uid, "hotkey": r.hotkey, "name": r.name or "",
+                        "state": "running" if r.state == "running" else "waiting", "period_id": r.period_id,
+                        "enqueued_ts": r.enqueued_ts, "started_ts": r.started_ts})  # fmt: skip
+        out.sort(key=lambda x: (x["state"] != "running", x["enqueued_ts"] or 0.0))
+        return {"queue": out}
+
     def results(self, period_id: str | None = None, limit: int = 500) -> dict[str, Any]:
         """Finished submissions of a period (default: the current one), newest first: public scores only."""
         pid = period_id or self.period().period_id
@@ -382,7 +461,11 @@ class IntakeService:
         for r in rows[: max(1, min(limit, 500))]:
             pub = store.status(r.id) or {}
             scores = {k: pub[k] for k in PUBLIC_RESULT if k in pub}
-            out.append({"submission_id": r.id, "hotkey": r.hotkey, "name": r.name or "",
+            try:
+                uid = self.uid(r.hotkey) if self.uid else None
+            except Exception:
+                uid = None
+            out.append({"submission_id": r.id, "uid": uid, "hotkey": r.hotkey, "name": r.name or "",
                         "finished_ts": r.finished_ts, **scores})  # fmt: skip
         return {"period_id": pid, "results": out}
 
@@ -476,6 +559,11 @@ class IntakeService:
 
     def cancel(self, hotkey: str, sid: str) -> dict[str, Any]:
         self._own(hotkey, sid)
+        row = self.queue.get(sid)
+        if row is not None and (row.attempts > 0 or row.started_ts is not None):
+            raise QueueError(
+                "this evaluation has already started (it resumes after a restart); it cannot be cancelled"
+            )
         self.queue.update(
             sid, expect=("awaiting_payment", "queued"), state="cancelled", finished_ts=self._now()
         )

@@ -43,7 +43,7 @@ def test_statement_from_metered_quantities():
     items = {i.item: i.amount_cents for i in st.items}
     assert items["detector:pangram"] == 10 + 15  # ceil(1.2)=2, ceil(2.5)=3 units x 5c
     assert items["judge:openai/gpt-6-luna"] == 15  # $0.10 + $0.05
-    assert items["lium:h100"] == 125
+    assert items["lium:h100"] == 225  # 0.5 h x 4.50 USDC (card 2026-11-26b)
     assert st.card_sha256 == CARD.sha256 and len(CARD.sha256) == 64
     with pytest.raises(KeyError):
         statement(CARD, detector_words={}, judge_tokens={"x/unknown": (1, 1)}, pod_hours=0)
@@ -135,3 +135,27 @@ def test_quote_with_no_paid_detectors_has_no_detector_lines():
     q = quote(CARD, [200] * 10, [])
     assert not [i for i in q.items if i.item.startswith("detector:")]
     assert {i.item for i in quote(CARD, [200] * 10).items} >= {f"detector:{d}" for d in CARD.detectors}
+
+
+def test_a_run_is_settled_with_the_card_of_its_quote_after_a_card_deploy(tmp_path):
+    """Quoted and held under one card; the server restarts with a new card (the pod dearer): the run is
+    priced with the quote's card (configs/price_cards keeps every card), and a statement priced with the
+    new card is refused."""
+    import copy
+
+    from humanizer_eval.billing.prices import statement as make_statement
+
+    acc = Accounts(tmp_path / "b.sqlite")
+    old = BillingService(CARD, acc)
+    acc.record_payment("tao:1", "hk", 100_000, 0)
+    q = old.make_quote("hk", [100] * 40)
+    old.start(q["id"], "s1")
+    raw = copy.deepcopy(CARD.raw)
+    raw["version"], raw["lium"]["rate_per_hour_usd"] = "2099-01-01", raw["lium"]["rate_per_hour_usd"] * 2
+    new = BillingService(PriceCard(raw), acc)
+    card = new.card_for("s1")
+    assert card.sha256 == CARD.sha256
+    with pytest.raises(BillingError):
+        new.finish("s1", make_statement(new.card, detector_words={}, judge_tokens={}, pod_hours=1.0))
+    out = new.finish("s1", make_statement(card, detector_words={}, judge_tokens={}, pod_hours=1.0))
+    assert out["charged_cents"] == round(CARD.raw["lium"]["rate_per_hour_usd"] * 100)

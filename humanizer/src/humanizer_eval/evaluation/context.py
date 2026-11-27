@@ -31,6 +31,17 @@ def stratum(slot: Mapping[str, Any]) -> str:
     return f"{slot['genre']}|{slot['length_bin']}"
 
 
+def human_id(scores: Any) -> str:
+    """A short id of one set of H scores ({detector: [score per human text]}): records name the H they were
+    scored against, so a reveal after a mid-period rescore can check each record against its own H."""
+    import hashlib
+
+    norm = {
+        d: [None if x is None else round(float(x), 8) for x in v] for d, v in sorted(dict(scores).items())
+    }
+    return hashlib.sha256(json.dumps(norm, sort_keys=True).encode()).hexdigest()[:12]
+
+
 @dataclass
 class PeriodContext:
     period_id: str
@@ -70,6 +81,11 @@ class PeriodContext:
 
     def human_reference(self) -> HumanReference:
         return HumanReference(self.human_scores, self.human_strata)
+
+    @property
+    def h_id(self) -> str:
+        """Which scoring of H this context carries (changes when a detector is rescored mid-period)."""
+        return human_id(self.human_scores)
 
     @property
     def harness_seed(self) -> int:
@@ -167,6 +183,8 @@ def load_period(
             hvers[name] = conditions.versions(det.score(texts))  # the detector cache answers: free
     try:
         new = conditions.take_baseline(hvers, watch, texts, {d: scores[d] for d in hvers if d in scores})
+    except conditions.CanaryUnavailable:  # an outage: the load fails and is tried again (never a hold)
+        raise
     except RuntimeError as e:  # H's detector models are not the vendors' current ones: hold every evaluation
         log.error("period %s: %s", manifest["period_id"], e)
         new = {"_problem": str(e)}
@@ -230,6 +248,11 @@ class KingRun:
     scores: dict[str, list[float]]  # +inf where the output was not sent (level 0)
     #: scoring fingerprint the run was scored under (evaluation/conditions.py); None: before 2026-11-21
     fingerprint: str | None = None
+    #: the submission record in the period's store this run's scores come from (the reveal checks every
+    #: crown decision against exactly that run); None: the king's own record, or the fixed baseline
+    record_id: str | None = None
+    #: the scoring of H it was made under (PeriodContext.h_id): a mid-period detector rescore makes it stale
+    h_id: str | None = None
 
     def to_run(self, strata: Sequence[str]) -> SubmissionRun:
         return SubmissionRun(self.scores, self.quality, list(strata), self.input_ids)
@@ -242,6 +265,8 @@ class KingRun:
             "quality": self.quality,
             "scores": {d: [_enc(x) for x in v] for d, v in self.scores.items()},
             "fingerprint": self.fingerprint,
+            "record_id": self.record_id,
+            "h_id": self.h_id,
         }
 
     @classmethod
@@ -253,12 +278,16 @@ class KingRun:
             [float(q) for q in d["quality"]],
             {k: [_dec(x) for x in v] for k, v in d["scores"].items()},
             d.get("fingerprint"),
+            d.get("record_id"),
+            d.get("h_id"),
         )
 
     def save(self, path: Path | str, key: bytes) -> None:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(encrypt_at_rest(key, json.dumps(self.to_dict()).encode()))
+        tmp = p.with_name(p.name + ".tmp")  # never a torn file: other threads and processes read it
+        tmp.write_bytes(encrypt_at_rest(key, json.dumps(self.to_dict()).encode()))
+        tmp.replace(p)
 
     @classmethod
     def load(cls, path: Path | str, key: bytes) -> KingRun | None:

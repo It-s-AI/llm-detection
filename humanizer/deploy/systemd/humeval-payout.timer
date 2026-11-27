@@ -1,0 +1,9 @@
+[Unit]
+Description=Pay the humanizer evaluation's earnings out every 10 minutes (off while PAYOUT_ADDRESS is empty)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

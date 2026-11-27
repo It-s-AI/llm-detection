@@ -18,6 +18,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+ops = [
+  "wandb==0.31.0",      # scripts/wandb_report.py: the evaluator's public state in W&B (same as the validators)
+]
 pool = [
   "datasets>=3.0",      # streaming of parquet/csv/jsonl repos (no loading scripts)
   "datasketch>=1.6",    # MinHash LSH near-duplicate filter

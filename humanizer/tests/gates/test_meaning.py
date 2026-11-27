@@ -222,3 +222,11 @@ def test_g1_levels_minor_and_severe():
     lost = _check(FakeLLM(), "The bridge opened in 1932. Somebody said things.")  # 3 omitted, 1 allowed
     assert lost.level == 0.0
     assert _check(FakeLLM(), SOURCE).level == 1.0
+
+
+def test_one_distortion_flagged_by_recall_and_precision_is_counted_once():
+    """'Opened in 1933' contradicts the source fact (recall) and makes its sentence incompatible with the
+    source (precision): one distortion, level 0.5 as rules.md 5 says, not 0 (audit 4)."""
+    out = "Opened in 1932, the bridge cost 4 million dollars WRONG. Dr. Lee thinks it changed the city; traffic doubled."
+    r = _check(FakeLLM(recall={("a/judge", 0): "contradicted", ("b/judge", 0): "contradicted"}), out)
+    assert r.level == 0.5

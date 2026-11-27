@@ -95,15 +95,26 @@ class VendorDetector:
                 return DetectorScore(self.name, sha, float("nan"), error=f"budget: {e}")
         elif est > 0:
             return DetectorScore(self.name, sha, float("nan"), error="paid detector requires a spend ledger")
+        http = getattr(self, "http", None)
+        counting = http is not None and hasattr(http, "begin_paid")
+        if counting:
+            http.begin_paid()
         try:
             payload = self._call(text)
         except Exception as e:
-            # we cannot know whether the vendor charged us -> commit at estimate
+            # booked: every send the vendor may have billed (accepted, or delivered and timed out); a call
+            # the vendor refused with an error status costs nothing (an outage must not eat the cap)
+            n = http.paid_sends() if counting else 1
             if res is not None:
-                res.commit(est, {"error": type(e).__name__})
-            return DetectorScore(self.name, sha, float("nan"), cost_usd=est, error=f"{type(e).__name__}: {e}")
+                if n:
+                    res.commit(est * n, {"error": type(e).__name__, "sends": n})
+                else:
+                    res.release({"error": type(e).__name__})
+            return DetectorScore(self.name, sha, float("nan"), cost_usd=est * n,
+                                 error=f"{type(e).__name__}: {e}")  # fmt: skip
+        n = max(1, http.paid_sends()) if counting else 1
         if res is not None:
-            res.commit(est)
+            res.commit(est * n, {"sends": n} if n > 1 else None)
         try:
             ex = self._extract(payload)
         except Exception as e:
@@ -144,7 +155,10 @@ def _check(resp: httpx.Response, vendor: str) -> dict[str, Any]:
 
 
 def _clip01(x: float) -> float:
-    return min(1.0, max(0.0, float(x)))
+    v = float(x)
+    if v != v:  # NaN: never a "human" 0.0
+        raise DetectorError("the detector returned NaN")
+    return min(1.0, max(0.0, v))
 
 
 # --- GPTZero -------------------------------------------------------------------
@@ -168,6 +182,8 @@ class GPTZero(VendorDetector):
     def _extract(self, p: dict[str, Any]) -> Extracted:
         doc = p["documents"][0]
         cp = doc.get("class_probabilities") or {}
+        if not isinstance(cp.get("ai"), int | float):  # never a "human" score from an incomplete answer
+            raise DetectorError("gptzero: no class_probabilities.ai in the response")
         cands = {
             "p_ai": _clip01(cp.get("ai", 0.0)),
             "p_mixed": _clip01(cp.get("mixed", 0.0)),
@@ -282,8 +298,10 @@ class Pangram(VendorDetector):
             cp = w.get("class_probabilities")
             if cp and len(cp) == 3:  # (Human, AI-Assisted, AI-Generated)
                 p_ai = float(cp[1]) + float(cp[2])
-            else:
-                p_ai = float(w.get("ai_assistance_score", 0.0))
+            elif isinstance(w.get("ai_assistance_score"), int | float):
+                p_ai = float(w["ai_assistance_score"])
+            else:  # never a "human" score from an incomplete answer
+                raise DetectorError("pangram: a window without class_probabilities or ai_assistance_score")
             ai += weight * p_ai
             hum += weight * float(w.get("humanizer_score") or 0.0)
             total += weight

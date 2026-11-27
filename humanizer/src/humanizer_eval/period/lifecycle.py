@@ -31,15 +31,19 @@ from humanizer_eval.period.seed import commitment, make_secret
 SCHEDULE = "schedule.json"
 
 
+BUILD_TRIES = 3  # failed builds of one period before the rotation stops trying
+
+
 @dataclass(frozen=True)
 class LifecycleConfig:
-    period_s: float = 4 * 86400.0
+    period_s: float = 7 * 86400.0
     build_lead_s: float = 12 * 3600.0  # B is produced this long before the period ends
     min_lead_blocks: int = 50  # B is at least this far ahead of the commitment (~10 min)
     finality_blocks: int = 12  # build only once B is this deep under the finalized head
     ready_grace_s: float = 3 * 3600.0
     block_s: float = 12.0
     netuid: int = 32  # named in the notary remarks
+    reveal_grace_s: float = 1800.0  # the reveal waits this long after the switch (then for running runs)
     notary_margin_blocks: int = 10  # the commitment remark must land this far before the seed block
 
 
@@ -52,9 +56,13 @@ def next_period_id(pid: str) -> str:
 
 def _write(path: Path, text: str, mode: int | None = None) -> None:
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(text)
-    if mode is not None:
+    if mode is not None:  # a secret: never readable by others, not even for a moment
+        from humanizer_eval.period.crypto import write_private
+
+        write_private(tmp, text)
         tmp.chmod(mode)
+    else:
+        tmp.write_text(text)
     tmp.replace(path)
 
 
@@ -148,6 +156,11 @@ class Lifecycle:
                        dedupe=f"no-merkle-{nxt}")  # fmt: skip
             return None
         ready = self.dir / nxt / "READY"
+        if not ready.exists() and not (self.dir / nxt / "LOADED").exists():
+            # never switch to a period the server could not even load: everything would stop on it
+            self.alert(f"period {cur} is over but {nxt} was never loaded by the server; {cur} goes on",
+                       dedupe=f"not-loaded-{nxt}")  # fmt: skip
+            return None
         if not ready.exists() and now < end + self.cfg.ready_grace_s:
             self.alert(f"period {cur} is over but {nxt} is not ready yet (the king's run on it)",
                        dedupe=f"not-ready-{nxt}")  # fmt: skip
@@ -208,6 +221,13 @@ class Lifecycle:
         if not self._post(rec, "notary_commitment", commitment_text(self.cfg.netuid, nxt, rec["commitment"],
                                                                     rec["seed_block"]), nxt):  # fmt: skip
             return None
+        if int(rec["notary_commitment"]["block"]) >= int(rec["seed_block"]):
+            # landed too late: it proves nothing (the seed block was known); never built from it
+            rec["notary_commitment_late"] = rec.pop("notary_commitment")
+            self._save(sch)
+            self.alert(f"the commitment for {nxt} landed at or after its seed block; run rotate_period.py "
+                       f"--recommit", dedupe=f"late-{nxt}")  # fmt: skip
+            return None
         if self.publish:
             self._save(sch)
             self.publish("schedule", nxt)
@@ -221,7 +241,17 @@ class Lifecycle:
             nxt = sch.get("next")
             if not nxt or sch["periods"][nxt].get("built_at"):
                 raise RuntimeError("no unbuilt next period to abandon")
-            rec = sch["periods"].pop(nxt)
+            rec = sch["periods"][nxt]
+            # the only legitimate case is a commitment remark that never landed in time; once it is on chain
+            # and its seed block is (nearly) produced, the owner knows the seed: abandoning would re-roll it
+            if (
+                rec.get("notary_commitment")
+                and self.chain.head() >= rec["seed_block"] - self.cfg.notary_margin_blocks
+            ):
+                raise RuntimeError(
+                    "the commitment is on chain and its seed block is reached: it cannot be redone"
+                )
+            sch["periods"].pop(nxt)
             sch.setdefault("abandoned", []).append(
                 {"period": nxt, **rec, "abandoned_at": self.now(), "reason": reason}
             )
@@ -251,19 +281,48 @@ class Lifecycle:
         head = self.chain.head()
         if head < rec["seed_block"] + self.cfg.finality_blocks:
             return None
+        # a build pays OpenRouter (~$5 per 500 texts): a failed one is tried again after an hour, then two;
+        # after BUILD_TRIES failures it waits for the owner (clear build_failures in the schedule)
+        fails = int(rec.get("build_failures") or 0)
+        built = self.dir / nxt / "manifest.json"
+        if built.exists():  # built by a pass killed before it saved the schedule: adopt it (free), no rebuild
+            bh = self.chain.block_hash(rec["seed_block"])
+            m = json.loads(built.read_text())
+            if m.get("commitment") != rec["commitment"] or m.get("block_hash") != bh:
+                raise RuntimeError(f"{nxt}: a built period on disk does not match its commitment")
+            return self._built(sch, nxt, rec, m, bh)
+        if fails >= BUILD_TRIES:
+            self.alert(f"building {nxt}: {fails} tries used; the rotation waits for the owner (clear "
+                       "build_failures in the schedule)", dedupe=f"build-stop-{nxt}")  # fmt: skip
+            return None
+        if self.now() < float(rec.get("build_retry_at") or 0):
+            return None
+        bh = self.chain.block_hash(rec["seed_block"])
         sp = self.secret_path(nxt)
         secret = bytes.fromhex(sp.read_text().strip())
-        bh = self.chain.block_hash(rec["seed_block"])
+        # the attempt counts before the paid work: a build that is killed (timeout, OOM, reboot) without
+        # an exception uses up a try and backs off like a failed one (never a full paid build every pass)
+        fails += 1
+        rec.update(build_failures=fails, build_retry_at=self.now() + 3600.0 * 2 ** (fails - 1))
+        self._save(sch)
         try:
             m = self.builder(nxt, secret, bh, rec["seed_block"])
         except Exception as e:
-            self.alert(f"building {nxt} failed: {type(e).__name__}: {e}", dedupe=f"build-{nxt}")
+            last = "; giving up until the owner looks" if fails >= BUILD_TRIES else ""
+            self.alert(f"building {nxt} failed ({fails}/{BUILD_TRIES}): {type(e).__name__}: {e}{last}",
+                       dedupe=f"build-{nxt}-{fails}")  # fmt: skip
             raise
+        return self._built(sch, nxt, rec, m, bh)
+
+    def _built(self, sch: dict[str, Any], nxt: str, rec: dict[str, Any], m: dict[str, Any], bh: str) -> str:
         if m.get("commitment") != rec["commitment"] or m.get("block_hash") != bh:
             raise RuntimeError(f"{nxt}: the built manifest does not match the commitment and the seed block")
         rec.update(block_hash=bh, merkle_root=m.get("merkle_root"), n_items=m.get("n_items"),
                    built_at=self.now(), cost_usd=m.get("cost_usd"))  # fmt: skip
-        sp.unlink(missing_ok=True)  # the builder keeps it in <pid>/secret.hex until the reveal
+        self._save(sch)  # built, on disk, before the secret goes: a crash after this never rebuilds
+        self.secret_path(nxt).unlink(
+            missing_ok=True
+        )  # the builder keeps it in <pid>/secret.hex until the reveal
         notarized = self.notary is None or self._post(
             rec,
             "notary_merkle",
@@ -286,9 +345,21 @@ class Lifecycle:
         for pid, rec in sch["periods"].items():
             if not rec.get("ended_at") or rec.get("revealed_at"):
                 continue
+            if self.now() < float(rec["ended_at"]) + self.cfg.reveal_grace_s:
+                continue  # a worker step that read the period just before the switch may still claim a run
             if self.running(pid):
                 continue  # an evaluation started before the switch still uses these inputs
-            info = self.revealer(pid)
+            if self.now() < float(rec.get("reveal_retry_at") or 0):
+                continue
+            try:
+                info = self.revealer(pid)
+            except Exception as e:  # one period that cannot be revealed never blocks the later ones
+                rec.update(reveal_error=f"{type(e).__name__}: {e}"[:300], reveal_retry_at=self.now() + 3600.0)
+                self._save(sch)
+                self.alert(f"reveal of {pid} failed ({type(e).__name__}: {e}); retried hourly, the later "
+                           "periods go on", dedupe=f"reveal-{pid}")  # fmt: skip
+                continue
+            rec.pop("reveal_error", None)
             rec.update(revealed_at=self.now(), reveal=info)
             if self.publish:
                 self._save(sch)

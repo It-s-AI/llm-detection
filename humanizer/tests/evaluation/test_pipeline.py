@@ -71,6 +71,8 @@ class FakeGates:
             return GateResult("fail", level=0.0, levels={"G3": 0.0})
         if "ODD" in output:
             return GateResult("fail", level=0.5, levels={"G3": 0.5})
+        if "SLIP" in output:  # G3 minor slips (D-22)
+            return GateResult("fail", level=0.75, levels={"G3": 0.75})
         return GateResult("pass", level=1.0, levels={"G1": 1.0, "G2": 1.0, "G3": 1.0})
 
 
@@ -210,16 +212,20 @@ def test_insufficient_balance_stops_before_the_pod(tmp_path):
     assert st["stage"] == "awaiting_payment" and st["amount_due_cents"] == e.value.amount_due_cents > 0
 
 
-def test_infra_failure_releases_the_hold(tmp_path):
+def test_an_infra_failure_pauses_the_same_submission_with_its_hold_kept(tmp_path):
+    """Our failure (no pod, a lost pod) never ends a submission: the same one, the same pinned commit, is
+    run again later; the miner does not resubmit, so its first commitment stands (owner decision)."""
+    from humanizer_eval.evaluation import EvaluationPaused
+
     class Down:
         def run(self, sub, items, seed, workdir):
             return RunOutput("infra_error", {}, 120.0, "rent failed")
 
     bill = _billing(tmp_path)
-    res, store, _ = _eval(tmp_path, Down(), billing=bill)
-    assert res.status == "failed" and bill.accounts.hold("s1").status == "released"
-    assert bill.accounts.available("hk1") == 30000
-    assert "nothing was charged" in store.status("s1")["reason"]
+    with pytest.raises(EvaluationPaused, match="our side: rent failed"):
+        _eval(tmp_path, Down(), billing=bill)
+    assert bill.accounts.hold("s1").status == "open"
+    assert SubmissionStore(tmp_path / "subs", KEY).status("s1")["stage"] == "paused"
 
 
 def test_judges_down_pause_then_resume_without_a_second_run(tmp_path):
@@ -374,29 +380,59 @@ def test_lium_runner_moves_on_after_a_refused_rent(tmp_path, monkeypatch):
 class FlakyGates(FakeGates):
     """The judge fails on output ``bad`` the first ``fails`` times it is asked."""
 
-    def __init__(self, llm, bad=5, fails=1):
+    def __init__(self, llm, bad=5, fails=1, reason="judge timeout"):
         super().__init__(llm)
-        self.bad, self.left = bad, fails
+        self.bad, self.left, self.reason = bad, fails, reason
 
     def check(self, source, output, facts):
         if f"topic {self.bad}." in output and self.left > 0:
             self.left -= 1
-            return GateResult("error", reasons=["judge timeout"])
+            return GateResult("error", reasons=[self.reason])
         return super().check(source, output, facts)
 
 
 def test_a_judge_failure_is_retried_never_scored_as_level_zero(tmp_path):
     ctx = _ctx()
-    res, _, _ = _eval(tmp_path, ReplayRunner(_outputs(ctx)), gates=lambda llm: FlakyGates(llm, fails=2))
+    left = {"n": 2}  # the judge fails twice on output 5, whichever gate view asks (first pass or retries)
+
+    class Shared(FlakyGates):
+        def check(self, source, output, facts):
+            if "topic 5." in output and left["n"] > 0:
+                left["n"] -= 1
+                return GateResult("error", reasons=["judge timeout"])
+            return FakeGates.check(self, source, output, facts)
+
+    res, _, _ = _eval(tmp_path, ReplayRunner(_outputs(ctx)), gates=lambda llm: Shared(llm))
     assert res.status == "done" and res.private["levels"][5] == 1.0  # retried, judged like every other
 
 
-def test_one_output_without_a_verdict_pauses_the_whole_evaluation(tmp_path):
+def test_one_output_without_a_verdict_pauses_never_gets_a_level(tmp_path):
+    """'No answer' cannot tell a provider outage (ours) from an unusable reply: never a level 0 for it; the
+    run pauses (and is parked for the owner past the pauses)."""
     from humanizer_eval.evaluation import EvaluationPaused
 
     ctx = _ctx()
+    gates = lambda llm: FlakyGates(llm, fails=99, reason="no answer from a/judge")  # noqa: E731
     with pytest.raises(EvaluationPaused, match="1 of 40 outputs could not be judged"):
-        _eval(tmp_path, ReplayRunner(_outputs(ctx)), gates=lambda llm: FlakyGates(llm, fails=99))
+        _eval(tmp_path, ReplayRunner(_outputs(ctx)), gates=gates)
+
+
+def test_our_detector_account_errors_never_count_as_a_refused_text(tmp_path):
+    """'403 Not enough credits' (ZeroGPT on 2026-11-26) is our account, not the miner's text."""
+    from humanizer_eval.evaluation.pipeline import _refusal
+
+    assert not _refusal("parse: DetectorError: zerogpt: code=403 message='Not enough credits'")
+    assert not _refusal("gptzero HTTP 403: forbidden")
+    assert not _refusal("pangram HTTP 401: invalid key")
+    assert not _refusal("gptzero HTTP 429: too many requests")
+    assert _refusal("gptzero HTTP 400: text not supported")
+
+
+def test_judges_failing_on_many_outputs_pause_the_evaluation(tmp_path):
+    from humanizer_eval.evaluation import EvaluationPaused
+
+    with pytest.raises(EvaluationPaused, match="could not be judged"):
+        _eval(tmp_path, ReplayRunner(_outputs(_ctx())), gates=lambda llm: FakeGates(llm, broken=True))
 
 
 class FlakyDetector(FakeDetector):
@@ -474,3 +510,183 @@ def test_fingerprint_covers_code_config_and_detectors():
     assert fp != scoring_fingerprint({**cfg, "g3": {"minor_base": 4}}, dets, {"n_boot": 2000})
     assert fp != scoring_fingerprint(cfg, dets, {"n_boot": 1000})
     assert fp != scoring_fingerprint(cfg, {k: v for k, v in dets.items() if k != "zerogpt"}, {"n_boot": 2000})
+
+
+def test_canary_tolerance_absorbs_gptzeros_two_backends_only(monkeypatch):
+    from humanizer_eval.evaluation import conditions
+
+    base = {"gptzero": {"versions": [], "canary": {"texts": ["t"], "scores": [0.3892]}},
+            "zerogpt": {"versions": [], "canary": {"texts": ["t"], "scores": [0.3892]}}}  # fmt: skip
+    monkeypatch.setattr(conditions, "_score_texts", lambda det, texts: [0.3964])  # GPTZero's other value
+    problems = conditions.check(base, {"gptzero": object(), "zerogpt": object()})
+    assert problems == [p for p in problems if p.startswith("zerogpt")] and len(problems) == 1
+    monkeypatch.setattr(conditions, "_score_texts", lambda det, texts: [0.45])  # a real model change
+    assert len(conditions.check(base, {"gptzero": object()})) == 1
+
+
+def test_an_output_at_level_075_is_scored_not_a_crash(tmp_path):
+    """G3 gives 0.75 for a few minor slips: the metric must take it (it once raised and every run crashed)."""
+    ctx = _ctx()
+    outs = _outputs(ctx)
+    first = ctx.items[0]["id"]
+    outs[first] = outs[first] + " SLIP"
+    res, _, _ = _eval(tmp_path, ReplayRunner(outs))
+    assert res.status == "done"
+    assert res.public["levels"]["0.75"] == 1
+
+
+def test_work_paid_before_a_pause_is_charged_once_at_the_end(tmp_path):
+    """A pause after the judges and two detectors finished used to make all of that free: on the resume
+    it came back as cache hits (0 tokens, 0 words). The statement must equal a run that never paused."""
+
+    class CachingLLM:  # the production CachedLLM: a hit costs 0 tokens
+        def __init__(self):
+            self.seen = set()
+
+        def chat(self, model, messages, **kw):
+            key = (model, json.dumps(messages))
+            hit = key in self.seen
+            self.seen.add(key)
+            return ChatResult("{}", model, "fake", 0 if hit else 100, 0 if hit else 20, 0.0, None, json={})
+
+    class CachingDet(FakeDetector):
+        def __init__(self, name):
+            super().__init__(name, rules=[(lambda t: "human" in t, 0.05)], lo=0.9, hi=1.0)
+            self.seen, self.down = set(), False
+
+        def score(self, texts):
+            out = super().score(texts)
+            for i, t in enumerate(texts):
+                if self.down and t not in self.seen:
+                    out[i] = DetectorScore(self.name, text_hash(t), 0.0, error="code=500 try again")
+                    continue
+                out[i].cached = t in self.seen
+                self.seen.add(t)
+            return out
+
+    def run(root, pause):
+        ctx = _ctx()
+        bill = _billing(root)
+        dets = {d: CachingDet(d) for d in DETS}
+        llm = CachingLLM()
+        store = SubmissionStore(root / "subs", KEY)
+        kw = dict(runner=ReplayRunner(_outputs(ctx), pod_seconds=600), llm=llm, gate_factory=FakeGates,
+                  detectors=dets, store=store, king=None, billing=bill, king_state_path=root / "ks.json",
+                  king_run_path=root / "kr.enc", cfg=EvalConfig(workers=4, retry_wait_s=0))  # fmt: skip
+        if pause:
+            dets["zerogpt"].down = True
+            with pytest.raises(EvaluationPaused):
+                evaluate_submission(Submission("s1", "hk1"), ctx, **kw)
+            dets["zerogpt"].down = False
+        res = evaluate_submission(Submission("s1", "hk1"), ctx, **kw)
+        return {i["item"]: i["quantity"] for i in res.statement["items"]}
+
+    clean, resumed = run(tmp_path / "a", False), run(tmp_path / "b", True)
+    assert resumed == clean and any("pangram" in k for k in clean)
+
+
+def test_a_cached_unusable_judge_reply_is_asked_again_on_retry(tmp_path):
+    """A reply that parsed but was unusable was cached and returned on every retry: a permanent judge
+    error and an abandoned run (audit 3). Retries bypass the cache."""
+    from humanizer_eval.llm.cache import CachedLLM
+
+    class Flaky:
+        n = 0
+
+        def chat(self, model, messages, **kw):
+            Flaky.n += 1
+            body = {"bad": True} if Flaky.n == 1 else {"ok": True}
+            return ChatResult(json.dumps(body), model, "fake", 10, 5, 0.0, None, json=body)
+
+    class Picky(FakeGates):
+        def check(self, source, output, facts):
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(1) as ex:  # judges ask from their own threads (G1 does)
+                r = ex.submit(
+                    self.llm.chat,
+                    JUDGE,
+                    [{"role": "user", "content": output}],
+                    json_schema={"type": "object"},
+                ).result()
+            if r.json.get("bad"):
+                return GateResult("error", reasons=["unusable reply"])
+            return GateResult("pass", level=1.0, levels={"G1": 1.0, "G2": 1.0, "G3": 1.0})
+
+    llm = CachedLLM(Flaky(), tmp_path / "c.sqlite", cache_all=True)
+    ctx = _ctx()
+    from humanizer_eval.evaluation.pipeline import _gate_all
+    from humanizer_eval.llm.cache import Refresh
+
+    res = _gate_all(Picky(llm), ctx, [ctx.items[0]["text"] + " x"], EvalConfig(retry_wait_s=0),
+                    retry_gates=Picky(Refresh(llm)), final_gates=Picky(Refresh(llm, strict=True)))  # fmt: skip
+    assert res[0].status == "pass"
+
+
+def test_a_text_the_detector_refuses_is_caught_not_a_free_run(tmp_path):
+    """One output a vendor answers with HTTP 400 every time paused the whole run until it was given up
+    for free (audit 5); a refusal of that very text now counts it as caught."""
+    ctx = _ctx()
+    outs = _outputs(ctx)
+    bad = outs[ctx.items[3]["id"]]
+
+    class Refuses(FakeDetector):
+        def score(self, texts):
+            out = super().score(texts)
+            return [DetectorScore(self.name, text_hash(t), 0.0, error="gptzero HTTP 400: text not supported")
+                    if t == bad else r for t, r in zip(texts, out, strict=True)]  # fmt: skip
+
+    dets = {
+        **_detectors(),
+        "gptzero": Refuses("gptzero", rules=[(lambda t: "human" in t, 0.05)], lo=0.9, hi=1.0),
+    }
+    res, _, _ = _eval(tmp_path, ReplayRunner(outs), dets=dets)
+    v = res.private["scores"]["gptzero"][3]
+    assert res.status == "done" and (v is None or math.isinf(v))  # caught (inf is stored as None)
+
+
+def test_our_own_judge_failures_never_become_level_0(tmp_path):
+    """A rate limit or our budget cap on a few outputs is ours: the run pauses (audit 5)."""
+    from humanizer_eval.evaluation import EvaluationPaused
+
+    class Limited(FakeGates):
+        def check(self, source, output, facts):
+            if "topic 1." in output:
+                return GateResult("error", reasons=["judge error: openrouter HTTP 429 rate limit"])
+            return super().check(source, output, facts)
+
+    with pytest.raises(EvaluationPaused):
+        _eval(tmp_path, ReplayRunner(_outputs(_ctx())), gates=Limited)
+
+
+def test_rank_skips_nodes_that_refuse_a_single_gpu_rent():
+    from humanizer_eval.evaluation.runners import EVAL_MACHINE, rank_executors
+
+    base = {"machine_name": EVAL_MACHINE, "tier": "secure", "price_per_gpu": 3.5, "reliability_score": 99,
+            "available_gpu_count": 8}  # fmt: skip
+    whole = {**base, "id": "whole", "gpu_count": 8, "ncu_profiling_enabled": True}
+    minimum = {**base, "id": "min", "gpu_count": 8, "min_gpu_count_for_rental": 6}
+    single_ncu = {**base, "id": "single-ncu", "gpu_count": 1, "ncu_profiling_enabled": True}
+    shared = {
+        **base,
+        "id": "shared",
+        "gpu_count": 8,
+        "ncu_profiling_enabled": False,
+        "min_gpu_count_for_rental": 1,
+    }
+    got = [e["id"] for e in rank_executors([whole, minimum, single_ncu, shared], 4.0, exact=(EVAL_MACHINE,))]
+    assert got == ["single-ncu", "shared"]
+
+
+def test_rank_prefers_a_single_h100_hbm3_and_falls_back_to_h200():
+    from humanizer_eval.evaluation.runners import EVAL_MACHINES, rank_executors
+
+    base = {"tier": "secure", "reliability_score": 99, "available_gpu_count": 1, "gpu_count": 1}
+    h100 = {**base, "id": "h100", "machine_name": "NVIDIA H100 80GB HBM3", "price_per_gpu": 4.4}
+    h200 = {**base, "id": "h200", "machine_name": "NVIDIA H200", "price_per_gpu": 4.2}
+    pcie = {**base, "id": "pcie", "machine_name": "NVIDIA H100 PCIe", "price_per_gpu": 2.2}
+    whole = {**h100, "id": "whole", "gpu_count": 8, "ncu_profiling_enabled": True, "price_per_gpu": 3.5}
+    pricey = {**h200, "id": "pricey", "price_per_gpu": 5.2}
+    assert [e["id"] for e in rank_executors([pcie, h200, whole, h100, pricey], 4.5, exact=EVAL_MACHINES)] == [
+        "h100", "h200"]  # fmt: skip
+    assert [e["id"] for e in rank_executors([pcie, h200, whole], 4.5, exact=EVAL_MACHINES)] == ["h200"]

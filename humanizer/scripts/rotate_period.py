@@ -46,7 +46,7 @@ def main() -> int:
     ap.add_argument(
         "--hf-prefix", default="periods", help="folder in the HF repo (a rehearsal: rehearsal/periods)"
     )
-    ap.add_argument("--period-days", type=float, default=4.0)
+    ap.add_argument("--period-days", type=float, default=7.0)
     ap.add_argument("--netuid", type=int, default=32)
     ap.add_argument("--notary-wallet", default=None, help="wallet that posts the remarks (period/notary.py)")
     ap.add_argument("--notary-path", default=None, help="its wallets dir (default var/keys/wallets)")
@@ -107,8 +107,9 @@ def main() -> int:
         shutil.rmtree(tmp, ignore_errors=True)
         save_period(res, tmp, load_or_create_key(var_dir() / "keys" / "period.key"))
         sp = tmp / "secret.hex"
-        sp.write_text(secret.hex())
-        sp.chmod(0o600)
+        from humanizer_eval.period.crypto import write_private
+
+        write_private(sp, secret.hex())
         tmp.replace(periods / pid)
         return res.manifest
 
@@ -117,8 +118,9 @@ def main() -> int:
         if not q.exists():
             return 0
         with sqlite3.connect(f"file:{q}?mode=ro", uri=True) as c:
-            return int(c.execute("SELECT COUNT(*) FROM submissions WHERE state = 'running' AND period_id = ?",
-                                 (pid,)).fetchone()[0])  # fmt: skip
+            # 'paused' too: a charged run waiting for its crown is still deciding on this period's inputs
+            return int(c.execute("SELECT COUNT(*) FROM submissions WHERE state IN ('queued', 'running', 'paused') "
+                                 "AND period_id = ?", (pid,)).fetchone()[0])  # fmt: skip
 
     def revealer(pid: str) -> dict:
         from humanizer_eval.evaluation.context import load_human_scores
@@ -132,9 +134,26 @@ def main() -> int:
             raise RuntimeError(f"{pid}: no human scores saved by the server ({args.detectors_tag})")
         sdir = state / "periods" / pid
         rec = json.loads((periods / "schedule.json").read_text())["periods"].get(pid)
+        cur = human_cache_path(pdir, args.detectors_tag)  # H as scored before a rescore_period.py run
+        older = [h for f in sorted(pdir.glob(cur.name + ".stale-*")) if (h := load_human_scores(f, key))]
+        import subprocess
+
+        from humanizer_eval.pool.store import PoolStore
+
+        want = set(hs["ids"])
+        texts: dict[str, str] = {}
+        for name in dict.fromkeys([*args.pool.split(","), "pool-full-v2", "pool-full"]):  # the server's pools
+            if (var_dir() / name).exists():
+                texts.update({r["text_id"]: r["text"] for r in PoolStore.load(var_dir() / name).rows
+                              if r["text_id"] in want and r["text_id"] not in texts})  # fmt: skip
+        commit = (
+            subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+            or None
+        )
         return write_reveal(pid, period_dir=pdir, submissions_dir=sdir / "submissions",
                             king_runs=sorted(sdir.glob("king_run.*.enc")), human_scores=hs, key=key,
-                            out_dir=public / pid, schedule_record=rec)  # fmt: skip
+                            out_dir=public / pid, schedule_record=rec, older_human_scores=older,
+                            human_texts=texts, code_commit=commit)  # fmt: skip
 
     publish = None
     if args.hf_repo:

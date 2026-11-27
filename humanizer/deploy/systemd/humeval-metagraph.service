@@ -4,6 +4,7 @@ Description=SN32 metagraph and commitments snapshot for the evaluation API
 [Service]
 Type=oneshot
 User=humeval
+UMask=0077
 EnvironmentFile=/etc/humeval/humeval.env
 WorkingDirectory=/srv/humeval/humanizer_eval
 # bittensor lives in its own venv (heavy); the snapshot holds public chain data only

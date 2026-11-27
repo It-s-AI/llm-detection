@@ -250,8 +250,24 @@ def test_run_ons_are_minor_broken_sentences_severe():
 
 def test_unchanged_output_needs_no_judge():
     llm = FakeLLM()
-    r = runner(llm).check(SOURCE, "  " + SOURCE.upper() + "\n", FACTS)
+    r = runner(llm).check(SOURCE, "  " + SOURCE.replace(" ", "  ") + "\n", FACTS)
     assert r.status == "pass" and r.level == 1.0 and llm.calls == [] and r.detail == {"unchanged": True}
+
+
+def test_a_case_only_rewrite_is_judged_not_passed_as_unchanged():
+    """Random or all-caps letter case changes what a detector sees: such an output is judged (audit #4)."""
+    llm = FakeLLM()
+    r = runner(llm).check(SOURCE, SOURCE.upper(), FACTS)
+    assert llm.calls and r.detail != {"unchanged": True}
+
+
+def test_an_output_split_into_many_sentences_is_level_0_without_a_judge():
+    """'Word. Word. Word.' made hundreds of sentences, more than a judge reply holds: the judge failure
+    counted as our outage (8 pauses, then nothing charged). Now level 0 at once (audit #6)."""
+    llm = FakeLLM()
+    out = " ".join(w.capitalize() + "." for w in SOURCE.split())
+    r = runner(llm).check(SOURCE, out, FACTS)
+    assert r.level == 0.0 and llm.calls == [] and "sentences" in r.reasons[0]
 
 
 def test_register_and_format_changes_are_not_flags():

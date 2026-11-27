@@ -55,6 +55,11 @@ class MetagraphSnapshot:
             return None
         return hks[hotkey] if hks[hotkey] is not None else 0
 
+    def uid(self, hotkey: str) -> int | None:
+        """The hotkey's UID (its index in the snapshot's metagraph order); None if not registered."""
+        hks = self._load()
+        return list(hks).index(hotkey) if hotkey in hks else None
+
     def commitment(self, hotkey: str) -> tuple[str, int] | None:
         """The hotkey's current on-chain commitment ``(data, block)`` (registered hotkeys only)."""
         self._load()

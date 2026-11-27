@@ -64,6 +64,10 @@ class HFBundle:
     gated: bool = False  # downloads need the owner's approval (or "auto" acceptance of terms)
 
 
+class HubNotReadable(HubError):
+    """The repo or commit cannot be read without a token: private (or not there)."""
+
+
 class HubClient:
     """The few Hub API calls we need, over plain HTTPS (no huggingface_hub dependency)."""
 
@@ -76,9 +80,7 @@ class HubClient:
         h = {"Authorization": f"Bearer {token}"} if token else {}
         r = self.http.get(self.endpoint + path, headers=h)
         if r.status_code in (401, 403, 404):
-            raise HubError(
-                f"repo or commit not found, or the repo is private (give hf_token) ({r.status_code})"
-            )
+            raise HubNotReadable(f"repo or commit not found, or the repo is private ({r.status_code})")
         r.raise_for_status()
         return r.json()
 

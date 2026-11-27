@@ -31,10 +31,10 @@ One server: the API for miners, the queue and the worker (`scripts/intake_server
 6. **systemd.** Copy `deploy/systemd/*` to `/etc/systemd/system/` (network, subnet and mode come from the env file), then:
    ```
    systemctl daemon-reload
-   systemctl enable --now humeval-metagraph.timer humeval-backup.timer humeval-intake.service
+   systemctl enable --now humeval-metagraph.timer humeval-backup.timer humeval-watchdog.timer humeval-intake.service
    ```
 7. **Caddy.** Install Caddy, put `deploy/Caddyfile` with your domain into `/etc/caddy/Caddyfile` and restart it: `systemctl reload caddy`. Caddy obtains the Let's Encrypt certificate by itself.
-8. **Payments.** On first start the server creates the payment keys; put ~0.02 ETH on the treasury on Base (see "Payments in TAO" below).
+8. **Payments.** On first start the server creates the payment keys; put ~0.02 ETH on the treasury on Base and ~0.01 TAO on its Bittensor EVM account (see "Payments in TAO" below).
 9. **Check.**
    - `curl https://<domain>/v1/info` shows the period and the queue.
    - `curl https://<domain>/v1/leaderboard` returns signed weights.
@@ -97,6 +97,7 @@ Miners pay only in TAO; balances, holds and charges are USDC. Each hotkey has it
 - **Install:** the extra `tao` (`pip install -e '.[api,pool,tao]'`). Payments are always on; there is no flag.
 - **Keys:** on first start the server creates `var/keys/tao_treasury.key` (the treasury: one EVM account, the same address on Bittensor EVM and Base) and `var/keys/tao_deposits.key` (the master secret every deposit address derives from). Both are money: back them up with `var/keys/`. Losing the deposit key strands TAO sent to the deposit addresses; losing the treasury key loses its USDC.
 - **ETH on Base:** the treasury pays each refund's bridge fee in ETH (~0.0023 ETH; the miner is charged it in USDC) and the Base gas. Keep ~0.02 ETH on it on Base. The server prints the treasury address on start.
+- **TAO on Bittensor EVM:** if the bridge cannot make a refund's liquid exit on Finney, it books the TAO for the treasury, which claims it and sends it on to the miner's address (stages `claimable` → `claiming` → `claimed` → `forwarding` → `delivered`); that gas (~0.0015 TAO, charged to the miner in USDC) is paid from the treasury's own account on Bittensor EVM. Keep ~0.01–0.02 TAO there: send it to the treasury's ss58 mirror (`tao_treasury.py` shows it as `bittensor_tao`). Without it such a refund waits and raises one alert.
 - **Status:** `python scripts/tao_treasury.py` (read-only) shows the treasury's balances (Base ETH, USDC and TAO), the rates, whether the bridge is ready, what miners are owed, the free USDC, and the deposits and refunds under way or stuck. A stuck CCIP message also raises a Telegram alert.
 - **Cashing out:** `python scripts/tao_treasury.py --withdraw-usdc <amount> --to 0x<Base address>` sends free USDC (above what miners are owed) on Base, e.g. straight to Coinbase (native Circle USDC).
 - **Options:** `--tao-buffer` (default 0.05: extra TAO asked over what is missing; the rest stays on the balance), `--tao-max-slippage` (0.02: a worse swap waits; alerts go to Telegram).

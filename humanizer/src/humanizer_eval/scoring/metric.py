@@ -9,7 +9,7 @@ Conventions
   inside each stratum (genre x length bin) and averaged with weights proportional to the number of
   submission outputs in the stratum. Strata that have outputs but no human texts are excluded and
   reported. An AUROC of 0.5 means the detector cannot tell the outputs from human text.
-* Every output has a quality level ``q`` in {1, 0.5, 0} from the gates (D-22): 1 passed, 0.5 minor
+* Every output has a quality level ``q`` in {1, 0.75, 0.5, 0} from the gates (D-22): 1 passed, 0.75/0.5 minor
   violation, 0 severe. Its contribution to both terms below is multiplied by ``q``: a severe failure
   counts as caught by every detector (as if its score were ``+inf``), a minor one earns half.
   Booleans are accepted (True = 1, False = 0).
@@ -51,7 +51,8 @@ DEFAULT_PROB_WEIGHT = 0.5
 #: (like an unchanged one) but costs nothing extra (owner decision 2026-11-09).
 DEFAULT_SEVERE_PENALTY = 0.0
 
-QUALITY_LEVELS = (0.0, 0.5, 1.0)
+#: D-22; 0.75 = G3 minor slips (owner decision 2026-11-20). Everything below is linear in q.
+QUALITY_LEVELS = (0.0, 0.5, 0.75, 1.0)
 
 
 # --- input validation -------------------------------------------------------------------------
@@ -98,7 +99,7 @@ def _as_quality(x: ArrayLike, name: str, n: int) -> np.ndarray:
         raise ValueError(f"{name} must be one-dimensional with {n} entries, got shape {a.shape}")
     a = a.astype(np.float64)
     if not np.isin(a, QUALITY_LEVELS).all():
-        raise ValueError(f"{name} must hold quality levels 0, 0.5, 1 (or booleans)")
+        raise ValueError(f"{name} must hold quality levels {QUALITY_LEVELS} (or booleans)")
     return a
 
 
@@ -281,7 +282,7 @@ class SubmissionRun:
     """One submission's raw detector scores on the period inputs (index-aligned across detectors).
 
     ``scores[d][i]`` is detector ``d``'s AI probability for the output on input ``i`` *before* gating;
-    ``gate_pass[i]`` is that output's quality level (1, 0.5, 0; booleans allowed); ``strata[i]`` is the
+    ``gate_pass[i]`` is that output's quality level (1, 0.75, 0.5, 0; booleans allowed); ``strata[i]`` is the
     stratum of input ``i``. ``input_ids`` (optional) lets the paired test verify that king and
     challenger arrays are aligned on the same inputs. Arrays are copied and validated once.
     """

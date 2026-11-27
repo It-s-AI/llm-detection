@@ -97,3 +97,11 @@ def test_deregistered_kings_drop_out_of_the_signed_weights():
     p = verify(sign(build_payload(st, now=T0, is_registered=reg), KEY), PUB, netuid=32, now=T0)
     assert p["kings"] == ["5Fa"] and p["king"]["submission_id"] == "s1"
     assert [h["submission_id"] for h in p["history"]] == ["s1", "baseline"]
+
+
+def test_each_king_is_signed_with_the_registration_he_was_crowned_under():
+    st = _state()
+    p = verify(sign(build_payload(st, now=T0), KEY), PUB, netuid=32, now=T0)
+    assert len(p["king_registered_at"]) == len(p["kings"])
+    by_hk = {e.hotkey: e.registered_at for e in st.history}
+    assert p["king_registered_at"] == [by_hk[h] for h in p["kings"]]

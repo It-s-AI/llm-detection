@@ -66,6 +66,15 @@ class PriceCard:
         return (tokens_in * j["in_per_mtok"] + tokens_out * j["out_per_mtok"]) / 1e6
 
 
+def card_archive(root: str | Path = "configs/price_cards") -> dict[str, PriceCard]:
+    """Every price card ever published, by sha256 (a run is settled with the card of its quote)."""
+    out: dict[str, PriceCard] = {}
+    for p in sorted(Path(root).glob("*.json")):
+        c = PriceCard.load(p)
+        out[c.sha256] = c
+    return out
+
+
 @dataclass
 class LineItem:
     item: str

@@ -118,6 +118,15 @@ def create_app(
         r.headers.update({**PUBLIC, "Cache-Control": "public, max-age=30"})
         return r
 
+    @app.get("/v1/queue")
+    async def public_queue(request: Request):
+        async def f(_):
+            return await call(svc.public_queue)
+
+        r = await guarded(f, request)
+        r.headers.update({**PUBLIC, "Cache-Control": "public, max-age=15"})
+        return r
+
     @app.get("/v1/leaderboard")
     async def board():
         """Signed payout weights for validators (publish/leaderboard.py); public."""
@@ -136,6 +145,23 @@ def create_app(
     async def period_list():
         """Commitments, seed blocks, Merkle roots and reveal state of every period (D-57); public."""
         p = periods_dir / "schedule.json" if periods_dir else None
+        if p is not None and not p.exists() and (periods_dir / "CURRENT").exists():
+            # no rotation schedule (a period set up by hand): the current period's public commitments
+            cur = (periods_dir / "CURRENT").read_text().strip()
+            m = periods_dir / cur / "manifest.json"
+            if _PID.fullmatch(cur) and m.exists():
+                man = json.loads(m.read_text())
+                keep = (
+                    "commitment",
+                    "block",
+                    "block_hash",
+                    "merkle_root",
+                    "n_items",
+                    "n_human_ref",
+                    "created_at",
+                )
+                return JSONResponse({"current": cur, "periods": {cur: {k: man.get(k) for k in keep}}},
+                                    headers={"Cache-Control": "public, max-age=30", **PUBLIC})  # fmt: skip
         if p is None or not p.exists():
             return err(404, "no period schedule here")
         return JSONResponse(

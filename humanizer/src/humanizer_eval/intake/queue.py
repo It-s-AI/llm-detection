@@ -13,6 +13,7 @@ The queue holds what the miner asked for and where it is; scores and records liv
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import threading
@@ -130,7 +131,12 @@ class SubmissionQueue:
         class _Tx:
             def __enter__(self_inner):
                 lock.acquire()
-                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    conn.execute("BEGIN IMMEDIATE")
+                except BaseException:  # never leave the lock held: every later write would hang
+                    conn.close()
+                    lock.release()
+                    raise
                 return conn
 
             def __exit__(self_inner, et, ev, tb):
@@ -218,13 +224,21 @@ class SubmissionQueue:
                         "register a new hotkey to submit again"
                     )
             if not owner_job:
-                dup = c.execute(
-                    "SELECT id FROM submissions WHERE bundle_sha256 = ? AND hotkey != ? AND owner_job = 0 "
-                    "AND state NOT IN ('cancelled', 'expired', 'failed')",
-                    (bundle_sha256, hotkey),
-                ).fetchone()
-                if dup:
-                    raise QueueError(f"this exact bundle was already submitted ({dup[0]}); it counts once")
+                # an identical bundle counts once, for the hotkey that committed it on chain FIRST (not the
+                # first API call: anyone can copy a public commitment string and race the author); its sha256
+                # is unknown ("") while the repo is private: then it is checked when the row is claimed
+                # the same pinned source (repo@commit) is the same bundle even before its sha is known
+                for dup_id, dup_block in c.execute(
+                    "SELECT id, commit_block FROM submissions WHERE hotkey != ? AND owner_job = 0 "
+                    # an unpaid quote never blocks: a front-runner copying a public commitment string and
+                    # never paying must not lock the author out
+                    "AND state NOT IN ('cancelled', 'expired', 'failed', 'awaiting_payment') "
+                    "AND ((? != '' AND bundle_sha256 = ?) "
+                    "OR (? IS NOT NULL AND hf_repo = ? AND hf_revision = ?))",
+                    (hotkey, bundle_sha256, bundle_sha256, hf_repo, hf_repo, hf_revision),
+                ).fetchall():
+                    if commit_block is None or dup_block is None or dup_block <= commit_block:
+                        raise QueueError(f"this exact bundle was already submitted ({dup_id}); counts once")
                 busy = c.execute(
                     f"SELECT id FROM submissions WHERE hotkey = ? AND owner_job = 0 AND state IN "  # noqa: S608
                     f"({','.join('?' * len(ACTIVE))})",
@@ -301,7 +315,10 @@ class SubmissionQueue:
             r = c.execute(
                 f"SELECT {_COLS} FROM submissions WHERE state = 'queued' "  # noqa: S608
                 "OR (state = 'paused' AND (retry_at IS NULL OR retry_at <= ?)) "
-                "ORDER BY owner_job DESC, enqueued_ts LIMIT 1",
+                # a winner waiting for an earlier decided crown goes after every other due row (or it would
+                # be claimed before the one it waits for, every time)
+                "ORDER BY owner_job DESC, (COALESCE(note, '') LIKE '%earlier decided crown%'), enqueued_ts "
+                "LIMIT 1",
                 (now,),
             ).fetchone()
             if r is None:
@@ -313,6 +330,73 @@ class SubmissionQueue:
             )
         return self.get(r[0])
 
+    def precheck(self, hotkey: str, reg_block: int | None, max_waiting: int | None = None) -> None:
+        """The cheap refusals of ``create``, before the caller does expensive work (Hugging Face calls, a
+        quote): a used registration, an active submission of the hotkey, a full queue."""
+        with self._tx() as c:
+            if (
+                reg_block is not None
+                and c.execute(
+                    f"SELECT 1 FROM submissions WHERE hotkey = ? AND reg_block = ? AND owner_job = 0 "  # noqa: S608
+                    f"AND state IN ({','.join('?' * len(CONSUMED))})",
+                    (hotkey, reg_block, *CONSUMED),
+                ).fetchone()
+            ):
+                raise QueueError("this hotkey registration already made its submission; register a new one")
+            busy = c.execute(
+                f"SELECT id FROM submissions WHERE hotkey = ? AND owner_job = 0 AND state IN "  # noqa: S608
+                f"({','.join('?' * len(ACTIVE))})",
+                (hotkey, *ACTIVE),
+            ).fetchone()
+            if busy:
+                raise QueueError(f"hotkey already has an active submission {busy[0]}")
+            if max_waiting is not None and (
+                c.execute("SELECT COUNT(*) FROM submissions WHERE state IN ('queued','paused')").fetchone()[0]
+                >= max_waiting
+            ):
+                raise QueueError("the queue is full; try again later")
+
+    def unknown_earlier(self, row: Row) -> list[Row]:
+        """Other hotkeys' live or finished rows committed before this one whose bundle sha is still unknown
+        (their repo was private at submission): read them before deciding this row is not a copy."""
+        if row.owner_job or row.commit_block is None:
+            return []
+        with self._tx() as c:
+            q = (
+                "SELECT id FROM submissions WHERE hotkey != ? AND owner_job = 0 AND bundle_sha256 = '' "
+                "AND hf_repo IS NOT NULL AND commit_block IS NOT NULL AND commit_block < ? "
+                "AND state NOT IN ('cancelled', 'expired', 'failed')"
+            )
+            ids = [r[0] for r in c.execute(q, (row.hotkey, row.commit_block))]
+        return [r for r in (self.get(i) for i in ids) if r is not None]
+
+    def committed_earlier(self, row: Row, unpaid: bool = True) -> str | None:
+        """Another hotkey's submission of the same bundle committed on chain before this row's commitment
+        (the author; this row is the copy): its id, else None. A 'failed' author row counts too (its
+        evaluation may have failed on our side). An unpaid author counts while its quote is alive
+        (``unpaid``): the caller waits for it a bounded time (AUTHOR_WAIT_S), then asks with unpaid=False,
+        so a front-runner who never pays cannot hold the author's run for long."""
+        if row.owner_job or row.commit_block is None:
+            return None
+        same = (
+            "((? != '' AND s.bundle_sha256 = ?) OR (? IS NOT NULL AND s.hf_repo = ? AND s.hf_revision = ?))"
+        )
+        args = (row.bundle_sha256, row.bundle_sha256, row.hf_repo, row.hf_repo, row.hf_revision)
+        with self._tx() as c:
+            r = c.execute(
+                "SELECT s.id FROM submissions s WHERE s.hotkey != ? AND s.owner_job = 0 "  # noqa: S608
+                "AND s.commit_block IS NOT NULL AND s.commit_block < ? AND " + same + " AND ("
+                "s.state NOT IN ('cancelled', 'expired', 'awaiting_payment') "
+                "OR (? AND s.state = 'awaiting_payment' AND COALESCE(s.expires_ts, 0) > ?)) "
+                "ORDER BY s.commit_block LIMIT 1",
+                (row.hotkey, row.commit_block, *args, int(unpaid), self._now()),
+            ).fetchone()
+        return r[0] if r else None
+
+    def author_unpaid(self, sid: str) -> bool:
+        r = self.get(sid)
+        return r is not None and r.state == "awaiting_payment"
+
     def recover(self) -> list[str]:
         """After a restart: a row left 'running' goes back to the queue (its saved outputs, if any, are
         reused; the run itself is not repeated when they exist)."""
@@ -321,5 +405,12 @@ class SubmissionQueue:
             c.execute("UPDATE submissions SET state = 'queued' WHERE state = 'running'")
         return ids
 
+    #: note keys that outlive a later note (a pause rewrites the note; the bounded author wait must not reset)
+    STICKY_NOTE = ("author_wait_since", "crown_waits")
+
     def note(self, sid: str, **info: Any) -> None:
+        cur = self.get(sid)
+        with contextlib.suppress(Exception):
+            old = json.loads(cur.note or "{}") if cur is not None else {}
+            info = {**{k: old[k] for k in self.STICKY_NOTE if k in old and k not in info}, **info}
         self.update(sid, note=json.dumps(info, default=str)[:2000])

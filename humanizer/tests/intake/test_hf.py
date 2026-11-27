@@ -1,5 +1,4 @@
 import hashlib
-import json
 
 import httpx
 import pytest
@@ -58,6 +57,8 @@ class FakeHub:
             names = [{"name": "main"}] + ([{"name": COMMIT}] if self.ambiguous else [])
             return httpx.Response(200, json={"branches": names, "tags": [], "converts": []})
         if p == f"/{REPO}/resolve/{COMMIT}/bundle.tar":
+            if req.method == "HEAD" and getattr(self, "head_down", False):
+                return httpx.Response(503)
             if req.method == "HEAD" or not self.lfs:
                 if not self.lfs and req.method == "GET":
                     return httpx.Response(200, content=self.served)
@@ -208,22 +209,108 @@ def test_crown_not_awarded_when_the_bundle_is_gone(tmp_path):
     assert st is None or st.current.is_baseline
 
 
-def test_private_repo_token_is_encrypted_and_dropped_after_the_run(tmp_path):
+def test_an_identical_bundle_belongs_to_the_earliest_commitment_not_the_first_api_call(tmp_path):
+    """A copier commits the author's public 'repo@sha' and calls the API first. It must neither block the
+    author (even unpaid) nor be evaluated in the author's place."""
+    from humanizer_eval.intake.client import SeedSigner
+
+    hub = FakeHub()
+    author = SeedSigner(b"\x05" * 32).ss58_address
+    thief = SeedSigner(b"\x06" * 32).ss58_address
+    w = _world(tmp_path, hub, {author: (f"{REPO}@{COMMIT}", 50), thief: (f"{REPO}@{COMMIT}", 60)})
+    t_sid = w.svc.submit_hf(thief)["submission_id"]  # first at the API, committed later
+    a_sid = w.svc.submit_hf(author)["submission_id"]  # not refused as a duplicate
+    for hk in (thief, author):
+        w.pay(hk)
+    w.converge()
+    outs = [w.worker.run_once() for _ in range(3)]
+    states = {o["submission_id"]: o["state"] for o in outs if o}
+    assert states[t_sid] == "failed" and states[a_sid] == "done"
+    assert w.billing.accounts.hold(t_sid).status == "released"  # the copy pays nothing
+    # and a later copier is refused at once
+    late = SeedSigner(b"\x07" * 32).ss58_address
+    w.svc.commitment = lambda hk: {late: (f"{REPO}@{COMMIT}", 70)}.get(hk)
+    with pytest.raises(Exception, match="counts once"):
+        w.svc.submit_hf(late)
+
+
+def test_a_hotkey_with_an_active_submission_is_refused_before_any_hugging_face_call(tmp_path):
+    import sqlite3
+
+    from humanizer_eval.intake.client import SeedSigner
+
+    def quotes():
+        with sqlite3.connect(tmp_path / "b.sqlite") as c:
+            return c.execute("SELECT COUNT(*) FROM quotes").fetchone()[0]
+
+    hub = FakeHub()
+    m = SeedSigner(b"\x05" * 32).ss58_address
+    w = _world(tmp_path, hub, {m: (f"{REPO}@{COMMIT}", 50)})
+    w.svc.submit_hf(m)
+    n_calls, n_quotes = len(hub.calls), quotes()
+    for _ in range(5):
+        with pytest.raises(Exception, match="active submission"):
+            w.svc.submit_hf(m)
+    assert len(hub.calls) == n_calls and quotes() == n_quotes
+
+
+def test_a_private_repo_may_be_paid_but_must_be_public_when_the_evaluation_starts(tmp_path):
+    """Owner decision 2026-11-26: no check at submission (the miner can keep the repo private while paying,
+    a few minutes); when the evaluation starts it must be public, else refused at once (nothing charged,
+    the registration used). Tokens are never taken."""
     from humanizer_eval.intake.client import SeedSigner
 
     hub = FakeHub(private=True)
     m = SeedSigner(b"\x05" * 32).ss58_address
     w = _world(tmp_path, hub, {m: (f"{REPO}@{COMMIT}", 50)})
+    with pytest.raises(ValueError, match="no tokens"):
+        w.svc.submit_hf(m, hf_token="hf_" + "a" * 30)
+    sid = w.svc.submit_hf(m)["submission_id"]  # accepted while private
     w.pay(m)
-    with pytest.raises(ValueError, match="private"):
-        w.svc.submit_hf(m)  # public metadata unreadable without the token
-    sid = w.svc.submit_hf(m, hf_token=hub.token)["submission_id"]
-    raw = (tmp_path / "q.sqlite").read_bytes()
-    assert hub.token.encode() not in raw and w.queue.get(sid).secret
-    w.worker.run_once()
-    assert w.queue.get(sid).secret is None
-    # the pod got the signed CDN link, never the token
-    assert any(
-        c == ("HEAD", f"/{REPO}/resolve/{COMMIT}/bundle.tar", f"Bearer {hub.token}") for c in hub.calls
-    )
-    assert json.dumps(w.svc.status(m, sid)).find(hub.token) == -1
+    w.converge()
+    assert w.worker.run_once()["state"] == "paused"  # just paid: it waits for the miner to open it
+    w.t[0] += 16 * 60  # past the 15 min grace, still private: refused, no retry
+    assert w.worker.run_once()["state"] == "failed"
+    assert w.billing.accounts.hold(sid).status == "released" and w.queue.get(sid).state == "done"
+    with pytest.raises(Exception, match="already made its submission"):
+        w.svc.submit_hf(m)
+
+
+def test_a_repo_made_public_after_paying_is_evaluated(tmp_path):
+    from humanizer_eval.intake.client import SeedSigner
+
+    hub = FakeHub(private=True)
+    m = SeedSigner(b"\x05" * 32).ss58_address
+    w = _world(tmp_path, hub, {m: (f"{REPO}@{COMMIT}", 50)})
+    sid = w.svc.submit_hf(m)["submission_id"]
+    assert w.queue.get(sid).bundle_sha256 == ""
+    w.pay(m)
+    w.converge()
+    hub.private = False  # the miner opens the repo
+    assert w.worker.run_once()["state"] == "done" and w.queue.get(sid).bundle_sha256 == SHA
+
+
+def test_a_copier_of_a_private_commitment_is_dropped_even_before_the_sha_is_known(tmp_path):
+    """The author keeps the repo private while paying (sha unknown); a copier commits the same repo@commit
+    later and is claimed first. It must not be evaluated with the author's bundle (audit 2, A2)."""
+    from humanizer_eval.intake.client import SeedSigner
+
+    hub = FakeHub(private=True)
+    author = SeedSigner(b"\x05" * 32).ss58_address
+    thief = SeedSigner(b"\x06" * 32).ss58_address
+    w = _world(tmp_path, hub, {author: (f"{REPO}@{COMMIT}", 50), thief: (f"{REPO}@{COMMIT}", 60)})
+    t_sid = w.svc.submit_hf(thief)["submission_id"]  # the copier reaches the API first (sha unknown)
+    a_sid = w.svc.submit_hf(author)["submission_id"]  # the author, committed earlier: not refused
+    w.pay(thief)
+    w.converge()
+    hub.private = False
+    out = w.worker.run_once()  # the author has not paid yet: the copy waits (nothing run, nothing charged)
+    assert out["submission_id"] == t_sid and out["state"] == "paused"
+    assert w.queue.get(a_sid).state == "awaiting_payment" and w.billing.accounts.hold(t_sid).status == "open"
+    w.pay(author)  # the author pays: the copy is dropped, its hold given back
+    w.converge()
+    w.t[0] += 3600
+    for _ in range(3):
+        w.worker.run_once()
+    assert w.queue.get(t_sid).state == "failed"
+    assert w.billing.accounts.hold(t_sid).status == "released"

@@ -94,7 +94,8 @@ class EvmClient:
         for attempt in range(4):
             r = self.http.post(self.rpc_url, json={"jsonrpc": "2.0", "id": self._id, "method": method,
                                                    "params": list(params)})  # fmt: skip
-            if r.status_code == 429 and attempt < 3:
+            # publicnode answers a burst with 403, others with 429; a resent transaction is "already known"
+            if r.status_code in (403, 429, 502, 503, 504) and attempt < 3:
                 time.sleep(2.0 * (attempt + 1))
                 continue
             r.raise_for_status()
@@ -185,11 +186,24 @@ class RouteConfig:
     fm_vault: str = "0x11837459896D96F821a8D88eC93a3C8D152033D4"
     fm_base_selector: int = 15971525489660198786
     fm_spoke_gateway: str = "0x1da2415229b614C787e145D1D7346eb496319C52"  # Base
-    base_offramp: str = "0xf09AFe78d3c7d359b334d7cB88995751F7eC5E13"  # CCIP deliveries to Base
-    bittensor_offramp: str = "0x51a6150400ed9F0Ae240F5D1b15E3b45Fc4339C7"  # CCIP deliveries to Bittensor
+    # CCIP deliveries: the destination's router names the OffRamps it trusts for a source chain (they
+    # change with CCIP upgrades, several at once: a delivery is accepted from any of them)
+    base_router: str = "0x881e3A65B4d4a04dD529061dd0071cf975F58bCD"
+    bittensor_router: str = "0xD941FbEcd2b971D0f54b4C34286c95Fab52B60b8"
+    bittensor_selector: int = 2135107236357186872  # Bittensor EVM as a CCIP source
+    # Base's spoke delivers to the V5 hub on Bittensor EVM (its hub pointer is immutable). When the hub
+    # cannot make the liquid exit on Finney it books the TAO for the exit's EVM fallback (the treasury),
+    # which claims it and sends it on to the ss58 address with the balance-transfer precompile.
+    fm_hub: str = "0xcd0C6d98D0A126B1c113d15b4c28F38321437787"
+    balance_transfer: str = "0x0000000000000000000000000000000000000800"  # transfer(bytes32 pubkey)
+    finney_claim_gas: int = 350_000  # claimLiquid, measured 230k
+    finney_transfer_gas: int = 100_000
     bridge_out_gas: int = 700_000  # Talisman measured 615k
     bridge_in_dest_gas: int = 3_500_000  # the liquid exit on Finney (unstake), as the SDK sends
     ccip_fee_buffer: float = 0.02  # on top of the quote; the contracts refund what is not used
+    # the liquid exit on Finney pays whole RAO, a few thousand wei under the amount: a minimum of exactly the
+    # amount fails it with Slippage() and the hub books the TAO for the fallback instead (mainnet 2026-11-25)
+    exit_tolerance: float = 0.005
     # Base: tokens and Uniswap V3
     wtao: str = "0xf3081494B87e8D5fb7960f066E931D1D0e6E3d67"  # TAO bridged by ForeverMoney, 18 decimals
     weth: str = "0x4200000000000000000000000000000000000006"
@@ -207,6 +221,10 @@ _EXEC_STATE = (
     topic("ExecutionStateChanged(uint64,uint64,bytes32,uint8,bytes)"),  # data: state
 )
 CCIP_SUCCESS, CCIP_FAILURE = 2, 3
+#: the delivery is searched from this many blocks before we first saw the bridge call mined (it can be
+#: seen late: a busy pass, a restart): ~1.5 h on Base, ~10 h on Bittensor; the search runs in 10k windows
+DELIVERY_LOOKBACK_BLOCKS = 3000
+_DELIVERED_LIQUID = topic("DeliveredLiquid(address,bytes32,uint256)")  # the hub's exit on Finney worked
 _TO_FINNEY = "(address,uint256,(bytes32,address,bool,uint256),uint256)"
 _TO_FINNEY_TYPES = ["address", "uint256", "(bytes32,address,bool,uint256)", "uint256"]
 
@@ -273,34 +291,115 @@ class ForeverMoneyBaseRoute:
         return {
             "ok": ok(r) and mid is not None,
             "message_id": mid,
-            "from_block": self.base.block_number() - 50,
+            "from_block": self.base.block_number() - DELIVERY_LOOKBACK_BLOCKS,
         }
 
     # --- CCIP delivery ---------------------------------------------------------------------------------
-    @staticmethod
-    def _delivery(client: EvmClient, offramp: str, message_id: str, from_block: int) -> bool | None:
-        """The CCIP execution state of ``message_id`` on the destination (scanned in windows: public
-        endpoints cap the block range of eth_getLogs)."""
+    def _execution(self, client: EvmClient, router: str, source: int, message_id: str,
+                   from_block: int) -> dict[str, Any] | None:  # fmt: skip
+        """The terminal ExecutionStateChanged of ``message_id`` on the destination ("state" added),
+        emitted by one of the OffRamps the destination's router names for ``source`` (scanned in windows:
+        public endpoints cap the block range of eth_getLogs and want the addresses)."""
+        ramps = self._offramps(client, router, source)
         head, step = client.block_number(), 10_000
+        src = "0x" + format(source, "064x")
         for start in range(max(0, from_block), head + 1, step):
-            q = {"address": offramp, "topics": [list(_EXEC_STATE), None, None, message_id],
+            q = {"address": ramps, "topics": [list(_EXEC_STATE), src, None, message_id],
                  "fromBlock": hex(start), "toBlock": hex(min(start + step - 1, head))}  # fmt: skip
             for lg in client.rpc("eth_getLogs", q):
+                if lg["address"].lower() not in ramps:
+                    continue
                 state = word(lg["data"], 1 if lg["topics"][0] == _EXEC_STATE[0] else 0)
                 if state in (CCIP_SUCCESS, CCIP_FAILURE):
-                    return state == CCIP_SUCCESS
+                    return {**lg, "state": state}
         return None
+
+    def _delivery(self, client: EvmClient, router: str, source: int, message_id: str,
+                  from_block: int) -> bool | None:  # fmt: skip
+        lg = self._execution(client, router, source, message_id, from_block)
+        return None if lg is None else lg["state"] == CCIP_SUCCESS
+
+    @staticmethod
+    def _offramps(client: EvmClient, router: str, source: int) -> list[str]:
+        """The router's OffRamps for deliveries from ``source`` (Router.getOffRamps, read each time: CCIP
+        upgrades add new ones and keep the old ones for messages in flight)."""
+        from eth_abi import decode
+
+        out = client.call(router, calldata("getOffRamps()", [], []))
+        pairs = decode(["(uint64,address)[]"], bytes.fromhex(out.removeprefix("0x")))[0]
+        ramps = sorted({ramp.lower() for sel, ramp in pairs if sel == source})
+        if not ramps:
+            raise ChainError(f"router {router} has no OffRamp for source {source}")
+        return ramps
 
     def arrived_on_base(self, message_id: str, from_block: int) -> bool | None:
         """True delivered, False failed (a manual retry on the CCIP explorer), None not yet."""
-        return self._delivery(self.base, self.cfg.base_offramp, message_id, from_block)
+        c = self.cfg
+        return self._delivery(self.base, c.base_router, c.bittensor_selector, message_id, from_block)
 
-    def delivered_on_finney(self, message_id: str, from_block: int) -> bool | None:
-        """Only a status for the miner (the money left with the bridge call): None if it cannot be seen."""
+    def finney_outcome(self, message_id: str, from_block: int) -> str | None:
+        """A refund's CCIP message on Bittensor: None not seen yet, "failed" (CCIP gave up), "liquid" (the
+        hub made the exit: the TAO is on the ss58 address), "claimable" (the hub booked it for the
+        treasury to claim)."""
+        c = self.cfg
         try:
-            return self._delivery(self.bt_logs, self.cfg.bittensor_offramp, message_id, from_block)
+            lg = self._execution(self.bt_logs, c.bittensor_router, c.fm_base_selector, message_id, from_block)
+            if lg is None:
+                return None
+            if lg["state"] != CCIP_SUCCESS:
+                return "failed"
+            r = self.bt.receipt(lg["transactionHash"])
         except ChainError:
             return None
+        if r is None:
+            return None
+        # one execution can carry several messages: ours are the logs after the previous execution event
+        logs = sorted(r.get("logs") or [], key=lambda x: int(x["logIndex"], 16))
+        mine: list[str] = []
+        for x in logs:
+            t0 = (x.get("topics") or [None])[0]
+            if int(x["logIndex"], 16) == int(lg["logIndex"], 16):
+                break
+            mine = [] if t0 in _EXEC_STATE else [*mine, t0]
+        return "liquid" if _DELIVERED_LIQUID in mine else "claimable"
+
+    # --- Bittensor EVM: the treasury claims a booked exit and sends the TAO on -------------------------
+    def claimable_tao(self) -> int:
+        c = self.cfg
+        data = calldata(
+            "claimableToken(address,address)", ["address", "address"], [c.fm_alpha_token, self.treasury]
+        )
+        return int(self.bt.call(c.fm_hub, data), 16)
+
+    def claim_tx(self, amount_wei: int) -> SignedTx:
+        """claimLiquid: the hub unwraps the booked ``amount_wei`` to the treasury's account."""
+        c = self.cfg
+        data = calldata("claimLiquid(address,uint256,address)", ["address", "uint256", "address"],
+                        [c.fm_alpha_token, self._min_out(amount_wei), self.treasury])  # fmt: skip
+        return self.bt.sign(self._key, c.fm_hub, data, gas=c.finney_claim_gas)
+
+    def forward_tx(self, tao_wei: int, pubkey: bytes) -> SignedTx:
+        """TAO from the treasury's EVM account to an ss58 account (whole RAO)."""
+        c = self.cfg
+        data = calldata("transfer(bytes32)", ["bytes32"], [pubkey])
+        value = tao_wei // RAO_WEI * RAO_WEI
+        return self.bt.sign(self._key, c.balance_transfer, data, value=value, gas=c.finney_transfer_gas)
+
+    def bt_tx_ok(self, tx_hash: str) -> bool | None:
+        r = self.bt.receipt(tx_hash)
+        return None if r is None else ok(r)
+
+    def treasury_usdc(self) -> int:
+        """USDC (6 decimals) the treasury holds on Base."""
+        return self.base.erc20_balance(self.cfg.usdc, self.treasury)
+
+    def treasury_bt_balance(self) -> int:
+        return self.bt.balance(self.treasury)
+
+    def finney_gas_wei(self) -> int:
+        """Bittensor EVM gas of a claim and the transfer that follows it (with a margin)."""
+        c = self.cfg
+        return int((c.finney_claim_gas + c.finney_transfer_gas) * self.bt.gas_price() * 1.2)
 
     # --- Base: swaps through Uniswap V3 -------------------------------------------------------------------
     def _path(self, sell_tao: bool) -> bytes:
@@ -351,8 +450,15 @@ class ForeverMoneyBaseRoute:
                 "tao_in": transfers_to(r, self.cfg.wtao, self.treasury)}  # fmt: skip
 
     # --- Base -> Finney: refunds ----------------------------------------------------------------------
+    def _min_out(self, tao_wei: int) -> int:
+        return int(tao_wei * (1.0 - self.cfg.exit_tolerance))
+
     def _exit_args(self, tao_wei: int, pubkey: bytes) -> list[Any]:
-        return [self.cfg.wtao, tao_wei, (pubkey, self.treasury, True, tao_wei), self.cfg.bridge_in_dest_gas]
+        """``tao_wei`` in whole RAO (the bridge's rule); the exit pays at least ``_min_out`` of it."""
+        if tao_wei % RAO_WEI:
+            raise ValueError("a bridge to Finney moves whole RAO")
+        exit_ = (pubkey, self.treasury, True, self._min_out(tao_wei))
+        return [self.cfg.wtao, tao_wei, exit_, self.cfg.bridge_in_dest_gas]
 
     def bridge_in_fee(self, tao_wei: int, pubkey: bytes) -> int:
         """ETH (wei) the CCIP message of a refund costs, with its buffer."""
@@ -376,7 +482,11 @@ class ForeverMoneyBaseRoute:
         for lg in r.get("logs") or []:
             if (lg.get("topics") or [None])[0] == _BRIDGED_TO_FINNEY:
                 mid = "0x" + lg["data"].removeprefix("0x")[64:128]  # data: (amount, messageId)
-        return {"ok": ok(r) and mid is not None, "message_id": mid, "from_block": self.bt.block_number() - 50}
+        return {
+            "ok": ok(r) and mid is not None,
+            "message_id": mid,
+            "from_block": self.bt.block_number() - DELIVERY_LOOKBACK_BLOCKS,
+        }
 
     def send(self, chain: str, tx: SignedTx) -> None:
         (self.bt if chain == "bittensor" else self.base).send(tx)
@@ -385,7 +495,9 @@ class ForeverMoneyBaseRoute:
         b, c = self.base, self.cfg
         return {"address": self.treasury, "base_eth": b.balance(self.treasury) / 1e18,
                 "base_usdc": b.erc20_balance(c.usdc, self.treasury) / 1e6,
-                "base_tao": b.erc20_balance(c.wtao, self.treasury) / 1e18}  # fmt: skip
+                "base_tao": b.erc20_balance(c.wtao, self.treasury) / 1e18,
+                "bittensor_tao": self.treasury_bt_balance() / 1e18,
+                "bittensor_claimable_tao": self.claimable_tao() / 1e18}  # fmt: skip
 
     def usdc_transfer_tx(self, to: str, usdc: int) -> SignedTx:
         """The owner's withdrawal: USDC from the treasury to an address of theirs (Coinbase on Base, etc.)."""

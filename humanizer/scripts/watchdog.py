@@ -6,7 +6,12 @@ hour, a low balance once a day; a daily summary goes out at --summary-hour (UTC)
 
 Checks: the API answers (locally and on the public address), the TLS certificate is not about to expire,
 the metagraph snapshot is fresh, the disk has room, no evaluation is stuck, backups are recent, the spend
-caps of the local ledger have room, the OpenRouter credit and the Lium balance (and no forgotten pod).
+caps of the local ledger have room (if any are set), the soft limit holds, the OpenRouter credit and the
+Lium balance (and no forgotten pod).
+
+Soft limit (SOFT_LIMIT_SINCE, SOFT_LIMIT_GAP_USD): since the launch, what we spent on the paid services
+should stay under what miners paid in (net of refunds) plus a gap for the owner's own runs (the kings').
+Past it the owner is alerted; nothing is stopped.
 """
 
 from __future__ import annotations
@@ -29,6 +34,31 @@ from humanizer_eval.ops.alerts import from_settings
 from humanizer_eval.paths import ledger_path, var_dir
 
 SERVICES = ("pangram", "gptzero", "zerogpt", "openrouter", "lium")
+
+
+def soft_limit(ledger_db: Path, billing_db: Path, since: float, gap_usd: float, weekly_usd: float = 0.0
+               ) -> tuple[float, float]:  # fmt: skip
+    """(spent, allowed) in USD since ``since``: the ledger's reserved and committed amounts on the paid
+    services, against the miners' net payments minus refunds plus ``gap_usd`` plus ``weekly_usd`` per
+    period begun (the same limit as budget.PoolLimit)."""
+    import sqlite3
+
+    from humanizer_eval.budget import pool_allowance
+
+    marks = ",".join("?" * len(SERVICES))
+    with sqlite3.connect(f"file:{ledger_db}?mode=ro", uri=True) as c:
+        spent = c.execute(
+            f"SELECT COALESCE(SUM(COALESCE(actual_usd, estimate_usd)), 0) FROM ledger "
+            f"WHERE ts >= ? AND status != 'released' AND service IN ({marks})",
+            (since, *SERVICES),
+        ).fetchone()[0]
+    paid = 0
+    if billing_db.exists():
+        with sqlite3.connect(f"file:{billing_db}?mode=ro", uri=True) as c:
+            paid = c.execute(
+                "SELECT COALESCE(SUM(net_cents - refunded_cents), 0) FROM payments WHERE ts >= ?", (since,)
+            ).fetchone()[0]
+    return float(spent), paid / 100 + pool_allowance(since, gap_usd, weekly_usd)
 
 
 def check_api(url: str) -> str | None:
@@ -93,6 +123,10 @@ def main() -> int:
     if free_gb < args.min_free_gb or free_frac < 0.1:
         problems.append(("disk", f"disk: {free_gb:.0f} GB free ({free_frac:.0%})"))
     facts.append(f"disk {free_gb:.0f} GB free")
+    root = shutil.disk_usage("/")  # nothing of ours is there, but a full system disk breaks ssh and journald
+    if root.free < 2 * 2**30:
+        problems.append(("root-disk", f"system disk /: {root.free / 2**30:.1f} GB free (everything of ours is on "
+                         "the volume; free the system disk)"))  # fmt: skip
 
     q = state / "queue.sqlite"
     if q.exists():
@@ -128,6 +162,23 @@ def main() -> int:
         facts.append(f"{svc} ${left:.0f} of cap left")
         if left < max(10.0, 0.1 * cap):
             problems.append((f"cap-{svc}", f"{svc}: only ${left:.2f} left under the spend cap ${cap:.0f}"))
+
+    if not s.soft_limit_since:
+        problems.append(("soft-limit", "SOFT_LIMIT_SINCE is not set: no spend alert at all"))
+    spent = allowed = 0.0
+    try:  # a broken check must not silence the others (the alerts are sent at the end)
+        if s.soft_limit_since:
+            since = dt.datetime.fromisoformat(s.soft_limit_since).replace(tzinfo=dt.UTC).timestamp()
+            spent, allowed = soft_limit(ledger_path(), state / "billing.sqlite", since, s.soft_limit_gap_usd,
+                                        s.soft_limit_weekly_usd)  # fmt: skip
+            facts.append(
+                f"spent ${spent:.0f} of ${allowed:.0f} (miners' money + gap + weekly) since {s.soft_limit_since}"
+            )
+    except Exception as e:
+        problems.append(("soft-limit", f"soft-limit check failed: {type(e).__name__}: {e}"))
+    if s.soft_limit_since and spent > allowed:
+        problems.append(("soft-limit", f"soft limit: spent ${spent:.2f} since {s.soft_limit_since}, "
+                         f"allowed ${allowed:.2f} (miners' money + gap + weekly allowance)"))  # fmt: skip
 
     if s.openrouter_api_key:
         try:
