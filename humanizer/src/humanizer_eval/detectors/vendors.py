@@ -166,7 +166,10 @@ def _clip01(x: float) -> float:
 
 class GPTZero(VendorDetector):
     name = service = "gptzero"
-    config = "v2-predict-text"
+    #: the model version asked for in every request (the API refuses an unknown one); a new version is taken
+    #: only at a period's start, since H and every run of a period must be scored by the same model
+    VERSION = "2026-11-04-base"
+    config = f"v2-predict-text@{VERSION}"
     primary = "p_ai_plus_mixed"
     URL = "https://api.gptzero.me/v2/predict/text"
 
@@ -177,7 +180,8 @@ class GPTZero(VendorDetector):
         return cls(http, cost_fn=gptzero_cost, **kw)
 
     def _call(self, text: str) -> dict[str, Any]:
-        return _check(self.http.request("POST", self.URL, json={"document": text}), "gptzero")
+        body = {"document": text, "version": self.VERSION}
+        return _check(self.http.request("POST", self.URL, json=body), "gptzero")
 
     def _extract(self, p: dict[str, Any]) -> Extracted:
         doc = p["documents"][0]

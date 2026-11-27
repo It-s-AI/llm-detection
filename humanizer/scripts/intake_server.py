@@ -48,6 +48,7 @@ from humanizer_eval.intake.archive import Archive
 from humanizer_eval.intake.hf import HubClient
 from humanizer_eval.llm.cache import CachedLLM
 from humanizer_eval.llm.openrouter import ModelPricing, OpenRouter
+from humanizer_eval.llm.ratelimit import limited
 from humanizer_eval.paths import ledger_path, var_dir
 from humanizer_eval.period.crypto import decrypt_at_rest, load_or_create_key
 from humanizer_eval.pool.store import PoolStore
@@ -163,6 +164,7 @@ def main() -> int:
     state.mkdir(parents=True, exist_ok=True)
     base = OpenRouter(s.openrouter_api_key, led, pricing=ModelPricing(var_dir() / "openrouter_models.json"),
                       log_path=var_dir() / "llm_calls.jsonl")  # fmt: skip
+    base = limited(base)  # OpenRouter's per-model limit (llm/ratelimit.py): no 429s
     llm = CachedLLM(base, var_dir() / "calibration" / "llm_cache.sqlite", key=key, cache_all=True)
     dets = [d for d in args.detectors.split(",") if d]
     detectors = {d: build_detector(d, ledger=led) for d in dets}

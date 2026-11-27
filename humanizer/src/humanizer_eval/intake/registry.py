@@ -38,6 +38,7 @@ class MetagraphSnapshot:
                 mtime,
                 {hk: (None if reg.get(hk) is None else int(reg[hk])) for hk in d["hotkeys"]},
             )
+            self._uids = {hk: int(u) for hk, u in (d.get("uids") or {}).items()}
             self._commitments = {
                 hk: (str(c["data"]), int(c["block"])) for hk, c in (d.get("commitments") or {}).items()
             }
@@ -56,9 +57,9 @@ class MetagraphSnapshot:
         return hks[hotkey] if hks[hotkey] is not None else 0
 
     def uid(self, hotkey: str) -> int | None:
-        """The hotkey's UID (its index in the snapshot's metagraph order); None if not registered."""
-        hks = self._load()
-        return list(hks).index(hotkey) if hotkey in hks else None
+        """The hotkey's UID on the subnet; None if not registered or the snapshot predates UIDs."""
+        self._load()
+        return self._uids.get(hotkey)
 
     def commitment(self, hotkey: str) -> tuple[str, int] | None:
         """The hotkey's current on-chain commitment ``(data, block)`` (registered hotkeys only)."""
@@ -77,7 +78,7 @@ def write_snapshot(
     path: Path | str,
     netuid: int,
     block: int,
-    hotkeys: list[str],
+    hotkeys: list[str],  # in UID order (metagraph.hotkeys): position = UID
     registered_at: dict[str, int] | None = None,
     now=time.time,
     commitments: dict[str, tuple[str, int]] | None = None,
@@ -90,6 +91,7 @@ def write_snapshot(
         "block": block,
         "ts": now(),
         "hotkeys": sorted(hotkeys),
+        "uids": {hk: uid for uid, hk in enumerate(hotkeys)},
         "registered_at": registered_at or {},
         "commitments": {hk: {"data": d, "block": b} for hk, (d, b) in (commitments or {}).items()},
     }

@@ -156,6 +156,8 @@ def load_period(
     texts = [human_texts[h["id"]] for h in human]
     ids = [h["id"] for h in human]
     cached = load_human_scores(human_cache, key) if human_cache else None
+    if cached is None and human_cache:  # a detector left: reuse the larger set's file
+        cached = _subset_of_larger(Path(human_cache), key, set(detectors))
     scores: dict[str, list[float]] = {}
     same = bool(cached) and cached["ids"] == ids
     base_cached: dict[str, Any] = dict((cached or {}).get("baseline") or {}) if same else {}
@@ -220,6 +222,23 @@ def save_human_scores(
     body = {"ids": ids, "scores": dict(scores), "baseline": dict(baseline or {})}
     tmp.write_bytes(encrypt_at_rest(key, json.dumps(body).encode()))
     tmp.replace(p)
+
+
+def _subset_of_larger(path: Path, key: bytes, want: set[str]) -> dict[str, Any] | None:
+    """H's scores for ``want`` from another file of the same period that has every one of those detectors
+    (``human_scores.<tag>.enc`` for a larger set): the same texts scored by the same models, so nothing is
+    paid again when a detector leaves the crown set. Their baseline (versions, canaries) comes along and is
+    checked again at the load like any cached one."""
+    for other in sorted(path.parent.glob("human_scores.*.enc")):
+        if other == path:
+            continue
+        got = load_human_scores(other, key)
+        if not got or not want <= set(got.get("scores") or {}):
+            continue
+        base = got.get("baseline") or {}
+        return {"ids": got["ids"], "scores": {d: got["scores"][d] for d in want},
+                "baseline": {d: base[d] for d in want if d in base}}  # fmt: skip
+    return None
 
 
 def load_human_scores(path: Path | str, key: bytes) -> dict[str, Any] | None:

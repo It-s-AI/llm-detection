@@ -126,7 +126,7 @@ svg text { fill: var(--ink-2); font-family: var(--font-body); }
     <div class="tile"><b class="num">2</b><span>competitions in one subnet: detection and humanizer</span></div>
     <div class="tile"><b class="num">80 / 20 → 50 / 50</b><span>split of miner weights, detection / humanizer: 20% now, 50% next</span></div>
     <div class="tile"><b class="num">~500</b><span>hidden texts per period, a fresh set every 7 days</span></div>
-    <div class="tile"><b class="num">3</b><span>commercial detectors score every result: GPTZero, Pangram, ZeroGPT</span></div>
+    <div class="tile"><b class="num">2</b><span>commercial detectors score every result at a pinned model version: GPTZero, Pangram</span></div>
   </div>
 
   <section>
@@ -152,7 +152,7 @@ svg text { fill: var(--ink-2); font-family: var(--font-body); }
             <text x="469" y="82" text-anchor="middle">one GPU, no network,</text><text x="469" y="97" text-anchor="middle">~500 hidden texts</text>
             <rect x="592" y="30" width="146" height="80" rx="10" fill="var(--surface)" stroke="var(--line)"/>
             <text x="665" y="62" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Scored</text>
-            <text x="665" y="82" text-anchor="middle">LLM judges: meaning,</text><text x="665" y="97" text-anchor="middle">quality; 3 detectors</text>
+            <text x="665" y="82" text-anchor="middle">LLM judges: meaning,</text><text x="665" y="97" text-anchor="middle">quality; 2 detectors</text>
             <rect x="788" y="30" width="180" height="80" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/>
             <text x="878" y="62" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Crown test</text>
             <text x="878" y="82" text-anchor="middle">beats the king on the</text><text x="878" y="97" text-anchor="middle">same texts, with confidence</text>
@@ -220,8 +220,8 @@ svg text { fill: var(--ink-2); font-family: var(--font-body); }
       </div>
       <div class="step">
         <div class="step-h"><span class="num">4</span><h3>One score across detectors</h3></div>
-        <div class="formula"><math display="block"><mi>S</mi><mo>=</mo><msup><mrow><mo>(</mo><mfrac><mn>1</mn><mn>3</mn></mfrac><munder><mo>∑</mo><mrow><mi>d</mi></mrow></munder><msubsup><mi>E</mi><mi>d</mi><mi>p</mi></msubsup><mo>)</mo></mrow><mrow><mn>1</mn><mo>/</mo><mi>p</mi></mrow></msup><mo>,</mo><mspace width="1.2em"/><mi>p</mi><mo>=</mo><mo>−</mo><mn>4</mn></math></div>
-        <p>The three detector numbers are combined so that the weakest one dominates: the final score stays low until all three detectors are fooled, so beating two and ignoring the third does not pay. If any detector catches everything, the score is 0. The score runs from 0, which is what simply copying the AI text gets, to 1.</p>
+        <div class="formula"><math display="block"><mi>S</mi><mo>=</mo><msup><mrow><mo>(</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><munder><mo>∑</mo><mrow><mi>d</mi></mrow></munder><msubsup><mi>E</mi><mi>d</mi><mi>p</mi></msubsup><mo>)</mo></mrow><mrow><mn>1</mn><mo>/</mo><mi>p</mi></mrow></msup><mo>,</mo><mspace width="1.2em"/><mi>p</mi><mo>=</mo><mo>−</mo><mn>4</mn></math></div>
+        <p>The two detector numbers are combined so that the weaker one dominates: the final score stays low until both detectors are fooled, so beating one and ignoring the other does not pay. If any detector catches everything, the score is 0. The score runs from 0, which is what simply copying the AI text gets, to 1.</p>
       </div>
     </div>
     <figure>
@@ -247,8 +247,8 @@ svg text { fill: var(--ink-2); font-family: var(--font-body); }
       </figure>
       <figure>
         <h3>What one evaluation costs (paid by the miner)</h3>
-        <svg id="chart-cost" viewBox="0 0 520 150" role="img" aria-label="Upper bound of one evaluation, 150.12 USDC: Pangram 90.15, GPTZero 23.19, LLM judges 19.36, ZeroGPT 10.67, GPU pod 6.75"></svg>
-        <div class="legend"><span><i style="background:var(--s1)"></i>Pangram</span><span><i style="background:var(--s2)"></i>GPTZero</span><span><i style="background:var(--s3)"></i>LLM judges</span><span><i style="background:var(--s4)"></i>ZeroGPT</span><span><i style="background:var(--s5)"></i>GPU pod</span></div>
+        <svg id="chart-cost" viewBox="0 0 520 150" role="img" aria-label="Upper bound of one evaluation, 105.02 USDC: Pangram 66.75, GPTZero 17.16, LLM judges 14.36, GPU pod 6.75"></svg>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Pangram</span><span><i style="background:var(--s2)"></i>GPTZero</span><span><i style="background:var(--s3)"></i>LLM judges</span><span><i style="background:var(--s5)"></i>GPU pod</span></div>
         <figcaption>Quote for the current period, at list prices. Miners pay in TAO; it is converted to USDC, the unused part of the hold stays on their balance. There are no free evaluations, so spam costs the spammer.</figcaption>
       </figure>
     </div>
@@ -304,7 +304,7 @@ svg text { fill: var(--ink-2); font-family: var(--font-body); }
   el("text", { x: 510, y: 96, "text-anchor": "end", "font-size": 11.5, "font-family": "var(--font-data)" }, sp).textContent = "humanizer 20% = 17 + 2 + 1";
   const sn = bar("chart-split-next", [["Detection miners", 50, "var(--s1)"], ["Current king", 42.5, "var(--s2)"], ["Previous king", 5, "var(--s4)"], ["King before that", 2.5, "var(--s5)"]], (v) => v + "%", 100, "Next");
   el("text", { x: 510, y: 96, "text-anchor": "end", "font-size": 11.5, "font-family": "var(--font-data)" }, sn).textContent = "humanizer 50% = 42.5 + 5 + 2.5";
-  const cp = bar("chart-cost", [["Pangram", 90.15, "var(--s1)"], ["GPTZero", 23.19, "var(--s2)"], ["LLM judges", 19.36, "var(--s3)"], ["ZeroGPT", 10.67, "var(--s4)"], ["GPU pod (1.5 h)", 6.75, "var(--s5)"]], (v) => "$" + v.toFixed(2), 150.12, "Upper bound for one evaluation: $150.12");
+  const cp = bar("chart-cost", [["Pangram", 66.75, "var(--s1)"], ["GPTZero", 17.16, "var(--s2)"], ["LLM judges", 14.36, "var(--s3)"], ["GPU pod (1.5 h)", 6.75, "var(--s5)"]], (v) => "$" + v.toFixed(2), 105.02, "Upper bound for one evaluation: $105.02");
   el("text", { x: 510, y: 96, "text-anchor": "end", "font-size": 11.5, "font-family": "var(--font-data)" }, cp).textContent = "charged by use, the rest is returned";
 })();
 </script>

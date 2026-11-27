@@ -139,10 +139,12 @@ class ModelPricing:
                     emb = c.get(f"{API}/embeddings/models").json().get("data", [])
                 except Exception:
                     emb = []
-            data = {
-                m["id"]: [float(m["pricing"].get("prompt", 0)), float(m["pricing"].get("completion", 0))]
-                for m in chat + emb
-            }
+            data = {}
+            for m in chat + emb:  # the alias and the dated id (canonical_slug, what the judges are pinned to)
+                price = [float(m["pricing"].get("prompt", 0)), float(m["pricing"].get("completion", 0))]
+                for k in (m["id"], m.get("canonical_slug")):
+                    if k:
+                        data.setdefault(k, price)
             if self.cache_path:
                 self.cache_path.parent.mkdir(parents=True, exist_ok=True)
                 self.cache_path.write_text(json.dumps(data))

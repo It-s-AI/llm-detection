@@ -37,12 +37,12 @@ def test_statement_from_metered_quantities():
     st = statement(
         CARD,
         detector_words={"pangram": [120, 250], "gptzero": [120, 250]},
-        judge_tokens={"openai/gpt-6-luna": (1_000_000, 100_000)},
+        judge_tokens={"openai/gpt-6-luna-20260922": (1_000_000, 100_000)},
         pod_hours=0.5,
     )
     items = {i.item: i.amount_cents for i in st.items}
     assert items["detector:pangram"] == 10 + 15  # ceil(1.2)=2, ceil(2.5)=3 units x 5c
-    assert items["judge:openai/gpt-6-luna"] == 15  # $0.10 + $0.05
+    assert items["judge:openai/gpt-6-luna-20260922"] == 15  # $0.10 + $0.05
     assert items["lium:h100"] == 225  # 0.5 h x 4.50 USDC (card 2026-11-26b)
     assert st.card_sha256 == CARD.sha256 and len(CARD.sha256) == 64
     with pytest.raises(KeyError):

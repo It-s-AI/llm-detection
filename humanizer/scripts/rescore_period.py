@@ -26,7 +26,7 @@ from pathlib import Path
 from humanizer_eval.intake.worker import CONDITIONS_FILE
 from humanizer_eval.paths import var_dir
 
-CROWN = ("gptzero", "pangram", "zerogpt")
+CROWN = ("gptzero", "pangram")
 
 
 def main() -> int:

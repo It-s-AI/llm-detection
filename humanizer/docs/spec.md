@@ -78,7 +78,7 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
 
 ## Detectors
 
-- **D-30 ✅** Detectors in the crown: **GPTZero, ZeroGPT, Pangram**. Originality — removed for now; Copyleaks and
+- **D-30 ✅** Detectors in the crown: **GPTZero, Pangram** (since 2026-11-27, each at a pinned model version: GPTZero `2026-11-04-base` in the request, Pangram `pangram-4.1`; ZeroGPT dropped: its API neither takes nor reports a version and its scores moved 4 times in 2.5 days; a third detector with a pinnable version is being evaluated). Before: GPTZero, ZeroGPT, Pangram. Originality — removed for now; Copyleaks and
   Turnitin — excluded.
 - **D-31 ✅** Admission test: a detector is included in the track if its AUROC on raw AI texts versus
   human texts is ≥ 0.9.
@@ -319,6 +319,7 @@ Statuses: **✅ accepted**, **🟡 default (can be changed)**, **⏳ decided by 
 | 2026-11-13 | D-92 | Signed leaderboard (ed25519, validity 3 h, the version never decreases); the validator sets mechanism 1 weights only when the subnet has two mechanisms; burn and the share of a deregistered king → owner's UID | report 11 |
 | 2026-11-13 | D-14, D-92 | Localnet: two mechanisms can be enabled only when `max_allowed_uids × 2 ≤ 256` (SN32 currently has 256 UIDs); the validator sets mechanism 1 before mechanism 0 (the SDK checks the rate limit against mechanism 0); the 90/10 split and burn via the owner's UID confirmed with money | report 11 |
 | 2026-11-13 | D-14, D-58, D-66, Q-13 | Owner's decisions: 128 UIDs × 2 mechanisms; one submission per hotkey registration, rollback when a king is deregistered; before the reveal the miner sees the level distribution (overall and per gate) and each detector's contribution (E, AUROC, P_human), but not the texts of the judges' reasons | owner's decisions 2026-11-13 |
+| 2026-11-27 | D-30 | ZeroGPT out of the crown (no version to pin, 4 shifts in 2.5 days); GPTZero pinned to `2026-11-04-base` in every request and the judges to dated OpenRouter ids; `verify_period.py --recheck` lets anyone score published texts again at the recorded versions; price card 2026-11-27 | owner's decision |
 | 2026-11-20 | D-43 | G3 calibration: severity on a single scale of impact on the reader (not tied to the defect type), only findings shared by both judges count (the milder rating), "gross" — by agreement of both or by the arbiter; no exception lists tailored to the samples | calibration 24×15, $3.7; Q-12 samples |
 | 2026-11-21 | D-45 | Injection screen before G1–G3: a dedicated judge that must quote the injected passage; level 0 and no quality judges for a flagged output; 0/276 false positives, 150/150 attacks caught | owner's requirement |
 | 2026-11-21 | D-26 | Identical conditions for king and challenger: zero tolerance for missing verdicts/scores (retries, pause), judges pinned to one provider, scoring fingerprint with king rescoring, detector-model checks (versions, canaries from H), one GPU model | owner's requirement |

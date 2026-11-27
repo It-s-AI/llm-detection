@@ -1201,3 +1201,12 @@ def test_the_public_queue_names_who_waits_but_not_the_bundle_or_money(tmp_path):
     assert [(x["uid"], x["hotkey"], x["state"]) for x in q] == [(3, "5Fa", "waiting"), (7, "5Fb", "waiting")]
     text = json.dumps(q)
     assert URL not in text and "hold" not in text and "sha" not in text
+
+
+def test_snapshot_uid_is_the_metagraph_position_not_the_sorted_one(tmp_path):
+    from humanizer_eval.intake.registry import MetagraphSnapshot, write_snapshot
+
+    p = tmp_path / "mg.json"
+    write_snapshot(p, 32, 100, ["5Zlast", "5Afirst", "5Mmid"])  # UID 0, 1, 2 (unsorted on purpose)
+    snap = MetagraphSnapshot(p)
+    assert [snap.uid(h) for h in ("5Zlast", "5Afirst", "5Mmid", "5Xnone")] == [0, 1, 2, None]

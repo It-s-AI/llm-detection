@@ -8,8 +8,10 @@ from humanizer_eval.detectors.cache import DetectorCache
 from humanizer_eval.detectors.vendors import GPTZero, ItsAI, Pangram, VendorDetector, ZeroGPT
 from humanizer_eval.paths import ledger_path, var_dir
 
-# Detectors that take part in crown scoring (D-30). It's AI is a simulation proxy only (D-33).
-CROWN_DETECTORS = ("gptzero", "zerogpt", "pangram")
+# Detectors that take part in crown scoring (D-30), each with its model version pinned in the request.
+# ZeroGPT left on 2026-11-27: its API takes no version and reports none, and its model moved 4 times in 2.5
+# days. It's AI is a simulation proxy only (D-33).
+CROWN_DETECTORS = ("gptzero", "pangram")
 
 
 def build_detector(

@@ -25,7 +25,7 @@ from humanizer_eval.runner.evaluate import fetch_script, pod_script
 from humanizer_eval.scoring.crown import KingState
 
 KEY = bytes(range(32))
-JUDGE = "openai/gpt-6-luna"
+JUDGE = "openai/gpt-6-luna-20260922"
 DETS = ("gptzero", "pangram", "zerogpt")
 N = 40
 

@@ -1,20 +1,20 @@
 {
   "comment": "Gate judges (D-44, Q-3) chosen by the G1 v2 calibration 2026-11-09 (report 04b): two vendors judge, a third-vendor model arbitrates G1 disputes. Fact validators at period build = the same judge pair (configs/period.json). G2 ignores register and format (owner decision 2026-11-09) and person/tense (2026-11-20).",
   "judges": [
-    "openai/gpt-6-luna",
-    "google/gemini-3.8-flash"
+    "openai/gpt-6-luna-20260922",
+    "google/gemini-3.8-flash-20260902"
   ],
-  "arbiter": "anthropic/claude-sonnet-5.5",
+  "arbiter": "anthropic/claude-sonnet-5.5-20260928",
   "providers": {
     "comment": "one provider per judge model, no fallback: the king and every challenger are judged on the same infrastructure; if it is down, evaluations pause (owner's requirement 2026-11-21). Slugs checked live 2026-11-21.",
-    "openai/gpt-6-luna": "openai",
-    "google/gemini-3.8-flash": "google-vertex",
-    "anthropic/claude-sonnet-5.5": "google-vertex"
+    "openai/gpt-6-luna-20260922": "openai",
+    "google/gemini-3.8-flash-20260902": "google-vertex",
+    "anthropic/claude-sonnet-5.5-20260928": "google-vertex"
   },
   "injection_screen": {
     "comment": "a dedicated judge before G1-G3 (owner's decision 2026-11-21): an output with a verified injected passage is level 0 and never reaches the quality judges",
     "judges": [
-      "anthropic/claude-sonnet-5.5"
+      "anthropic/claude-sonnet-5.5-20260928"
     ]
   },
   "judge_overrides": {

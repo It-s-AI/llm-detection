@@ -26,7 +26,7 @@ from humanizer_eval.paths import var_dir
 from humanizer_eval.period.chain import FINNEY_RPC, Chain
 from humanizer_eval.period.lifecycle import Lifecycle, LifecycleConfig
 
-CROWN_TAG = "gptzero-pangram-zerogpt"
+CROWN_TAG = "gptzero-pangram"
 
 
 def human_cache_path(pdir: Path, tag: str = CROWN_TAG) -> Path:
@@ -99,6 +99,9 @@ def main() -> int:
         led = SpendLedger(ledger_path(), s.caps())
         llm = OpenRouter(s.openrouter_api_key, led, pricing=ModelPricing(var_dir() / "openrouter_models.json"),
                          log_path=var_dir() / "llm_calls.jsonl")  # fmt: skip
+        from humanizer_eval.llm.ratelimit import limited
+
+        llm = limited(llm)  # OpenRouter's per-model limit: no 429s while building
         gen = GenConfig.from_dict(json.loads(Path("configs/period.json").read_text()))
         pool = PoolAdapter.load(var_dir() / args.pool)
         res = build_period(pid, secret, block_hash, pool, llm, gen, n=args.n, workers=args.workers)
