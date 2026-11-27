@@ -210,7 +210,9 @@ class OpenRouter:
             burst=10,
             timeout=timeout,
             transport=transport,
-            retry=RetryPolicy(max_attempts=4),
+            # 429 (a provider's rate limit) clears within a minute or two: wait it out per call (Retry-After
+            # when given, else 2, 4, ... 60 s) rather than fail the output and pause the whole evaluation
+            retry=RetryPolicy(max_attempts=8, base_delay=2.0, max_delay=60.0),
         )
 
     def _log(self, record: dict[str, Any]) -> None:
@@ -288,7 +290,7 @@ class OpenRouter:
             if n:
                 res.commit(est * n, {"status": resp.status_code, "sends": n})
             else:
-                res.release({"status": resp.status_code})  # failed requests are not billed
+                res.release({"status": resp.status_code, "model": model})  # failed requests are not billed
             err = body.get("error") if isinstance(body, dict) else None
             msg = err.get("message") if isinstance(err, dict) else err
             raise RuntimeError(f"openrouter HTTP {resp.status_code}: {str(msg)[:300]}")
