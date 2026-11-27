@@ -158,11 +158,12 @@ Nothing is burned.
 An older v4 validator (leaderboard schema `sn32-humanizer-leaderboard/1`) refuses the new leaderboard and
 keeps paying the kings of the last `/1` leaderboard it had until it is updated.
 
-**Updating.** The code is the `v4` branch. `run.sh` follows the branch you are on, so switch once and the
-auto-update keeps you current:
+**Updating.** v4 is on `main`. A validator started with `run.sh` on `main` updates itself: within ~30 minutes
+it sees the new `__version__` (4.x), pulls, runs `pip install -e .` and restarts (no new packages, no new
+flags). If you switched to the `v4` branch earlier, switch back to `main` once, so that later updates reach you:
 
 ```bash
-git fetch origin && git checkout v4 && pip install -e .
+git fetch origin && git checkout main && git pull && pip install -e .
 pm2 restart llm_detection_validators_autoupdate     # or however you run the validator
 ```
 
