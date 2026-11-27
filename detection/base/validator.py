@@ -297,6 +297,13 @@ class BaseValidatorNeuron(BaseNeuron):
             version_key=self.spec_version,
         )
 
+        self.last_weights_set = {  # logged to wandb with the next step (the vector validators really sent)
+            "block": int(self.metagraph.block.item()),
+            "ok": result is True,
+            "message": str(msg)[:300],
+            "uids": [int(u) for u in uint_uids],
+            "weights": [int(w) for w in uint_weights],
+        }
         if result is True:
             bt.logging.info("set_weights on chain successfully!")
         else:
@@ -309,7 +316,9 @@ class BaseValidatorNeuron(BaseNeuron):
         no king to pay, no valid leaderboard ever, or --humanizer.disable, the detection weights are used
         alone. If this round's computation fails, the previous humanizer vector is reused."""
         key = self.config.humanizer.public_key or DEFAULT_PUBLIC_KEY
+        self.humanizer_status = {"share": HUMANIZER_SHARE, "applied": False}
         if self.config.humanizer.disable or not key:
+            self.humanizer_status["reason"] = "disabled" if self.config.humanizer.disable else "no public key"
             return detection
         try:
             if getattr(self, "humanizer", None) is None:
@@ -326,10 +335,14 @@ class BaseValidatorNeuron(BaseNeuron):
             self._humanizer_vector = self.humanizer.dense(list(self.metagraph.hotkeys), regs)
             self._humanizer_hotkeys = list(self.metagraph.hotkeys)
             self._humanizer_ok = True
+            self.humanizer_status["reason"] = "ok"
         except Exception as e:
+            self.humanizer_status["error"] = str(e)[:300]
             if not getattr(self, "_humanizer_ok", False):
                 bt.logging.error(f"humanizer share not applied: {e}")
+                self.humanizer_status["reason"] = "error, never applied"
                 return detection
+            self.humanizer_status["reason"] = "error, previous vector reused"
             # the previous vector is by UID: reuse it only for UIDs that still hold the same hotkey
             prev, hks = self._humanizer_vector, getattr(self, "_humanizer_hotkeys", None)
             now = list(self.metagraph.hotkeys)
@@ -340,10 +353,25 @@ class BaseValidatorNeuron(BaseNeuron):
                 self._humanizer_hotkeys = now
             bt.logging.error(f"humanizer share: reusing the previous vector ({e})")
         hum = self._humanizer_vector
+        p = getattr(getattr(self, "humanizer", None), "payload", None)
+        if p is not None:  # what the signed leaderboard said (the same for every honest validator)
+            now = time.time()
+            self.humanizer_status.update(
+                leaderboard_seq=int(p.get("seq", 0)),
+                leaderboard_age_s=round(now - float(p.get("issued_at", now)), 1),
+                leaderboard_fresh=now < float(p.get("expires_at", 0)),
+                kings=list(p.get("kings") or []),
+                king_registered_at=list(p.get("king_registered_at") or []),
+            )
         if hum is None:
             bt.logging.info("humanizer share: no king to pay; detection gets all the weights")
+            self.humanizer_status["reason"] = "no king to pay: the share went to detection"
             return detection
         out = blend(detection.cpu().tolist(), hum, HUMANIZER_SHARE)
+        self.humanizer_status.update(
+            applied=True,
+            king_weights={str(uid): round(w * HUMANIZER_SHARE, 6) for uid, w in enumerate(hum) if w > 0},
+        )
         bt.logging.info(
             "humanizer share",
             {uid: round(w * HUMANIZER_SHARE, 6) for uid, w in enumerate(hum) if w > 0},
@@ -528,9 +556,28 @@ class BaseValidatorNeuron(BaseNeuron):
 
             signed_msg = f'0x{self.keypair.sign(original_format_json).hex()}'
             bt.logging.info("Logging to Wandb")
+            hs = getattr(self, "humanizer_status", None) or {}
+            humanizer_log = {  # the humanizer competition as this validator applied it (v4)
+                "humanizer/applied": int(bool(hs.get("applied"))),
+                "humanizer/share": hs.get("share"),
+                "humanizer/n_kings": len(hs.get("kings") or []),
+                "humanizer/leaderboard_seq": hs.get("leaderboard_seq"),
+                "humanizer/leaderboard_age_s": hs.get("leaderboard_age_s"),
+                "humanizer/leaderboard_fresh": int(bool(hs.get("leaderboard_fresh"))),
+                "humanizer/king_weights": hs.get("king_weights") or {},
+                "humanizer/status_json": json.dumps(hs, default=str),
+            }
+            ws = getattr(self, "last_weights_set", None)
+            weights_log = {} if ws is None else {
+                "weights_set/ok": int(ws["ok"]),
+                "weights_set/block": ws["block"],
+                "weights_set/json": json.dumps(ws),
+            }
             self.wandb_run.log(
                 {
                     **graphed_data,
+                    **humanizer_log,
+                    **weights_log,
                     "original_format_json": original_format_json,
                     "signed_msg": signed_msg
                 },
