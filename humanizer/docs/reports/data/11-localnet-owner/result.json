@@ -1,0 +1,91 @@
+{
+ "steps": [
+  {
+   "step": "bob_registers_subnet",
+   "ok": true,
+   "msg": "Success",
+   "sudo_result": null,
+   "t": 3.5
+  },
+  {
+   "step": "start_call",
+   "ok": true,
+   "msg": "Success",
+   "sudo_result": null,
+   "t": 3.7
+  },
+  {
+   "step": "sudo_freeze_0",
+   "ok": true,
+   "msg": "Success",
+   "sudo_result": "{'sudo_result': {'Ok': ()}}",
+   "t": 6.2
+  },
+  {
+   "step": "sudo_tempo_40",
+   "ok": true,
+   "msg": "Success",
+   "sudo_result": "{'sudo_result': {'Ok': ()}}",
+   "t": 7.5
+  },
+  {
+   "step": "sudo_freeze_10",
+   "ok": true,
+   "msg": "Success",
+   "sudo_result": "{'sudo_result': {'Ok': ()}}",
+   "t": 10.2
+  },
+  {
+   "step": "helper_mech_count_2_as_owner",
+   "ok": false,
+   "msg": "Subtensor returned `SubstrateRequestException(Invalid Transaction)` error. This means: `Invalid signing address`.",
+   "sudo_result": null,
+   "t": 10.2
+  },
+  {
+   "step": "owner_max_uids_128",
+   "ok": true,
+   "msg": "Success",
+   "sudo_result": null,
+   "t": 12.8
+  },
+  {
+   "step": "owner_mech_count_2_try0",
+   "ok": true,
+   "msg": "Success",
+   "sudo_result": null,
+   "t": 14.2
+  },
+  {
+   "step": "owner_split_90_10_try0",
+   "ok": true,
+   "msg": "Success",
+   "sudo_result": null,
+   "t": 15.5
+  },
+  {
+   "step": "helper_split_as_owner",
+   "ok": false,
+   "msg": "Subtensor returned `SubstrateRequestException(Invalid Transaction)` error. This means: `Invalid signing address`.",
+   "sudo_result": null,
+   "t": 15.5
+  }
+ ],
+ "netuid": 2,
+ "owner_is_bob": true,
+ "tempo": 40,
+ "admin_freeze_window": 10,
+ "max_uids_start": 256,
+ "mechanisms_start": 1,
+ "mechanisms_after_helper": 1,
+ "max_uids_after": 128,
+ "mechanisms_after_owner": 2,
+ "split_after_owner": [
+  90,
+  10
+ ],
+ "split_after_helper": [
+  90,
+  10
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "public": {
+  "submission_id": "pilot-ref-v2-itsai",
+  "hotkey": "5Fpilot-miner",
+  "stage": "done",
+  "updated_at": 1794413504.80167,
+  "period_id": "pilot-1",
+  "S": 0.0424,
+  "crowned": true,
+  "bundle_ran": true,
+  "S_king": 0.0086,
+  "delta": 0.0338,
+  "lower_bound": 0.0245,
+  "alpha": 0.05,
+  "charged_cents": 0
+ },
+ "statement": {
+  "lium:h100": [
+   0.0,
+   0
+  ]
+ },
+ "settlement": {
+  "submission_id": "pilot-ref-v2-itsai",
+  "hold_cents": 2784,
+  "charged_cents": 0,
+  "returned_cents": 2784,
+  "statement_total_cents": 0
+ },
+ "levels": {
+  "1.0": 36,
+  "0.5": 37,
+  "0.0": 5
+ },
+ "score": {
+  "S": 0.042371269732083,
+  "auroc": {
+   "its_ai": 0.9999999999999999
+  },
+  "p_human": {
+   "its_ai": 0.08474253946416578
+  },
+  "evasion": {
+   "its_ai": 0.042371269732083
+  },
+  "severe_rate": 0.0641025641025641,
+  "minor_rate": 0.47435897435897434,
+  "excluded_strata": []
+ },
+ "crown": {
+  "crown": true,
+  "delta": 0.03378977415054145,
+  "lower": 0.024495855186827793,
+  "se": 0.005407385335096838,
+  "s_king": 0.008581495581541549,
+  "s_challenger": 0.042371269732083
+ },
+ "run": {
+  "status": "ok",
+  "reason": "",
+  "pod_seconds": 0.0,
+  "cost_usd": null
+ },
+ "judge_tokens": {},
+ "seconds": 4.0,
+ "n_human": 71,
+ "missing_human": 7,
+ "owner_spent": {}
+}

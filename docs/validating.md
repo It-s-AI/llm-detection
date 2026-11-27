@@ -129,3 +129,46 @@ If you want to properly serve your Axon you need to change --axon.port from 7000
 pm2 start run.sh --name llm_detection_validators_autoupdate -- --wallet.name YOUR_COLDKEY --wallet.hotkey YOUR_HOTKEY --axon.port 70000 --neuron.device cuda:0
 ```
 
+
+## Humanizer competition (v4)
+
+From v4 the subnet runs two competitions on **one** set of weights; there is no second mechanism.
+
+* **Detection** (unchanged): your validator scores the detection miners as before. They get **80%** of
+  your weights, in the same proportions as in v3.
+* **Humanizer competition**: the other **20%**, split 85% / 10% / 5% between the current king and the two
+  previous kings with distinct hotkeys. The subnet owner's evaluator (its code is in
+  [`humanizer/`](../humanizer)) runs the miners' humanizers against paid AI detectors and publishes **who
+  the kings are** (their hotkeys, newest first) as a **signed leaderboard**. Your validator fetches it,
+  checks the ed25519 signature against the key built into the release, the subnet, the expiry and that
+  the sequence number never goes back, drops kings that are not in the metagraph (the rest close ranks)
+  and gives the shares of missing slots to the current king. You run no extra evaluation, need no new API
+  key and pay nothing extra.
+
+The split and the 85/10/5 shares are constants of this code (`HUMANIZER_SHARE`, `KING_SHARES` in
+`detection/validator/humanizer_mechanism.py`), so every validator on the same release sets them the same
+way.
+
+If no fresh leaderboard can be had (the owner's server is down, a bad signature), the kings of the last
+valid leaderboard keep their share; it is kept on disk and survives restarts. When there is no king to pay
+(the owner's baseline is king, none of the kings is registered, or the validator has never received a
+valid leaderboard), the validator uses the detection weights alone: the humanizer 20% goes to detection.
+Nothing is burned.
+
+An older v4 validator (leaderboard schema `sn32-humanizer-leaderboard/1`) refuses the new leaderboard and
+keeps paying the kings of the last `/1` leaderboard it had until it is updated.
+
+**Updating.** v4 is on `main`. A validator started with `run.sh` on `main` updates itself: within ~30 minutes
+it sees the new `__version__` (4.x), pulls, runs `pip install -e .` and restarts (no new packages, no new
+flags). If you switched to the `v4` branch earlier, switch back to `main` once, so that later updates reach you:
+
+```bash
+git fetch origin && git checkout main && git pull && pip install -e .
+pm2 restart llm_detection_validators_autoupdate     # or however you run the validator
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--humanizer.urls` | built-in | comma-separated leaderboard URLs (a mirror, for example) |
+| `--humanizer.public_key` | built-in | hex ed25519 public key of the leaderboard signer |
+| `--humanizer.disable` | off | leave the humanizer competition out (not recommended: your weights then differ from the other validators') |

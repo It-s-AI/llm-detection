@@ -1,0 +1,12 @@
+[Unit]
+Description=SN32 metagraph and commitments snapshot for the evaluation API
+
+[Service]
+Type=oneshot
+User=humeval
+EnvironmentFile=/etc/humeval/humeval.env
+WorkingDirectory=/srv/humeval/humanizer_eval
+# bittensor lives in its own venv (heavy); the snapshot holds public chain data only
+ExecStart=/srv/humeval/btenv/bin/python scripts/refresh_metagraph.py --netuid ${HUMEVAL_NETUID} --network ${HUMEVAL_NETWORK} \
+    --out /srv/humeval/var/intake/metagraph.json
+TimeoutStartSec=240

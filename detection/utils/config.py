@@ -108,6 +108,28 @@ def add_args(cls, parser):
 
     if neuron_type == "validator":
         parser.add_argument(
+            "--humanizer.disable",
+            action="store_true",
+            help="Leave the humanizer competition out of the weights (not recommended: your weights then "
+            "differ from the other validators').",
+            default=False,
+        )
+
+        parser.add_argument(
+            "--humanizer.urls",
+            type=str,
+            help="Comma-separated URLs of the signed humanizer leaderboard (default: built-in list).",
+            default="",
+        )
+
+        parser.add_argument(
+            "--humanizer.public_key",
+            type=str,
+            help="Hex ed25519 public key of the leaderboard signer (default: built-in).",
+            default="",
+        )
+
+        parser.add_argument(
             "--neuron.num_concurrent_forwards",
             type=int,
             help="The number of concurrent forwards running at any time.",

@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "humanizer-eval"
+version = "0.1.0"
+description = "Evaluator for the SN32 humanizer competition (It's AI)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "numpy>=1.26",
+  "pynacl>=1.5",
+]
+
+[project.optional-dependencies]
+pool = [
+  "datasets>=3.0",      # streaming of parquet/csv/jsonl repos (no loading scripts)
+  "datasketch>=1.6",    # MinHash LSH near-duplicate filter
+  "pyarrow>=15",        # pool storage
+  "langid>=1.1.6",      # language id (model ships with the package, offline)
+  "scikit-learn>=1.4",  # TF-IDF + SVD embeddings, k-means
+  "zstandard>=0.22",    # reading monology/pile-uncopyrighted *.jsonl.zst at full scale
+]
+api = [
+  "fastapi>=0.115",              # miner API (intake/api.py)
+  "uvicorn>=0.30",
+  "py-sr25519-bindings>=0.2",    # hotkey signatures (sr25519, as in bittensor_wallet)
+  "huggingface_hub>=0.25",       # public copies of king bundles (publish/kings.py HFMirror)
+]
+tao = [
+  "eth-account>=0.11",           # payments in TAO: signing Bittensor EVM transactions (billing/evm.py)
+]
+dev = [
+  "eth-account>=0.11",
+  "pytest>=8",
+  "pytest-cov>=5",
+  "ruff>=0.6",
+  "scikit-learn>=1.4",
+  "fastapi>=0.115",
+  "py-sr25519-bindings>=0.2",
+  "huggingface_hub>=0.25",
+]
+
+[project.scripts]
+humeval = "humanizer_eval.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/humanizer_eval"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not live and not slow' -q"
+markers = [
+  "live: calls real paid/external APIs; run manually with `pytest -m live`",
+  "slow: long offline simulations (minutes); run with `pytest -m slow`",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = [".claude", ".venv", "var", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = ["S101", "RUF001", "RUF002", "RUF003", "SIM905"]  # SIM905: "a b c".split() word lists are clearer
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B011", "E501"]
+# seeded `random` is used for reproducible sampling, never for secrets
+"src/humanizer_eval/period/**" = ["S311", "E501"]
+"scripts/**" = ["S", "E501", "SIM905"]
+# runs on the HF Space (Python 3.10: no datetime.UTC); urlopen gets only the configured https API
+"space/**" = ["UP017", "S310"]
+# example submissions: seeded `random` for data order, long docstrings
+"examples/**" = ["S311", "E501"]
+# the orchestrator shells out to ssh/scp on purpose; the harness runs inside the sandbox
+"src/humanizer_eval/runner/evaluate.py" = ["S603", "S607", "S108", "E501"]
+"harness/**" = ["S108", "S603", "S110"]
+# dev-only local runner of trusted bundles (harness/run.py as a subprocess)
+"src/humanizer_eval/evaluation/runners.py" = ["S603"]

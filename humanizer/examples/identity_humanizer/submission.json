@@ -1,0 +1,1 @@
+{"name": "identity-baseline", "entrypoint": "humanize:humanize", "license": "MIT", "batch_size": 32}

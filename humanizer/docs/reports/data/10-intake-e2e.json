@@ -1,0 +1,98 @@
+{
+ "hotkey": "5HY6kuXimmLcHxCVXPq33g5DNRLu1puhAKJUr8YheRZEQRBc",
+ "info": {
+  "period_id": "pilot-1",
+  "n_inputs": 78,
+  "crown_detectors": [
+   "its_ai"
+  ],
+  "price_card": {
+   "version": "2026-11-09",
+   "sha256": "e46ac7653af0049b29f640f70b012875ab4367a34dfbd5b4e179966c3b245c7b"
+  },
+  "quote_total_cents": 2999,
+  "queue": {
+   "waiting": 0,
+   "running": 0
+  },
+  "limits": {
+   "max_bundle_bytes": 100000000000,
+   "one_active_submission_per_hotkey": true
+  }
+ },
+ "unsigned_balance_status": 401,
+ "submit": {
+  "submission_id": "sub-0862caf997454b04",
+  "state": "awaiting_payment",
+  "period_id": "pilot-1",
+  "payment_amount_cents": 2999,
+  "checkout_url_host": "https://checkout.stripe.com/g/p"
+ },
+ "second_submit": "409: hotkey already has an active submission sub-0862caf997454b04",
+ "other_hotkey_status": "404: no such submission for this hotkey",
+ "topup": {
+  "payment_intent": "pi_3UbHt3ImfLXMPkBi026v6E33",
+  "gross_cents": 2999,
+  "fee_cents": 183
+ },
+ "states": [
+  "queued",
+  "running",
+  "done"
+ ],
+ "wait_s": 9.4,
+ "final": {
+  "submission_id": "sub-0862caf997454b04",
+  "state": "done",
+  "period_id": "pilot-1",
+  "created_ts": 1794566356.311665,
+  "enqueued_ts": 1794566361.2665794,
+  "started_ts": 1794566365.4173205,
+  "finished_ts": 1794566369.7941234,
+  "hold_cents": 2784,
+  "evaluation": {
+   "stage": "done",
+   "updated_at": 1794566369.786901,
+   "period_id": "pilot-1",
+   "S": 0.0424,
+   "crowned": true,
+   "bundle_ran": true,
+   "S_king": 0.0086,
+   "delta": 0.0338,
+   "lower_bound": 0.0246,
+   "alpha": 0.05,
+   "charged_cents": 0
+  }
+ },
+ "statement": {
+  "lium:h100": [
+   0.0,
+   0
+  ]
+ },
+ "settlement": {
+  "submission_id": "sub-0862caf997454b04",
+  "hold_cents": 2784,
+  "charged_cents": 0,
+  "returned_cents": 2784,
+  "statement_total_cents": 0
+ },
+ "balance_before_refund": {
+  "hotkey": "5HY6kuXimmLcHxCVXPq33g5DNRLu1puhAKJUr8YheRZEQRBc",
+  "balance_cents": 2816,
+  "available_cents": 2816
+ },
+ "refund": {
+  "refunds": [
+   {
+    "payment_intent": "pi_3UbHt3ImfLXMPkBi026v6E33",
+    "amount_cents": 2816,
+    "status": "succeeded",
+    "refund": "re_3UbHt3ImfLXMPkBi0h9I0NlQ"
+   }
+  ],
+  "hotkey": "5HY6kuXimmLcHxCVXPq33g5DNRLu1puhAKJUr8YheRZEQRBc",
+  "balance_cents": 0,
+  "available_cents": 0
+ }
+}

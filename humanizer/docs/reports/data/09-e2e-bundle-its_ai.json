@@ -1,0 +1,71 @@
+{
+ "public": {
+  "submission_id": "pilot-identity-lium2",
+  "hotkey": "5Fpilot-miner",
+  "stage": "done",
+  "updated_at": 1794414203.1850033,
+  "period_id": "pilot-1",
+  "S": 0.0086,
+  "crowned": false,
+  "bundle_ran": true,
+  "S_king": 0.0424,
+  "delta": -0.0338,
+  "lower_bound": -0.0429,
+  "alpha": 0.05,
+  "charged_cents": 35
+ },
+ "statement": {
+  "lium:h100": [
+   0.1394,
+   35
+  ]
+ },
+ "settlement": {
+  "submission_id": "pilot-identity-lium2",
+  "hold_cents": 2784,
+  "charged_cents": 35,
+  "returned_cents": 2749,
+  "statement_total_cents": 35
+ },
+ "levels": {
+  "1.0": 78,
+  "0.5": 0,
+  "0.0": 0
+ },
+ "score": {
+  "S": 0.008581495581541549,
+  "auroc": {
+   "its_ai": 0.9999999999999999
+  },
+  "p_human": {
+   "its_ai": 0.017162991163082876
+  },
+  "evasion": {
+   "its_ai": 0.008581495581541549
+  },
+  "severe_rate": 0.0,
+  "minor_rate": 0.0,
+  "excluded_strata": []
+ },
+ "crown": {
+  "crown": false,
+  "delta": -0.03378977415054145,
+  "lower": -0.042908513658064466,
+  "se": 0.005398219213820681,
+  "s_king": 0.042371269732083,
+  "s_challenger": 0.008581495581541549
+ },
+ "run": {
+  "status": "ok",
+  "reason": "",
+  "pod_seconds": 501.9,
+  "cost_usd": 0.03527973597777778
+ },
+ "judge_tokens": {},
+ "seconds": 506.0,
+ "n_human": 71,
+ "missing_human": 7,
+ "owner_spent": {
+  "lium": 0.035
+ }
+}

@@ -1,0 +1,13 @@
+runsc version release-20261102.0
+== runsc do (cpu, no network)
+starting container: connecting to control server at PID 2183: connection refused: the sandbox exited before the container started (see the sandbox logs)
+== runsc do platform=ptrace
+starting container: connecting to control server at PID 2281: connection refused: the sandbox exited before the container started (see the sandbox logs)
+== runsc do nvproxy
+starting container: connecting to control server at PID 2324: connection refused: the sandbox exited before the container started (see the sandbox logs)
+== runsc do nvproxy ptrace
+starting container: connecting to control server at PID 2367: connection refused: the sandbox exited before the container started (see the sandbox logs)
+== docker runsc with ignore-cgroups+network none
+stdout: 
+stderr: bind-mount /proc/2493/ns/net -> /var/run/docker/netns/6d937bf8893a: no such file or directory: unknown.
+== done

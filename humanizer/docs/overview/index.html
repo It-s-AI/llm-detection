@@ -1,0 +1,310 @@
+<title>Subnet 32 Overview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column with wide figure bands; a probability scale (0 = human, 1 = AI) is the recurring motif. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --ink: #0f1622; --ink-2: #4a5466; --ink-3: #7b8496;
+  --line: #dde2ea; --accent: #2a5fd6; --accent-soft: #e6edfb;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --q1: #1d4fa8; --q2: #6f9be0; --q3: #c9d8f3;
+  --font-display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e131b; --surface: #151c27; --ink: #eef1f6; --ink-2: #b4bccb; --ink-3: #8790a2;
+  --line: #273142; --accent: #6f9cf0; --accent-soft: #1a2640;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --q1: #8fb3f2; --q2: #4f7fd0; --q3: #2a4778; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e131b; --surface: #151c27; --ink: #eef1f6; --ink-2: #b4bccb; --ink-3: #8790a2;
+  --line: #273142; --accent: #6f9cf0; --accent-soft: #1a2640;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --q1: #8fb3f2; --q2: #4f7fd0; --q3: #2a4778; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font-body); }
+.wrap { max-width: 1060px; margin: 0 auto; padding-block: 0 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 4.6vw, 3.3rem); line-height: 1.1; font-weight: 700; }
+h2 { font-size: clamp(1.45rem, 2.6vw, 1.95rem); line-height: 1.2; font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 66ch; color: var(--ink-2); }
+.eyebrow { font: 500 0.75rem/1 var(--font-data); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+.steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.step-h { display: flex; gap: 10px; align-items: baseline; }
+.step-h .num { font-size: 0.8rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 50%; width: 1.6rem; height: 1.6rem; display: inline-grid; place-items: center; flex: none; }
+.step p { font-size: 0.93rem; }
+.formula { overflow-x: auto; padding: 14px 10px; border-radius: 10px; background: var(--accent-soft); color: var(--ink); display: flex; justify-content: center; }
+.formula math { margin: 0; }
+.formula-pair { flex-wrap: wrap; gap: 8px 40px; align-items: baseline; }
+math { font-size: 1.12rem; }
+@media (max-width: 820px) { .steps { grid-template-columns: 1fr; } }
+.gates { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.gate { background: var(--surface); padding: 18px 20px; display: grid; grid-template-columns: 3rem 1fr; gap: 14px; align-items: start; }
+.gate > div { min-width: 0; display: grid; gap: 6px; }
+.gate p { font-size: 0.93rem; }
+.gate-id { font-weight: 500; font-size: 0.95rem; color: var(--accent); padding-top: 1px; }
+.tbl { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th { text-align: left; font: 500 0.72rem var(--font-data); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); }
+td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+td:first-child { color: var(--ink); font-weight: 500; width: 4rem; }
+td:last-child { white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+@media (max-width: 600px) { td:last-child { white-space: normal; } }
+/* hero */
+.hero { padding-block: 56px 40px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 40px; align-items: center; }
+.hero > div { min-width: 0; display: grid; gap: 18px; }
+.hero p { font-size: 1.08rem; }
+.scale-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: grid; gap: 14px; }
+.scale-card .lbl { display: flex; justify-content: space-between; font: 500 0.72rem var(--font-data); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.sample { display: grid; gap: 6px; }
+.sample .txt { font-size: 0.9rem; color: var(--ink-2); line-height: 1.45; }
+.track { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--s1), var(--line) 50%, var(--s2)); }
+.pin { position: absolute; top: -5px; width: 4px; height: 20px; border-radius: 2px; background: var(--ink); transform: translateX(-2px); }
+.sample .meta { display: flex; justify-content: space-between; font: 0.78rem var(--font-data); color: var(--ink-3); }
+
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.tile { background: var(--surface); padding: 20px; display: grid; gap: 4px; min-width: 0; }
+.tile b { font: 600 1.9rem/1.1 var(--font-display); color: var(--ink); }
+.tile span { font-size: 0.86rem; color: var(--ink-2); }
+
+section { padding-block: 56px 0; display: grid; gap: 22px; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+.split > * { min-width: 0; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: grid; gap: 12px; min-width: 0; }
+figcaption { font-size: 0.86rem; color: var(--ink-3); }
+figure h3 { color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--ink-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+svg { display: block; width: 100%; height: auto; max-width: 100%; overflow: visible; }
+svg text { fill: var(--ink-2); font-family: var(--font-body); }
+.points { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.point { display: grid; gap: 8px; align-content: start; border-top: 2px solid var(--ink); padding-top: 14px; min-width: 0; }
+.point p { font-size: 0.95rem; }
+.flow-scroll { overflow-x: auto; }
+.flow-scroll svg { min-width: 760px; }
+.status { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 28px; }
+.status div { display: flex; gap: 10px; align-items: baseline; font-size: 0.95rem; color: var(--ink-2); min-width: 0; }
+.status div::before { content: "✓"; color: var(--s3); font-weight: 700; flex: none; }
+.tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font: 0.8rem/1.35 var(--font-body); padding: 7px 10px; border-radius: 7px; max-width: 260px; z-index: 20; }
+.foot { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 0.82rem; color: var(--ink-3); }
+.foot p { color: var(--ink-3); }
+@media (max-width: 820px) {
+  .hero, .split { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .points, .status { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: no-preference) { .pin { transition: left 0.6s ease; } }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <span class="eyebrow">Bittensor · Subnet 32 · It's AI</span>
+      <h1>Detecting AI text, and learning to beat the detectors</h1>
+      <p>Subnet 32 runs two competitions over the same question: can a machine tell AI-written text from human writing? Detection miners build the best detectors. Humanizer miners build models that rewrite AI text so that leading commercial detectors read it as human, while keeping the meaning and the quality.</p>
+    </div>
+    <div class="scale-card" aria-label="Detector score scale, 0 means human and 1 means AI">
+      <div class="lbl"><span>0 · human</span><span>detector score</span><span>AI · 1</span></div>
+      <div class="sample"><div class="txt">“Call me Ishmael. Some years ago, never mind how long precisely…”</div>
+        <div class="track"><div class="pin" style="left:0.4%"></div></div><div class="meta"><span>Classic prose</span><span class="num">0.00–0.002</span></div></div>
+      <div class="sample"><div class="txt">“In today's fast-paced digital landscape, effective time management has become more crucial than ever…”</div>
+        <div class="track"><div class="pin" style="left:99.6%"></div></div><div class="meta"><span>Typical LLM prose</span><span class="num">1.00</span></div></div>
+      <div class="sample"><div class="txt">The humanizer's job: move AI text to the left of this scale without changing what it says.</div>
+        <div class="track"><div class="pin" style="left:20%"></div></div><div class="meta"><span>Target</span><span class="num">→ 0</span></div></div>
+    </div>
+  </header>
+
+  <div class="tiles">
+    <div class="tile"><b class="num">2</b><span>competitions in one subnet: detection and humanizer</span></div>
+    <div class="tile"><b class="num">80 / 20 → 50 / 50</b><span>split of miner weights, detection / humanizer: 20% now, 50% next</span></div>
+    <div class="tile"><b class="num">~500</b><span>hidden texts per period, a fresh set every 7 days</span></div>
+    <div class="tile"><b class="num">3</b><span>commercial detectors score every result: GPTZero, Pangram, ZeroGPT</span></div>
+  </div>
+
+  <section>
+    <span class="eyebrow">How the humanizer competition works</span>
+    <h2>One king, one challenger at a time, judged on hidden texts</h2>
+    <figure>
+      <div class="flow-scroll">
+        <svg viewBox="0 0 980 250" role="img" aria-label="Flow: a miner commits a bundle on chain and pays; the bundle runs offline on a GPU over hidden texts; judges and detectors score it; if it beats the king with statistical confidence it is crowned; validators read the signed leaderboard.">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+          <g style="color:var(--ink-3)" stroke="currentColor" stroke-width="1.6" fill="none" marker-end="url(#ar)">
+            <line x1="150" y1="70" x2="196" y2="70"/><line x1="346" y1="70" x2="392" y2="70"/><line x1="542" y1="70" x2="588" y2="70"/><line x1="738" y1="70" x2="784" y2="70"/>
+            <path d="M860 112 V180 H630"/>
+          </g>
+          <g font-size="12.5">
+            <rect x="10" y="30" width="140" height="80" rx="10" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="80" y="62" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Miner</text>
+            <text x="80" y="82" text-anchor="middle">model on Hugging Face,</text><text x="80" y="97" text-anchor="middle">commit on chain</text>
+            <rect x="200" y="30" width="146" height="80" rx="10" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="273" y="62" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Pays the evaluation</text>
+            <text x="273" y="82" text-anchor="middle">in TAO, at cost;</text><text x="273" y="97" text-anchor="middle">unused part refunded</text>
+            <rect x="396" y="30" width="146" height="80" rx="10" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="469" y="62" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Runs offline</text>
+            <text x="469" y="82" text-anchor="middle">one GPU, no network,</text><text x="469" y="97" text-anchor="middle">~500 hidden texts</text>
+            <rect x="592" y="30" width="146" height="80" rx="10" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="665" y="62" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Scored</text>
+            <text x="665" y="82" text-anchor="middle">LLM judges: meaning,</text><text x="665" y="97" text-anchor="middle">quality; 3 detectors</text>
+            <rect x="788" y="30" width="180" height="80" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="878" y="62" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Crown test</text>
+            <text x="878" y="82" text-anchor="middle">beats the king on the</text><text x="878" y="97" text-anchor="middle">same texts, with confidence</text>
+            <rect x="440" y="150" width="190" height="62" rx="10" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="535" y="178" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Signed leaderboard</text>
+            <text x="535" y="197" text-anchor="middle">kings only, newest first</text>
+            <rect x="160" y="150" width="210" height="62" rx="10" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="265" y="178" text-anchor="middle" font-weight="600" style="fill:var(--ink)">Validators</text>
+            <text x="265" y="197" text-anchor="middle">pay 85 / 10 / 5 to the kings</text>
+          </g>
+          <g style="color:var(--ink-3)" stroke="currentColor" stroke-width="1.6" fill="none" marker-end="url(#ar)"><line x1="440" y1="181" x2="374" y2="181"/></g>
+          <text x="745" y="172" font-size="11.5" style="fill:var(--ink-3)">new king</text>
+          <text x="384" y="172" font-size="11.5" style="fill:var(--ink-3)">reads</text>
+        </svg>
+      </div>
+      <figcaption>A challenger never competes against a pool, only against the current king, on identical inputs. The king and every challenger see the same ~500 texts, which stay secret until the period ends.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <span class="eyebrow">Quality gates</span>
+    <h2>How every rewrite is judged before the detectors see it</h2>
+    <p>A humanizer could fool detectors by writing anything. The gates make sure it rewrites the same text: same facts, same language and genre, readable form. They are applied in order to every output, by LLM judges from two different vendors. A flag counts only when both judges raise it at the same place, taking the milder of their two ratings; when they disagree, a third model from another vendor acts as arbiter.</p>
+    <div class="gates">
+      <div class="gate"><span class="gate-id num">G0</span><div><h3>Normalization</h3><p>Unicode is normalized, invisible and control characters are removed, look-alike letters are mapped back. Everything is judged on the normalized text, and the output is cut at 1.3× the input's length.</p></div></div>
+      <div class="gate"><span class="gate-id num">GI</span><div><h3>Injection screen</h3><p>A dedicated judge looks for text addressed to the reviewers instead of the reader and must quote it. A flagged output is level 0 and goes no further. The output always reaches the judges as data inside a document tag, never as instructions.</p></div></div>
+      <div class="gate"><span class="gate-id num">G1</span><div><h3>Meaning</h3><p>When the period is built, the facts of every input are extracted and checked by both judges. Each rewrite is then checked both ways: every input fact must still be present and undistorted (recall), and every output sentence must be supported by the input (precision). Allowed: a few omissions, up to max(1, 10% of the facts), and a little filler, up to max(2, 20% of the sentences). Distortions and additions are not allowed.</p></div></div>
+      <div class="gate"><span class="gate-id num">G2</span><div><h3>Language and genre</h3><p>The rewrite must stay in the same language and the same genre, and read as a coherent whole. Register, format, person and tense may change freely: that is part of the humanizer's job.</p></div></div>
+      <div class="gate"><span class="gate-id num">G3</span><div><h3>Naturalness</h3><p>The judges list defects of form that the input did not have, each with a quote and a severity by its effect on the reader: minor, noticeable or gross. Only defects both judges found count. The allowance for minor ones grows with length: max(3, ⌈words / 75⌉).</p></div></div>
+    </div>
+    <figure>
+      <h3>From verdicts to a quality level</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Level</th><th>When</th><th>Counts as</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>Every gate passed</td><td>full contribution</td></tr>
+          <tr><td class="num">0.75</td><td>Only a few minor flaws of form (G3)</td><td>three quarters</td></tr>
+          <tr><td class="num">0.5</td><td>One noticeable violation: a single distortion or addition, one omission over the allowance, too much filler, a noticeable defect of form, or more minor ones than allowed</td><td>half</td></tr>
+          <tr><td class="num">0</td><td>A gross violation: two or more distortions or additions, many omissions, a different language or genre, incoherent or cut-off text, garbage, an empty output, an injection</td><td>caught by every detector</td></tr>
+        </tbody>
+      </table></div>
+      <figcaption>An output's level is the minimum over all gates. Text that did not change from the input needs no judge: it keeps level 1, and the detectors catch it anyway.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <span class="eyebrow">The score</span>
+    <h2>How a submission's score S is computed</h2>
+    <p>Every period has about 500 hidden AI-written inputs and a reference set H of about 500 human texts written before 2022, matched by genre and length. The submission rewrites every input. Each rewrite gets a quality verdict from LLM judges and a score from each of the three detectors; the human texts are scored by the same detectors. S combines those numbers in four steps.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-h"><span class="num">1</span><h3>Quality level of each output</h3></div>
+        <div class="formula"><math display="block"><msub><mi>q</mi><mi>i</mi></msub><mo>=</mo><munder><mo movablelimits="true">min</mo><mtext>gates</mtext></munder><mspace width="0.3em"/><msub><mi>level</mi><mi>g</mi></msub><mo>(</mo><mi>i</mi><mo>)</mo><mspace width="0.6em"/><mo>∈</mo><mo>{</mo><mn>1</mn><mo>,</mo><mn>0.75</mn><mo>,</mo><mn>0.5</mn><mo>,</mo><mn>0</mn><mo>}</mo></math></div>
+        <p>Each rewrite first gets a quality grade from the gates described above: the lowest grade any gate gives it. The grade decides how much that rewrite can count for later. A perfect rewrite counts fully, a slightly flawed one counts partly, and a broken one counts as if every detector had caught it.</p>
+      </div>
+      <div class="step">
+        <div class="step-h"><span class="num">2</span><h3>Two terms per detector</h3></div>
+        <div class="formula"><math display="block"><msub><mi>A</mi><mi>d</mi></msub><mo>=</mo><mn>1</mn><mo>−</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mi>q</mi><mi>i</mi></msub><mspace width="0.15em"/><msub><mi>u</mi><mrow><mi>d</mi><mo>,</mo><mi>i</mi></mrow></msub><mspace width="2em"/><msub><mi>P</mi><mi>d</mi></msub><mo>=</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mi>q</mi><mi>i</mi></msub><mo>(</mo><mn>1</mn><mo>−</mo><msub><mi>s</mi><mrow><mi>d</mi><mo>,</mo><mi>i</mi></mrow></msub><mo>)</mo></math></div>
+        <p>For each detector we ask two questions. The first: can the detector still tell the rewrites apart from real human writing? We compare every rewrite with human texts of the same genre and length and count how often the detector finds the human text more suspicious. If it always picks out the rewrite, the detector wins completely; if it guesses no better than a coin, the rewrites are indistinguishable from people. The second: how sure is the detector? We take its average confidence that the rewrites were written by a human. Both answers are weighted by the quality grade, so broken text never helps.</p>
+      </div>
+      <div class="step">
+        <div class="step-h"><span class="num">3</span><h3>Evasion per detector</h3></div>
+        <div class="formula"><math display="block"><msub><mi>E</mi><mi>d</mi></msub><mo>=</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>·</mo><mn>2</mn><mspace width="0.1em"/><mo movablelimits="true">min</mo><mo>(</mo><mn>0.5</mn><mo>,</mo><mspace width="0.2em"/><mn>1</mn><mo>−</mo><msub><mi>A</mi><mi>d</mi></msub><mo>)</mo><mo>+</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>·</mo><msub><mi>P</mi><mi>d</mi></msub><mspace width="1.2em"/><msub><mi>E</mi><mi>d</mi></msub><mo>∈</mo><mo>[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>]</mo></math></div>
+        <p>The two answers are averaged into one number per detector, from 0 to 1. Half of it is earned by becoming truly indistinguishable from human writing. The other half is earned by any drop in the detector's confidence, so a miner sees progress even before the rewrites are good enough to pass as human. A 1 means the detector takes every rewrite for human writing.</p>
+      </div>
+      <div class="step">
+        <div class="step-h"><span class="num">4</span><h3>One score across detectors</h3></div>
+        <div class="formula"><math display="block"><mi>S</mi><mo>=</mo><msup><mrow><mo>(</mo><mfrac><mn>1</mn><mn>3</mn></mfrac><munder><mo>∑</mo><mrow><mi>d</mi></mrow></munder><msubsup><mi>E</mi><mi>d</mi><mi>p</mi></msubsup><mo>)</mo></mrow><mrow><mn>1</mn><mo>/</mo><mi>p</mi></mrow></msup><mo>,</mo><mspace width="1.2em"/><mi>p</mi><mo>=</mo><mo>−</mo><mn>4</mn></math></div>
+        <p>The three detector numbers are combined so that the weakest one dominates: the final score stays low until all three detectors are fooled, so beating two and ignoring the third does not pay. If any detector catches everything, the score is 0. The score runs from 0, which is what simply copying the AI text gets, to 1.</p>
+      </div>
+    </div>
+    <figure>
+      <h3>The crown test</h3>
+      <div class="formula formula-pair">
+        <math display="block"><mi>Δ</mi><mi>S</mi><mo>=</mo><msub><mi>S</mi><mtext>challenger</mtext></msub><mo>−</mo><msub><mi>S</mi><mtext>king</mtext></msub></math>
+        <math display="block"><mtext>crown</mtext><mspace width="0.6em"/><mo stretchy="false">⟺</mo><mspace width="0.6em"/><msub><mi>Q</mi><mn>0.05</mn></msub><mo stretchy="false">(</mo><mi>Δ</mi><msup><mi>S</mi><mo>*</mo></msup><mo stretchy="false">)</mo><mo>&gt;</mo><mn>0</mn></math>
+      </div>
+      <figcaption>The challenger and the king rewrite the same texts. To be sure the challenger is really better and not just lucky with this particular set of texts, we re-draw the set 2,000 times at random and compare the two scores on each draw. The challenger takes the crown only if it comes out ahead in at least 95% of those draws. No extra margin is required on top of that for now.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <span class="eyebrow">Incentives</span>
+    <h2>Where the emission goes</h2>
+    <div class="split">
+      <figure>
+        <h3>Miner weights set by every validator</h3>
+        <svg id="chart-split" viewBox="0 0 520 110" role="img" aria-label="Now: detection 80 percent; humanizer 20 percent split into current king 17, previous king 2, the one before 1"></svg>
+        <svg id="chart-split-next" viewBox="0 0 520 110" role="img" aria-label="Next: detection 50 percent; humanizer 50 percent split into current king 42.5, previous king 5, the one before 2.5"></svg>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Detection miners</span><span><i style="background:var(--s2)"></i>Current king</span><span><i style="background:var(--s4)"></i>Previous king</span><span><i style="background:var(--s5)"></i>King before that</span></div>
+        <figcaption>The humanizer share starts at 20% and moves to 50%. It is paid 85 / 10 / 5 to the current king and the two previous kings. Until the first miner beats the owner's baseline, that share goes to detection. Nothing is burned.</figcaption>
+      </figure>
+      <figure>
+        <h3>What one evaluation costs (paid by the miner)</h3>
+        <svg id="chart-cost" viewBox="0 0 520 150" role="img" aria-label="Upper bound of one evaluation, 150.12 USDC: Pangram 90.15, GPTZero 23.19, LLM judges 19.36, ZeroGPT 10.67, GPU pod 6.75"></svg>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Pangram</span><span><i style="background:var(--s2)"></i>GPTZero</span><span><i style="background:var(--s3)"></i>LLM judges</span><span><i style="background:var(--s4)"></i>ZeroGPT</span><span><i style="background:var(--s5)"></i>GPU pod</span></div>
+        <figcaption>Quote for the current period, at list prices. Miners pay in TAO; it is converted to USDC, the unused part of the hold stays on their balance. There are no free evaluations, so spam costs the spammer.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Trust</span>
+    <h2>Built to be checked, not trusted</h2>
+    <div class="points">
+      <div class="point"><h3>Open code</h3><p>Every line of the evaluator is public. Only the current period's texts and seeds are secret, and only until the period ends.</p></div>
+      <div class="point"><h3>Committed on chain</h3><p>Each period's inputs are fixed in advance by a commitment and a Merkle root posted on chain, so they cannot be changed after miners submit.</p></div>
+      <div class="point"><h3>Verifiable afterwards</h3><p>After a period ends, its texts, scores and crown decisions are published. Anyone can recompute every result with one script.</p></div>
+      <div class="point"><h3>No human in the loop</h3><p>Results come from commercial detectors, LLM judges and statistics. People only chose and calibrated the tools.</p></div>
+      <div class="point"><h3>Statistical crown</h3><p>A challenger must beat the king on the same texts with a paired bootstrap test, so luck does not take the crown.</p></div>
+      <div class="point"><h3>One submission per registration</h3><p>An identical copy only counts for whoever committed it on chain first, and the winning model is published 48 hours later.</p></div>
+    </div>
+  </section>
+
+  <div class="foot"><p>Figures come from Subnet 32's own configuration and live checks on the production server (November 2026). Detector names are the commercial services the evaluator calls. The score is defined in the subnet's specification (D-20 to D-23).</p></div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function () {
+  const NS = "http://www.w3.org/2000/svg";
+  const tip = document.getElementById("tip");
+  function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+  function hover(node, text) {
+    node.style.cursor = "default";
+    node.addEventListener("pointermove", (ev) => { tip.textContent = text; tip.hidden = false;
+      const x = Math.min(ev.clientX + 14, window.innerWidth - 270); tip.style.left = x + "px"; tip.style.top = (ev.clientY + 14) + "px"; });
+    node.addEventListener("pointerleave", () => { tip.hidden = true; });
+  }
+  function roundTop(x, y, w, h, r) { r = Math.min(r, h, w / 2); return `M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z`; }
+  function roundRight(x, y, w, h, r) { r = Math.min(r, w, h / 2); return `M${x},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h - r} Q${x + w},${y + h} ${x + w - r},${y + h} H${x} Z`; }
+
+  // 4/5. one 100% bar each
+  function bar(id, parts, unit, total, label) {
+    const svg = document.getElementById(id);
+    const L = 10, W = 500, yy = 30, h = 40; let x0 = L;
+    el("text", { x: L, y: 18, "font-size": 12.5, style: "fill:var(--ink)" }, svg).textContent = label;
+    parts.forEach(([name, v, col]) => {
+      const w = W * v / total - 2;
+      el("rect", { x: x0, y: yy, width: Math.max(w, 1.5), height: h, rx: 3, fill: col }, svg);
+      if (w > 46) el("text", { x: x0 + 8, y: yy + 25, "font-size": 12, "font-family": "var(--font-data)", style: "fill:#fff" }, svg).textContent = unit(v);
+      const hit = el("rect", { x: x0, y: yy - 6, width: Math.max(w, 8), height: h + 12, fill: "transparent" }, svg);
+      hover(hit, `${name}: ${unit(v)}`);
+      x0 += w + 2;
+    });
+    return svg;
+  }
+  const sp = bar("chart-split", [["Detection miners", 80, "var(--s1)"], ["Current king", 17, "var(--s2)"], ["Previous king", 2, "var(--s4)"], ["King before that", 1, "var(--s5)"]], (v) => v + "%", 100, "Now");
+  el("text", { x: 510, y: 96, "text-anchor": "end", "font-size": 11.5, "font-family": "var(--font-data)" }, sp).textContent = "humanizer 20% = 17 + 2 + 1";
+  const sn = bar("chart-split-next", [["Detection miners", 50, "var(--s1)"], ["Current king", 42.5, "var(--s2)"], ["Previous king", 5, "var(--s4)"], ["King before that", 2.5, "var(--s5)"]], (v) => v + "%", 100, "Next");
+  el("text", { x: 510, y: 96, "text-anchor": "end", "font-size": 11.5, "font-family": "var(--font-data)" }, sn).textContent = "humanizer 50% = 42.5 + 5 + 2.5";
+  const cp = bar("chart-cost", [["Pangram", 90.15, "var(--s1)"], ["GPTZero", 23.19, "var(--s2)"], ["LLM judges", 19.36, "var(--s3)"], ["ZeroGPT", 10.67, "var(--s4)"], ["GPU pod (1.5 h)", 6.75, "var(--s5)"]], (v) => "$" + v.toFixed(2), 150.12, "Upper bound for one evaluation: $150.12");
+  el("text", { x: 510, y: 96, "text-anchor": "end", "font-size": 11.5, "font-family": "var(--font-data)" }, cp).textContent = "charged by use, the rest is returned";
+})();
+</script>

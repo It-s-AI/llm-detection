@@ -1,0 +1,43 @@
+{
+  "comment": "Gate judges (D-44, Q-3) chosen by the G1 v2 calibration 2026-11-09 (report 04b): two vendors judge, a third-vendor model arbitrates G1 disputes. Fact validators at period build = the same judge pair (configs/period.json). G2 ignores register and format (owner decision 2026-11-09) and person/tense (2026-11-20).",
+  "judges": [
+    "openai/gpt-6-luna",
+    "google/gemini-3.8-flash"
+  ],
+  "arbiter": "anthropic/claude-sonnet-5.5",
+  "providers": {
+    "comment": "one provider per judge model, no fallback: the king and every challenger are judged on the same infrastructure; if it is down, evaluations pause (owner's requirement 2026-11-21). Slugs checked live 2026-11-21.",
+    "openai/gpt-6-luna": "openai",
+    "google/gemini-3.8-flash": "google-vertex",
+    "anthropic/claude-sonnet-5.5": "google-vertex"
+  },
+  "injection_screen": {
+    "comment": "a dedicated judge before G1-G3 (owner's decision 2026-11-21): an output with a verified injected passage is level 0 and never reaches the quality judges",
+    "judges": [
+      "anthropic/claude-sonnet-5.5"
+    ]
+  },
+  "judge_overrides": {
+    "qwen/qwen3.8-flash": {
+      "max_tokens": 12000
+    }
+  },
+  "g1": {
+    "max_omitted_frac": 0.1,
+    "min_omitted_allowed": 1,
+    "max_contradicted": 0,
+    "max_added": 0,
+    "max_embellished_frac": 0.2,
+    "min_embellished_allowed": 2
+  },
+  "g2_ignore": [
+    "same_register",
+    "same_format",
+    "same_person_and_tense"
+  ],
+  "g3": {
+    "comment": "G3 v3 (owner decision 2026-11-20): judges list defects with a quote, kind and severity; a few minor slips -> 0.75, at most max(minor_base, ceil(words / words_per_minor)); any major -> 0.5; broken / incoherent / artifact -> 0",
+    "minor_base": 3,
+    "words_per_minor": 75
+  }
+}

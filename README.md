@@ -15,6 +15,18 @@
 
 </div>
 
+## v4: two competitions, one set of weights <!-- omit in toc -->
+
+* **Detection** (this repository's miners and validators, unchanged): 80% of every validator's weights.
+* **Humanizer competition**: 20%, split 85/10/5 between the current king and the two previous kings.
+  Miners submit a model that rewrites AI text so that commercial AI detectors take it for human writing
+  while the meaning and quality are kept. The subnet owner's evaluator judges every submission and
+  publishes who the kings are in a signed leaderboard; the split and the shares are fixed in the validator
+  code, and validators apply them without running anything new. While no miner is king, the 20% goes to
+  detection. The evaluator's code, rules and miner guide are in
+  [`humanizer/`](humanizer) ([rules](humanizer/docs/rules.md), [miners](humanizer/docs/miners.md),
+  [validators](humanizer/docs/validators.md)).
+
 # About
 
 It's AI is an ai-detector tool, which helps people to identify whether the text was human-written or ai-generated. In addition to just classifying texts, It's AI also provides a deep scan functionality, which shows probabilities of AI for each sentence in the text.

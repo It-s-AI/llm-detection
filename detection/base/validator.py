@@ -27,6 +27,9 @@ from typing import List
 from traceback import print_exception
 
 from detection.base.neuron import BaseNeuron
+from detection.validator.humanizer_mechanism import (
+    DEFAULT_PUBLIC_KEY, DEFAULT_URLS, HUMANIZER_SHARE, HumanizerLeaderboard, blend
+)
 from detection import (
     __version__, WANDB_PROJECT,
     WANDB_ENTITY, MAX_RUN_STEPS_PER_WANDB_RUN
@@ -243,7 +246,6 @@ class BaseValidatorNeuron(BaseNeuron):
         """
         Sets the validator weights to the metagraph hotkeys based on the scores it has received from the miners. The weights determine the trust and incentive level the validator assigns to miner nodes on the network.
         """
-
         # Check if self.scores contains any NaN values and log a warning if it does.
         if torch.isnan(self.scores).any():
             bt.logging.warning(
@@ -255,6 +257,8 @@ class BaseValidatorNeuron(BaseNeuron):
         # m = torch.nn.Softmax()
         # raw_weights = m(self.scores * 4)
         raw_weights = torch.nn.functional.normalize(self.scores, p=1, dim=0)
+        # v4: the humanizer competition's share, from the owner's signed leaderboard (one weight vector)
+        raw_weights = self.add_humanizer_share(raw_weights)
 
         bt.logging.info("raw_weights", raw_weights)
         bt.logging.info("raw_weight_uids", self.metagraph.uids)
@@ -293,10 +297,86 @@ class BaseValidatorNeuron(BaseNeuron):
             version_key=self.spec_version,
         )
 
+        self.last_weights_set = {  # logged to wandb with the next step (the vector validators really sent)
+            "block": int(self.metagraph.block.item()),
+            "ok": result is True,
+            "message": str(msg)[:300],
+            "uids": [int(u) for u in uint_uids],
+            "weights": [int(w) for w in uint_weights],
+        }
         if result is True:
             bt.logging.info("set_weights on chain successfully!")
         else:
             bt.logging.error(f"set_weights failed {msg}")
+
+    def add_humanizer_share(self, detection: torch.FloatTensor) -> torch.FloatTensor:
+        """Both competitions in one weight vector, with the split fixed in code: detection keeps
+        ``1 - HUMANIZER_SHARE`` (80%), the humanizer competition gets ``HUMANIZER_SHARE`` (20%), 85/10/5 to
+        its kings named by the owner's signed leaderboard (the last valid one's through an outage). With
+        no king to pay, no valid leaderboard ever, or --humanizer.disable, the detection weights are used
+        alone. If this round's computation fails, the previous humanizer vector is reused."""
+        key = self.config.humanizer.public_key or DEFAULT_PUBLIC_KEY
+        self.humanizer_status = {"share": HUMANIZER_SHARE, "applied": False}
+        if self.config.humanizer.disable or not key:
+            self.humanizer_status["reason"] = "disabled" if self.config.humanizer.disable else "no public key"
+            return detection
+        try:
+            if getattr(self, "humanizer", None) is None:
+                urls = [u.strip() for u in (self.config.humanizer.urls or "").split(",") if u.strip()]
+                self.humanizer = HumanizerLeaderboard(
+                    urls or list(DEFAULT_URLS),
+                    key,
+                    self.config.netuid,
+                    state_path=os.path.join(self.config.neuron.full_path, "humanizer_leaderboard.json"),
+                    log=bt.logging.warning,
+                )
+            regs = getattr(self.metagraph, "block_at_registration", None)
+            regs = [int(b) for b in regs] if regs is not None and len(regs) == len(self.metagraph.hotkeys) else None
+            self._humanizer_vector = self.humanizer.dense(list(self.metagraph.hotkeys), regs)
+            self._humanizer_hotkeys = list(self.metagraph.hotkeys)
+            self._humanizer_ok = True
+            self.humanizer_status["reason"] = "ok"
+        except Exception as e:
+            self.humanizer_status["error"] = str(e)[:300]
+            if not getattr(self, "_humanizer_ok", False):
+                bt.logging.error(f"humanizer share not applied: {e}")
+                self.humanizer_status["reason"] = "error, never applied"
+                return detection
+            self.humanizer_status["reason"] = "error, previous vector reused"
+            # the previous vector is by UID: reuse it only for UIDs that still hold the same hotkey
+            prev, hks = self._humanizer_vector, getattr(self, "_humanizer_hotkeys", None)
+            now = list(self.metagraph.hotkeys)
+            if prev is not None and hks is not None:
+                keep = [w if i < len(now) and i < len(hks) and now[i] == hks[i] else 0.0 for i, w in enumerate(prev)]
+                total = sum(keep)
+                self._humanizer_vector = [w / total for w in keep] if total > 0 else None
+                self._humanizer_hotkeys = now
+            bt.logging.error(f"humanizer share: reusing the previous vector ({e})")
+        hum = self._humanizer_vector
+        p = getattr(getattr(self, "humanizer", None), "payload", None)
+        if p is not None:  # what the signed leaderboard said (the same for every honest validator)
+            now = time.time()
+            self.humanizer_status.update(
+                leaderboard_seq=int(p.get("seq", 0)),
+                leaderboard_age_s=round(now - float(p.get("issued_at", now)), 1),
+                leaderboard_fresh=now < float(p.get("expires_at", 0)),
+                kings=list(p.get("kings") or []),
+                king_registered_at=list(p.get("king_registered_at") or []),
+            )
+        if hum is None:
+            bt.logging.info("humanizer share: no king to pay; detection gets all the weights")
+            self.humanizer_status["reason"] = "no king to pay: the share went to detection"
+            return detection
+        out = blend(detection.cpu().tolist(), hum, HUMANIZER_SHARE)
+        self.humanizer_status.update(
+            applied=True,
+            king_weights={str(uid): round(w * HUMANIZER_SHARE, 6) for uid, w in enumerate(hum) if w > 0},
+        )
+        bt.logging.info(
+            "humanizer share",
+            {uid: round(w * HUMANIZER_SHARE, 6) for uid, w in enumerate(hum) if w > 0},
+        )
+        return torch.tensor(out, dtype=detection.dtype)
 
     def update_has_enough_stake(self):
         self.has_enough_stake = torch.zeros(len(self.hotkeys), dtype=torch.float32)
@@ -476,9 +556,28 @@ class BaseValidatorNeuron(BaseNeuron):
 
             signed_msg = f'0x{self.keypair.sign(original_format_json).hex()}'
             bt.logging.info("Logging to Wandb")
+            hs = getattr(self, "humanizer_status", None) or {}
+            humanizer_log = {  # the humanizer competition as this validator applied it (v4)
+                "humanizer/applied": int(bool(hs.get("applied"))),
+                "humanizer/share": hs.get("share"),
+                "humanizer/n_kings": len(hs.get("kings") or []),
+                "humanizer/leaderboard_seq": hs.get("leaderboard_seq"),
+                "humanizer/leaderboard_age_s": hs.get("leaderboard_age_s"),
+                "humanizer/leaderboard_fresh": int(bool(hs.get("leaderboard_fresh"))),
+                "humanizer/king_weights": hs.get("king_weights") or {},
+                "humanizer/status_json": json.dumps(hs, default=str),
+            }
+            ws = getattr(self, "last_weights_set", None)
+            weights_log = {} if ws is None else {
+                "weights_set/ok": int(ws["ok"]),
+                "weights_set/block": ws["block"],
+                "weights_set/json": json.dumps(ws),
+            }
             self.wandb_run.log(
                 {
                     **graphed_data,
+                    **humanizer_log,
+                    **weights_log,
                     "original_format_json": original_format_json,
                     "signed_msg": signed_msg
                 },

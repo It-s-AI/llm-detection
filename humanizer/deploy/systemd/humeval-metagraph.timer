@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh the SN32 snapshot every 3 minutes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=3min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

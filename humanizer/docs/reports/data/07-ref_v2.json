@@ -1,0 +1,210 @@
+{
+ "name": "ref_v2",
+ "n": 78,
+ "empty": 0,
+ "levels": {
+  "1.0": 36,
+  "0.5": 37,
+  "0.0": 5
+ },
+ "gate_reasons": [
+  [],
+  [],
+  [],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=True"
+  ],
+  [],
+  [
+   "style: ['same_person_and_tense']"
+  ],
+  [],
+  [],
+  [],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "meaning: 1 contradicted",
+   "naturalness: flags=['odd_word_choice'] worse=True"
+  ],
+  [],
+  [],
+  [],
+  [
+   "style: ['same_person_and_tense']"
+  ],
+  [
+   "naturalness: flags=['introduced_errors', 'odd_word_choice'] worse=True"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [],
+  [
+   "naturalness: flags=['introduced_errors'] worse=False"
+  ],
+  [],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=True"
+  ],
+  [],
+  [
+   "meaning: 2 contradicted"
+  ],
+  [
+   "naturalness: flags=[] worse=True"
+  ],
+  [],
+  [
+   "meaning: 2 contradicted",
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "meaning: 2 contradicted",
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "style: ['same_person_and_tense']",
+   "naturalness: flags=['run_ons'] worse=False"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "style: ['same_person_and_tense']",
+   "naturalness: flags=['incoherent', 'introduced_errors', 'odd_word_choice'] worse=True"
+  ],
+  [
+   "meaning: 1 contradicted",
+   "style: ['same_person_and_tense']",
+   "naturalness: flags=['introduced_errors', 'run_ons'] worse=False"
+  ],
+  [],
+  [],
+  [
+   "meaning: 1 contradicted",
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=True"
+  ],
+  [],
+  [],
+  [],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [],
+  [],
+  [
+   "style: ['same_person_and_tense']"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=True"
+  ],
+  [
+   "naturalness: flags=['introduced_errors'] worse=True"
+  ],
+  [],
+  [
+   "naturalness: flags=[] worse=True"
+  ],
+  [
+   "naturalness: flags=['broken_sentences', 'introduced_errors', 'run_ons'] worse=True"
+  ],
+  [
+   "meaning: 1 contradicted",
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [],
+  [
+   "meaning: omitted 2 of 19 facts (allowed 1)"
+  ],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['introduced_errors', 'odd_word_choice'] worse=False"
+  ],
+  [],
+  [
+   "naturalness: flags=['odd_word_choice'] worse=True"
+  ],
+  [],
+  [],
+  [
+   "naturalness: flags=['run_ons'] worse=False"
+  ],
+  [
+   "meaning: 1 sentences add new specific content",
+   "naturalness: flags=['odd_word_choice'] worse=False"
+  ],
+  [
+   "naturalness: flags=['odd_word_choice', 'run_ons'] worse=True"
+  ],
+  [
+   "naturalness: flags=['run_ons'] worse=True"
+  ]
+ ],
+ "words_ratio": 1.021605198384603,
+ "detectors": {
+  "its_ai": {
+   "identity": {
+    "S": 0.008198128242328634,
+    "auroc": 1.0,
+    "p_human": 0.016396256484657267,
+    "mean_score": 0.9826889704904835
+   },
+   "ref_v2": {
+    "S": 0.04374466199075256,
+    "auroc": 1.0,
+    "p_human": 0.08748932398150512,
+    "mean_score": 0.8397006861164684
+   },
+   "ref_v2_no_gates": {
+    "S": 0.08271109304611883,
+    "auroc": 1.0,
+    "p_human": 0.16542218609223766,
+    "mean_score": 0.8397006861164684
+   }
+  }
+ },
+ "spent": {
+  "openrouter": 1.508
+ }
+}

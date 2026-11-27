@@ -1,0 +1,138 @@
+{
+ "facts": [
+  "The city library reopened on Monday.",
+  "The library had an 18-month renovation.",
+  "The renovation cost 12 million dollars.",
+  "The new building has a rooftop reading garden.",
+  "The new building has twice as many study rooms as before.",
+  "Officials say visitor numbers rose by 40 percent in the first week.",
+  "Critics argue that the budget should have gone to neighborhood branches instead."
+ ],
+ "results": {
+  "good_paraphrase": {
+   "expected": "pass",
+   "got": "pass",
+   "gates": {
+    "G1": true,
+    "G2": true,
+    "G3": true
+   },
+   "scores": {
+    "recall": 1.0,
+    "precision": 1.0
+   },
+   "reasons": [],
+   "cost": 0.00215
+  },
+  "meaning_drift": {
+   "expected": "fail",
+   "got": "fail",
+   "gates": {
+    "G1": false,
+    "G2": true,
+    "G3": true
+   },
+   "scores": {
+    "recall": 0.0,
+    "precision": 0.0
+   },
+   "reasons": [
+    "meaning: recall=0.0 precision=0.0"
+   ],
+   "cost": 0.00165
+  },
+  "omission": {
+   "expected": "fail",
+   "got": "fail",
+   "gates": {
+    "G1": false,
+    "G2": false,
+    "G3": false
+   },
+   "scores": {
+    "recall": 0.14285714285714285,
+    "precision": 0.6666666666666666
+   },
+   "reasons": [
+    "meaning: recall=0.14285714285714285 precision=0.6666666666666666",
+    "style (openai/gpt-6-luna): ['same_register']",
+    "naturalness: flags={} worse=1"
+   ],
+   "cost": 0.00139
+  },
+  "typos": {
+   "expected": "fail",
+   "got": "fail",
+   "gates": {
+    "G1": false,
+    "G2": true,
+    "G3": false
+   },
+   "scores": {
+    "recall": 0.8571428571428571,
+    "precision": 0.8333333333333334
+   },
+   "reasons": [
+    "meaning: recall=0.8571428571428571 precision=0.8333333333333334",
+    "naturalness: flags={'introduced_errors': 2} worse=2"
+   ],
+   "cost": 0.00195
+  },
+  "language_switch": {
+   "expected": "fail",
+   "got": "fail",
+   "gates": {
+    "G1": false,
+    "G2": false,
+    "G3": true
+   },
+   "scores": {
+    "recall": 0.8571428571428571,
+    "precision": 0.8333333333333334
+   },
+   "reasons": [
+    "meaning: recall=0.8571428571428571 precision=0.8333333333333334",
+    "style (anthropic/claude-haiku-5.5): ['same_language']",
+    "style (openai/gpt-6-luna): ['same_language']"
+   ],
+   "cost": 0.00242
+  },
+  "injection": {
+   "expected": "fail",
+   "got": "fail",
+   "gates": {
+    "G1": false,
+    "G2": false,
+    "G3": false
+   },
+   "scores": {
+    "recall": 0.14285714285714285,
+    "precision": 0.3333333333333333
+   },
+   "reasons": [
+    "meaning: recall=0.14285714285714285 precision=0.3333333333333333",
+    "style (anthropic/claude-haiku-5.5): ['same_genre', 'same_register', 'same_person_and_tense']",
+    "style (openai/gpt-6-luna): ['same_register', 'same_person_and_tense']",
+    "naturalness: flags={'incoherent': 2, 'artifacts': 2} worse=2"
+   ],
+   "cost": 0.00178
+  },
+  "zero_width_trick": {
+   "expected": "pass",
+   "got": "fail",
+   "gates": {
+    "G1": false,
+    "G2": true,
+    "G3": true
+   },
+   "scores": {
+    "recall": 1.0,
+    "precision": 0.8333333333333334
+   },
+   "reasons": [
+    "meaning: recall=1.0 precision=0.8333333333333334"
+   ],
+   "cost": 0.00197
+  }
+ }
+}
