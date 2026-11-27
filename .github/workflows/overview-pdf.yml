@@ -1,0 +1,35 @@
+# Keeps humanizer/docs/overview/overview.pdf in step with index.html: renders the page in headless Chromium
+# (one tall page, as a browser shows it) and commits the PDF when it changed.
+name: overview pdf
+on:
+  push:
+    paths:
+      - "humanizer/docs/overview/index.html"
+      - "humanizer/docs/overview/render_pdf.mjs"
+      - ".github/workflows/overview-pdf.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Chromium and fonts
+        run: |
+          npm install --no-save playwright@1.65.1
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-dejavu-core fonts-noto-core
+      - name: Render
+        run: node humanizer/docs/overview/render_pdf.mjs "$PWD/humanizer/docs/overview/index.html" humanizer/docs/overview/overview.pdf
+      - name: Commit if changed
+        run: |
+          git add humanizer/docs/overview/overview.pdf
+          if git diff --cached --quiet; then echo "pdf unchanged"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "overview: render PDF [skip ci]"
+          git push
