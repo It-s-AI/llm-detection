@@ -98,6 +98,35 @@ def fake_vendor_transport(
                     ],
                 },
             )
+        if vendor == "winston":
+            p = _ai_prob(body["text"])
+            return httpx.Response(
+                200,
+                json={
+                    "status": 200,
+                    "score": round((1 - p) * 100, 2),
+                    "version": body.get("version") or "5.2",
+                    "credits_used": len(body["text"].split()),
+                    "attack_detected": {"zero_width_space": False, "homoglyph_attack": False},
+                },
+            )
+        if vendor == "originality":
+            p = _ai_prob(body["content"])
+            pct = round(p * 100)
+            return httpx.Response(
+                200,
+                json={
+                    "results": {
+                        "credits": {"used": max(1, -(-len(body["content"].split()) // 100))},
+                        "ai": {
+                            "model": body.get("aiModelVersion"),
+                            "prediction_label": "ai" if pct >= 50 else "human",
+                            "ai_assisted_percent": pct,
+                            "sentences": [{"text": body["content"], "ai_score": p}],
+                        },
+                    }
+                },
+            )
         if vendor == "zerogpt":
             p = _ai_prob(body["input_text"])
             return httpx.Response(

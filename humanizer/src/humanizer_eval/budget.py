@@ -52,7 +52,9 @@ class PoolLimit:
     billing_db: Path  # intake billing.sqlite (payments of the miners)
     since_ts: float
     gap_usd: float
-    services: tuple[str, ...] = ("pangram", "gptzero", "zerogpt", "openrouter", "lium")
+    services: tuple[str, ...] = (
+        "pangram", "gptzero", "originality", "winston", "zerogpt", "openrouter", "lium"
+    )  # fmt: skip
     weekly_usd: float = 0.0  # our own spend per period (the period's build), added once per period begun
     period_s: float = 7 * 86400.0
 

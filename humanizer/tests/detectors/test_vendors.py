@@ -16,10 +16,14 @@ from humanizer_eval.detectors.http import HttpClient, RetryPolicy
 from humanizer_eval.detectors.vendors import (
     GPTZero,
     ItsAI,
+    Originality,
     Pangram,
+    Winston,
     ZeroGPT,
     gptzero_cost,
+    originality_cost,
     pangram_cost,
+    winston_cost,
     zerogpt_cost,
 )
 
@@ -28,7 +32,10 @@ NO_SLEEP = {"sleep": lambda _s: None}
 
 
 def ledger(tmp_path, cap=10.0):
-    return SpendLedger(tmp_path / "led.sqlite", {s: cap for s in ("gptzero", "zerogpt", "pangram", "its_ai")})
+    return SpendLedger(
+        tmp_path / "led.sqlite",
+        {s: cap for s in ("gptzero", "zerogpt", "pangram", "its_ai", "originality", "winston")},
+    )
 
 
 def http(vendor, base_url="", **kw):
@@ -47,12 +54,15 @@ def test_pricing_upper_bounds():
     assert pangram_cost(230) == pytest.approx(0.15)  # 3 units, conservative ceil
     assert gptzero_cost(1_000_000) == pytest.approx(150)
     assert zerogpt_cost(1000) == pytest.approx(0.069)
+    assert originality_cost(256) == pytest.approx(0.03)  # 1 credit per started 100 words
 
 
-@pytest.mark.parametrize("cls,vendor", [(GPTZero, "gptzero"), (ZeroGPT, "zerogpt")])
+@pytest.mark.parametrize(
+    "cls,vendor", [(GPTZero, "gptzero"), (ZeroGPT, "zerogpt"), (Originality, "originality")]
+)
 def test_sync_vendors_parse_and_meter(tmp_path, cls, vendor):
     led = ledger(tmp_path)
-    cost = {"gptzero": gptzero_cost, "zerogpt": zerogpt_cost}[vendor]
+    cost = {"gptzero": gptzero_cost, "zerogpt": zerogpt_cost, "originality": originality_cost}[vendor]
     det = cls(http(vendor), ledger=led, cost_fn=cost)
     out = det.score(TEXTS)
     assert all(s.ok for s in out), [s.error for s in out]
@@ -131,12 +141,28 @@ def test_sends_delivered_with_an_unknown_outcome_are_each_booked(tmp_path):
 
     led = ledger(tmp_path)
     client = HttpClient("", transport=httpx.MockTransport(handler),
-                        retry=RetryPolicy(max_attempts=4), sleep=lambda _s: None)  # fmt: skip
+                        retry=RetryPolicy(max_attempts=4, max_delivered=3), sleep=lambda _s: None)  # fmt: skip
     det = GPTZero(client, ledger=led, cost_fn=gptzero_cost)
     det.max_workers = 1
     s = det.score(TEXTS[:1])[0]
     one = gptzero_cost(len(TEXTS[0].split()))
     assert calls["n"] == 3 and led.spent("gptzero") == pytest.approx(3 * one), (s, led.spent("gptzero"))
+
+
+def test_a_possibly_billed_send_is_repeated_only_max_delivered_times(tmp_path):
+    """Read timeouts after the request went out may each be billed: by default the text is sent twice in all,
+    not max_attempts times (429 / 5xx answers, which are not billed, keep max_attempts)."""
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        raise httpx.ReadTimeout("read timed out", request=request)
+
+    client = HttpClient("", transport=httpx.MockTransport(handler),
+                        retry=RetryPolicy(max_attempts=8), sleep=lambda _s: None)  # fmt: skip
+    det = GPTZero(client, ledger=ledger(tmp_path), cost_fn=gptzero_cost)
+    det.max_workers = 1
+    assert not det.score(TEXTS[:1])[0].ok and calls["n"] == 2
 
 
 def test_malformed_response_is_an_error(tmp_path):
@@ -248,3 +274,62 @@ def test_an_answer_without_probabilities_is_an_error_not_a_human_score(tmp_path)
     p = Pangram.__new__(Pangram)
     with pytest.raises(DetectorError):
         p._extract({"windows": [{"label": "AI", "word_count": 10}]})
+
+
+def test_originality_asks_for_its_model_and_reports_it(tmp_path):
+    seen = []
+    tr = fake_vendor_transport("originality")
+
+    class Spy(httpx.BaseTransport):
+        def handle_request(self, request):
+            seen.append(request)
+            return tr.handle_request(request)
+
+    h = HttpClient(transport=Spy(), retry=RetryPolicy(max_attempts=2, base_delay=0), rate_per_sec=1000, burst=1000,
+                   **NO_SLEEP)  # fmt: skip
+    s = Originality(h, ledger=ledger(tmp_path), cost_fn=originality_cost).score(TEXTS[:1])[0]
+    import json as _json
+
+    body = _json.loads(seen[0].content)
+    assert body["aiModelVersion"] == Originality.MODEL and body["check_plagiarism"] is False
+    assert body["storeScan"] is False and s.version == Originality.MODEL
+    assert s.score == pytest.approx(s.candidates["ai_assisted"]) and 0 <= s.score <= 1
+
+
+def _spy(vendor, seen, **kw):
+    tr = fake_vendor_transport(vendor, **kw)
+
+    class Spy(httpx.BaseTransport):
+        def handle_request(self, request):
+            seen.append(request)
+            return tr.handle_request(request)
+
+    return HttpClient(transport=Spy(), retry=RetryPolicy(max_attempts=2, base_delay=0), rate_per_sec=1000,
+                      burst=1000, **NO_SLEEP)  # fmt: skip
+
+
+def test_winston_pins_its_version_and_refuses_an_answer_from_another():
+    import json as _json
+
+    seen = []
+    led = ledger(__import__("pathlib").Path(__import__("tempfile").mkdtemp()))
+    long = TEXTS[0] * 2
+    s = Winston(_spy("winston", seen), ledger=led, cost_fn=winston_cost).score([long])[0]
+    body = _json.loads(seen[0].content)
+    assert body["version"] == Winston.VERSION and s.version == Winston.VERSION and s.ok
+    assert s.score == pytest.approx(s.candidates["p_ai"]) and 0 <= s.score <= 1  # 1 - human score / 100
+
+    class Other(Winston):
+        VERSION = "5.1"  # the fake answers with the version asked for: check by changing what we expect
+
+    det = Other(_spy("winston", []), ledger=led, cost_fn=winston_cost)
+    det._call = lambda text: {"score": 10.0, "version": "5.2"}  # a retired pin answered by the newest model
+    bad = det.score([long])[0]
+    assert not bad.ok and "not the pinned" in bad.error
+
+
+def test_winston_does_not_send_texts_under_its_minimum():
+    seen = []
+    led = ledger(__import__("pathlib").Path(__import__("tempfile").mkdtemp()))
+    s = Winston(_spy("winston", seen), ledger=led, cost_fn=winston_cost).score(["Too short."])[0]
+    assert not seen and s.ok and s.score == 1.0 and s.raw == {"too_short": True}

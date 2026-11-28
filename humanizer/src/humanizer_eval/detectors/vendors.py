@@ -34,6 +34,17 @@ def gptzero_cost(words: int) -> float:
     return 150.0 * words / 1_000_000
 
 
+def originality_cost(words: int) -> float:
+    """1 credit per started 100 words (seen on the API: 256 words -> 3 credits), ~$0.01 a credit."""
+    return 0.01 * max(1, math.ceil(words / 100))
+
+
+def winston_cost(words: int) -> float:
+    """1 credit per word (official): $0.07 per 1k credits on the smallest package (bigger ones are cheaper),
+    and Winston counts 1.5% (up to 3.4%) more words than ``word_count`` (measured 2026-11-28): x1.07."""
+    return 0.000075 * max(1, words)
+
+
 def zerogpt_cost(words: int) -> float:
     """Third-party figure: up to $0.069 per 1k words (upper bound of reported range)."""
     return 0.069 * words / 1000
@@ -231,6 +242,106 @@ class ZeroGPT(VendorDetector):
         }
         slim = {k: d.get(k) for k in ("fakePercentage", "isHuman", "textWords", "aiWords")}
         return Extracted(cands[self.primary], cands, None, slim)
+
+
+# --- Originality.ai ---------------------------------------------------------------
+
+
+class Originality(VendorDetector):
+    """API v3 scan, AI check only (no plagiarism, facts, readability, grammar; nothing stored on their side).
+
+    The model is asked for by name in every request (``aiModelVersion``) and the answer names the model that
+    scored; the API gives no finer version than the model's name, so a change behind the same name is caught
+    by the canaries (evaluation/conditions.py). Answers are deterministic (the same text twice: the same
+    score, checked 2026-11-28). The score is the document's AI share the vendor reports
+    (``ai_assisted_percent`` / 100); the length-weighted mean of its sentence scores is a second candidate."""
+
+    name = service = "originality"
+    MODEL = "model-5.0"
+    config = f"v3-scan@{MODEL}"
+    primary = "ai_assisted"
+    URL = "https://api.originality.ai/api/v3/scan"
+
+    @classmethod
+    def build(cls, api_key: str, **kw) -> Originality:
+        transport = kw.pop("transport", None)
+        http = HttpClient(headers={"X-OAI-API-KEY": api_key}, rate_per_sec=4, burst=4, transport=transport)
+        return cls(http, cost_fn=originality_cost, **kw)
+
+    def _call(self, text: str) -> dict[str, Any]:
+        body = {"title": "humeval", "content": text, "check_ai": True, "check_plagiarism": False,
+                "check_facts": False, "check_readability": False, "check_grammar": False, "storeScan": False,
+                "aiModelVersion": self.MODEL}  # fmt: skip
+        return _check(self.http.request("POST", self.URL, json=body), "originality")
+
+    def _extract(self, p: dict[str, Any]) -> Extracted:
+        ai = ((p.get("results") or {}).get("ai")) if isinstance(p, dict) else None
+        if not isinstance(ai, dict) or ai.get("ai_assisted_percent") is None:
+            raise DetectorError(f"originality: no AI result ({str(p)[:200]})")
+        sents = ai.get("sentences") or []
+        words = sum(len(str(s.get("text", "")).split()) for s in sents)
+        wavg = (sum(float(s.get("ai_score", 0)) * len(str(s.get("text", "")).split()) for s in sents) / words
+                if words else float(ai["ai_assisted_percent"]) / 100.0)  # fmt: skip
+        cands = {
+            "ai_assisted": _clip01(float(ai["ai_assisted_percent"]) / 100.0),
+            "sentence_wavg": _clip01(wavg),
+        }
+        credits = ((p.get("results") or {}).get("credits") or {}).get("used")
+        slim = {"model": ai.get("model"), "label": ai.get("prediction_label"),
+                "ai_assisted_percent": ai.get("ai_assisted_percent"), "credits": credits}  # fmt: skip
+        return Extracted(cands[self.primary], cands, ai.get("model"), slim)
+
+
+# --- Winston AI ------------------------------------------------------------------
+
+
+class Winston(VendorDetector):
+    """API v2 AI content detection, the model version pinned in every request (``version``).
+
+    The answer names the version that scored, and an unknown or retired version is silently replaced by the
+    newest model (seen 2026-11-28: "9.9" answered as "5.2"), so an answer from another version is an error,
+    never a score. Answers are mostly the same for the same text; about one call in ten is another value
+    (spec D-30). ``score`` is the HUMAN share (0-100): our AI probability is 1 - score / 100. Texts under
+    300 characters (the API's minimum) are not sent: they count as caught (such an output fails the meaning
+    gate anyway)."""
+
+    name = service = "winston"
+    VERSION = "5.2"
+    MIN_CHARS = 300
+    config = f"v2@{VERSION}"
+    primary = "p_ai"
+    URL = "https://api.gowinston.ai/v2/ai-content-detection"
+
+    @classmethod
+    def build(cls, api_key: str, **kw) -> Winston:
+        transport = kw.pop("transport", None)
+        http = HttpClient(
+            headers={"Authorization": f"Bearer {api_key}"}, rate_per_sec=4, burst=4, transport=transport
+        )
+        return cls(http, cost_fn=winston_cost, **kw)
+
+    def _one(self, text: str) -> DetectorScore:
+        if len(text.strip()) < self.MIN_CHARS:
+            # no call is made: marked cached so that the miner's statement meters no words sent to Winston
+            return DetectorScore(self.name, text_hash(text), 1.0, {"p_ai": 1.0}, self.VERSION,
+                                 {"too_short": True}, cached=True, cost_usd=0.0)  # fmt: skip
+        return super()._one(text)
+
+    def _call(self, text: str) -> dict[str, Any]:
+        body = {"text": text, "version": self.VERSION, "sentences": False, "language": "en"}
+        return _check(self.http.request("POST", self.URL, json=body), "winston")
+
+    def _extract(self, p: dict[str, Any]) -> Extracted:
+        if not isinstance(p, dict) or p.get("score") is None:
+            raise DetectorError(f"winston: no score ({str(p)[:200]})")
+        if str(p.get("version")) != self.VERSION:
+            raise DetectorError(
+                f"winston: answered by version {p.get('version')!r}, not the pinned {self.VERSION}"
+            )
+        p_ai = _clip01(1.0 - float(p["score"]) / 100.0)
+        slim = {"version": p.get("version"), "human_score": p.get("score"), "credits": p.get("credits_used"),
+                "attack_detected": p.get("attack_detected")}  # fmt: skip
+        return Extracted(p_ai, {"p_ai": p_ai}, p.get("version"), slim)
 
 
 # --- Pangram -------------------------------------------------------------------

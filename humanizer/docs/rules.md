@@ -127,11 +127,17 @@ The score is a soft minimum over detectors, so you must beat **all** of them:
 together, H resampled too). You are crowned if the one-sided 5% lower bound of `ΔS = S_you − S_king`
 is above `δ_min` (0 at launch; it may be raised after the first periods, with notice).
 
-**Crown detectors: GPTZero and Pangram, each at a pinned model version** (GPTZero `2026-11-04-base`,
-Pangram `pangram-4.1`), asked for in every request; a new version is taken only at the start of a period.
+**Crown detectors: GPTZero, Pangram and Winston AI, each at a pinned model version** asked for in every
+request (GPTZero `2026-11-04-base`, Pangram `pangram-4.1`, Winston AI `5.2`); a new version is taken only
+at the start of a period. An answer from another version than the pinned one is an error, never a score.
+Winston AI needs at least 300 characters: a shorter output counts as caught by it (it fails the meaning
+gate anyway).
 Anyone can score the published texts again at the same version and get the same scores
-(`scripts/verify_period.py --recheck K` with your own API keys). ZeroGPT was dropped on 2026-11-27: its API
-neither takes nor reports a model version and its scores moved 4 times in 2.5 days. It's AI's own detector
+(`scripts/verify_period.py --recheck K` with your own API keys). Pangram and GPTZero answer the same text the
+same way; Winston AI does too, except about one call in ten, which gives a slightly different value (most
+within 0.005): `--recheck` asks a Winston text up to 3 times and accepts it if one answer matches. ZeroGPT was dropped on 2026-11-27: its API
+neither takes nor reports a model version and its scores moved 4 times in 2.5 days; Winston AI took its
+place on 2026-11-28. It's AI's own detector
 is used for tests only and never decides a crown.
 
 **Identical conditions.** You and the king are always judged and scored the same way:

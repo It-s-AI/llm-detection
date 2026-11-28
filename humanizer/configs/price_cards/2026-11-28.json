@@ -1,0 +1,42 @@
+{
+  "version": "2026-11-28",
+  "currency": "usdc",
+  "comment": "Public price card (D-80). Miners pay quantity x rate per line item, in USDC (1 USDC = 1 USD on this card; payments arrive in TAO and are kept as USDC, billing/tao.py). Detector prices are the vendors' list prices; judge prices are OpenRouter list prices at card time; Lium is the hourly price of the GPU pod (H100 80GB HBM3, else H200) incl. setup. Changing any rate means a new version (its sha256 is pinned in every quote and statement).",
+  "detectors": {
+    "pangram": {
+      "rate_usd": 0.05,
+      "per_words": 100,
+      "rounding": "ceil_per_text"
+    },
+    "gptzero": {
+      "rate_usd": 0.15,
+      "per_words": 1000,
+      "rounding": "exact"
+    },
+    "winston": {
+      "rate_usd": 0.075,
+      "per_words": 1000,
+      "rounding": "exact"
+    }
+  },
+  "judges": {
+    "openai/gpt-6-luna-20260922": {
+      "in_per_mtok": 0.1,
+      "out_per_mtok": 0.5
+    },
+    "google/gemini-3.8-flash-20260902": {
+      "in_per_mtok": 0.825,
+      "out_per_mtok": 4.125
+    },
+    "anthropic/claude-sonnet-5.5-20260928": {
+      "in_per_mtok": 2.0,
+      "out_per_mtok": 10.0
+    }
+  },
+  "judge_quote_per_output_usd": 0.04,
+  "lium": {
+    "rate_per_hour_usd": 4.5,
+    "quote_hours": 1.5
+  },
+  "quote_ttl_seconds": 3600
+}

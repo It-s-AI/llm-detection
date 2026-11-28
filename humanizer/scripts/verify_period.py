@@ -50,14 +50,15 @@ def same_code(root: Path) -> str | None:
     try:
         from types import SimpleNamespace
 
-        from humanizer_eval.detectors.vendors import GPTZero, Pangram
+        from humanizer_eval.detectors.vendors import GPTZero, Pangram, Winston
         from humanizer_eval.evaluation.conditions import scoring_fingerprint
 
         gates = json.loads((Path(__file__).resolve().parents[1] / "configs" / "gates.json").read_text())
         dets = {
             "gptzero": SimpleNamespace(config=GPTZero.config),
-            "pangram": SimpleNamespace(config=Pangram.config),
-        }
+            "pangram": SimpleNamespace(config=f"task-{Pangram.__init__.__kwdefaults__['model']}"),
+            "winston": SimpleNamespace(config=Winston.config),
+        }  # the server's crown detectors (registry.CROWN_DETECTORS) with the configs their instances carry
         mine = scoring_fingerprint(gates, dets, {"n_boot": 2000})
     except Exception as e:
         return f"note: could not compute this checkout's scoring fingerprint ({e})"
@@ -73,21 +74,29 @@ def same_code(root: Path) -> str | None:
 #: the version each crown detector's scores were made with must be asked for again: GPTZero takes it in the
 #: request ("version"), Pangram as its model name ("pangram-<version>")
 TOL = 1e-3
+#: Winston answers about one call in ten with another value (spec D-30): a text is asked up to this many
+#: times and passes if one answer is the published score (an odd answer is not a made-up score)
+TRIES = {"winston": 3}
 
 
 def recheck(root: Path, k: int, seed: int = 0) -> list[str]:
     """Score ``k`` published human texts and ``k`` published outputs again with YOUR OWN detector keys
-    (GPTZERO_API_KEY, PANGRAM_API_KEY), at the model version they were scored with, and compare. The vendors
-    answer a text the same way at a fixed version, so every difference above TOL is reported: our scores
-    cannot be made up. Costs a few cents per text, paid to the vendors by you."""
+    (GPTZERO_API_KEY, PANGRAM_API_KEY, WINSTON_API_KEY), at the model version they were scored with, and compare.
+    Pangram answers a text the same way at a fixed version, GPTZero within its canary tolerance (two close
+    values), Winston mostly the same way (about one call in ten differs: up to TRIES calls, one must match):
+    every text none of whose answers matches is reported, so our scores cannot be made up. Costs a few cents
+    per text, paid to the vendors by you."""
     import os
     import random
 
     from humanizer_eval.budget import SpendLedger
-    from humanizer_eval.detectors.vendors import GPTZero, Pangram
+    from humanizer_eval.detectors.vendors import GPTZero, Originality, Pangram, Winston
+    from humanizer_eval.evaluation.conditions import canary_tol
 
     tmp = Path(tempfile.mkdtemp())
-    led = SpendLedger(tmp / "ledger.sqlite", {"gptzero": float("inf"), "pangram": float("inf")})  # your own spend
+    led = SpendLedger(
+        tmp / "ledger.sqlite", dict.fromkeys(("gptzero", "pangram", "originality", "winston"), float("inf"))
+    )
     hs = json.loads((root / "human_scores.json").read_text())
     htexts = json.loads((root / "human_texts.json").read_text())
     base = hs.get("baseline") or {}
@@ -107,7 +116,9 @@ def recheck(root: Path, k: int, seed: int = 0) -> list[str]:
                     outs.append((d, (f"{p.stem} output {i}", rec["outputs"][i], v, ver)))
     for d, item in rng.sample(outs, min(k * len(samples), len(outs))):
         samples.setdefault(d, []).append(item)
-    keys = {"gptzero": os.environ.get("GPTZERO_API_KEY"), "pangram": os.environ.get("PANGRAM_API_KEY")}
+    keys = {
+        d: os.environ.get(f"{d.upper()}_API_KEY") for d in ("gptzero", "pangram", "originality", "winston")
+    }
     notes = []
     for d, items in samples.items():
         if not keys.get(d):
@@ -118,10 +129,20 @@ def recheck(root: Path, k: int, seed: int = 0) -> list[str]:
             if d == "gptzero":
                 det = GPTZero.build(keys[d], ledger=led)
                 det.VERSION = ver or det.VERSION
+            elif d == "winston":
+                det = Winston.build(keys[d], ledger=led)
+                det.VERSION = ver or det.VERSION
+            elif d == "originality":
+                det = Originality.build(keys[d], ledger=led)
+                det.MODEL = ver or det.MODEL
             else:
                 det = Pangram.build(keys[d], ledger=led, model=f"pangram-{ver}" if ver else "pangram-4.1")
-            r = det.score([text])[0]
-            if not r.ok or abs(r.score - published) > TOL:
+            tol = max(TOL, canary_tol(d))
+            for _ in range(TRIES.get(d, 1)):
+                r = det.score([text])[0]
+                if r.ok and abs(r.score - published) <= tol:
+                    break
+            if not r.ok or abs(r.score - published) > tol:
                 bad += 1
                 notes.append(f"FAIL recheck {d} {what}: published {published:.4f}, now "
                              f"{r.score if r.ok else r.error} (version {ver})")  # fmt: skip
@@ -141,7 +162,7 @@ def main() -> int:
     ap.add_argument("-v", "--verbose", action="store_true", help="print every passed check")
     ap.add_argument("--recheck", type=int, default=0, metavar="K",
                     help="score K human texts and K outputs per detector again with your own API keys "
-                         "(GPTZERO_API_KEY, PANGRAM_API_KEY) at the recorded model version")  # fmt: skip
+                         "(GPTZERO_API_KEY, PANGRAM_API_KEY, WINSTON_API_KEY) at the recorded model version")  # fmt: skip
     args = ap.parse_args()
     with tempfile.TemporaryDirectory() as tmp:
         root = args.dir or download(args.url, Path(tmp))

@@ -5,7 +5,7 @@ writing, with its meaning and quality kept.
 
 Miners publish a humanizer (code + weights) in their own Hugging Face repo and pin it on chain. The
 evaluator runs it offline on a fresh GPU pod over the period's hidden texts. It checks every output with
-LLM judges (meaning, style, naturalness), sends the outputs to GPTZero and Pangram (each at a pinned model version), and decides
+LLM judges (meaning, style, naturalness), sends the outputs to GPTZero, Pangram and Winston AI (each at a pinned model version), and decides
 with a paired statistical test against the current king whether the submission takes the crown. The king
 and the two previous kings share the competition's emission 85/10/5. Validators set one weight vector,
 detection 80% and humanizer 20%; the split and the 85/10/5 shares are fixed in the validator code, and the

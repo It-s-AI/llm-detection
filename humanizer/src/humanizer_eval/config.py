@@ -27,6 +27,8 @@ class Settings(BaseSettings):
 
     # detectors
     gptzero_api_key: str = ""
+    originality_api_key: str = ""
+    winston_api_key: str = ""
     zerogpt_api_key: str = ""
     pangram_api_key: str = ""
     its_ai_special_url: str = ""
@@ -47,6 +49,8 @@ class Settings(BaseSettings):
     # hard spending caps, USD
     budget_pangram_usd: float = 30.0
     budget_gptzero_usd: float = 20.0
+    budget_originality_usd: float = 20.0
+    budget_winston_usd: float = 20.0
     budget_zerogpt_usd: float = 10.0
     budget_openrouter_usd: float = 25.0
     budget_lium_usd: float = 50.0
@@ -73,6 +77,8 @@ class Settings(BaseSettings):
         return {
             "pangram": self.budget_pangram_usd,
             "gptzero": self.budget_gptzero_usd,
+            "originality": self.budget_originality_usd,
+            "winston": self.budget_winston_usd,
             "zerogpt": self.budget_zerogpt_usd,
             "openrouter": self.budget_openrouter_usd,
             "lium": self.budget_lium_usd,

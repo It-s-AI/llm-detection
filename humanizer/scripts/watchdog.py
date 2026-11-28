@@ -33,7 +33,7 @@ from humanizer_eval.config import get_settings
 from humanizer_eval.ops.alerts import from_settings
 from humanizer_eval.paths import ledger_path, var_dir
 
-SERVICES = ("pangram", "gptzero", "zerogpt", "openrouter", "lium")
+SERVICES = ("pangram", "gptzero", "originality", "winston", "zerogpt", "openrouter", "lium")
 
 
 def soft_limit(ledger_db: Path, billing_db: Path, since: float, gap_usd: float, weekly_usd: float = 0.0

@@ -50,7 +50,15 @@ CANARIES_PER_DETECTOR = 2
 CANARY_TOL = 1e-3
 #: GPTZero answers the same text with one of two close values (two backends?): 0.3892 / 0.3964 on a
 #: mid-range H text, measured on the production key 2026-11-25; a model change moves such texts much more
-CANARY_TOL_BY_DETECTOR = {"gptzero": 0.02}
+CANARY_TOL_BY_DETECTOR = {"gptzero": 0.02, "winston": 0.005}  # Winston: odd answers within 0.0044 seen
+#: Winston AI (version 5.2) mostly answers a text with the same score, but about one call in ten is another
+#: value (8 of 82 calls on p2 H texts, production key, 2026-11-28; most within 0.005, two 0.035 and 0.14
+#: off): its canaries are the median of 5 calls, a difference is confirmed by 5 more calls before it counts
+#: (a model change moves every answer, an odd answer is outvoted), and a canary is only a text whose single
+#: stored H score agrees with that median (an odd stored answer is skipped, never a hold)
+CANARY_REPEATS = {"winston": 5}
+#: candidates tried per repeated detector to find ``CANARIES_PER_DETECTOR`` agreeing ones: most must agree
+CANARY_CANDIDATES = 6
 
 
 def canary_tol(name: str) -> float:
@@ -94,6 +102,22 @@ def _score_texts(det: Any, texts: Sequence[str], tries: int = 3) -> list[float]:
     return [float(r.score) for r in res]
 
 
+def _median(col: Sequence[float]) -> float:
+    c = sorted(col)
+    return c[(len(c) - 1) // 2]
+
+
+def _canary_runs(name: str, det: Any, texts: Sequence[str], n: int | None = None) -> list[list[float]]:
+    """``n`` (default ``CANARY_REPEATS[name]``, 1) uncached calls per text: one list of answers per text."""
+    runs = [_score_texts(det, texts) for _ in range(n or CANARY_REPEATS.get(name, 1))]
+    return [list(col) for col in zip(*runs, strict=True)]
+
+
+def _canary_scores(name: str, det: Any, texts: Sequence[str]) -> list[float]:
+    """The canary texts' scores now: the median of ``CANARY_REPEATS[name]`` uncached calls per text."""
+    return [_median(c) for c in _canary_runs(name, det, texts)]
+
+
 def pick_canaries(texts: Sequence[str], scores: Sequence[float], k: int = CANARIES_PER_DETECTOR) -> list[int]:
     """Indices of the ``k`` texts whose scores are closest to 0.5 (saturated 0 or 1 hide a model change)."""
     order = sorted(range(len(texts)), key=lambda i: (scores[i] in (0.0, 1.0), abs(scores[i] - 0.5)))
@@ -116,16 +140,20 @@ def take_baseline(
         entry: dict[str, Any] = {"versions": vers}
         hs = (human_scores or {}).get(name)
         if watch is not None and name in watch and human_texts and hs is not None:
-            idx = pick_canaries(human_texts, hs)
-            texts = [human_texts[i] for i in idx]
-            fresh = _score_texts(watch[name], texts)
-            stale = max((abs(f - float(hs[i])) for f, i in zip(fresh, idx, strict=True)), default=0.0)
-            if stale > canary_tol(name):
+            k = CANARIES_PER_DETECTOR
+            repeated = name in CANARY_REPEATS
+            idx = pick_canaries(human_texts, hs, CANARY_CANDIDATES if repeated else k)
+            fresh = _canary_scores(name, watch[name], [human_texts[i] for i in idx])
+            agree = [j for j, i in enumerate(idx) if abs(fresh[j] - float(hs[i])) <= canary_tol(name)]
+            # a repeated detector: a stored H answer can be the odd one; a stale H (older model) moves most
+            if (repeated and 2 * len(agree) <= len(idx)) or (not repeated and len(agree) < len(idx)):
+                stale = max(abs(f - float(hs[i])) for f, i in zip(fresh, idx, strict=True))
                 raise RuntimeError(
                     f"{name}: H's stored scores differ from the vendor's current model by {stale:.4g} "
                     "(cached from an older model?): rescore with scripts/rescore_period.py"
                 )
-            entry["canary"] = {"texts": texts, "scores": fresh}
+            use = agree[:k] if repeated else list(range(len(idx)))
+            entry["canary"] = {"texts": [human_texts[idx[j]] for j in use], "scores": [fresh[j] for j in use]}
         out[name] = entry
     return out
 
@@ -144,8 +172,13 @@ def check(baseline: Mapping[str, Any] | None, watch: Mapping[str, Any] | None,
         if b.get("versions") and got and got != b["versions"]:
             problems.append(f"{name}: model version {got} differs from the period's {b['versions']}")
         if b.get("canary") and watch is not None and name in watch:
-            now = _score_texts(watch[name], b["canary"]["texts"])
-            diff = max((abs(x - y) for x, y in zip(now, b["canary"]["scores"], strict=True)), default=0.0)
+            texts, want = b["canary"]["texts"], b["canary"]["scores"]
+            runs = _canary_runs(name, watch[name], texts)
+            diff = max((abs(_median(r) - y) for r, y in zip(runs, want, strict=True)), default=0.0)
+            if diff > canary_tol(name) and name in CANARY_REPEATS:  # confirm: an odd answer is outvoted
+                more = _canary_runs(name, watch[name], texts)
+                runs = [r + m for r, m in zip(runs, more, strict=True)]
+                diff = max((abs(_median(r) - y) for r, y in zip(runs, want, strict=True)), default=0.0)
             if diff > canary_tol(name):
                 problems.append(
                     f"{name}: canary scores moved by {diff:.4g} since the period's human texts were scored"

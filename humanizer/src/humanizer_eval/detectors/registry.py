@@ -5,13 +5,23 @@ from __future__ import annotations
 from humanizer_eval.budget import SpendLedger
 from humanizer_eval.config import Settings, get_settings
 from humanizer_eval.detectors.cache import DetectorCache
-from humanizer_eval.detectors.vendors import GPTZero, ItsAI, Pangram, VendorDetector, ZeroGPT
+from humanizer_eval.detectors.vendors import (
+    GPTZero,
+    ItsAI,
+    Originality,
+    Pangram,
+    VendorDetector,
+    Winston,
+    ZeroGPT,
+)
 from humanizer_eval.paths import ledger_path, var_dir
 
 # Detectors that take part in crown scoring (D-30), each with its model version pinned in the request.
 # ZeroGPT left on 2026-11-27: its API takes no version and reports none, and its model moved 4 times in 2.5
-# days. It's AI is a simulation proxy only (D-33).
-CROWN_DETECTORS = ("gptzero", "pangram")
+# days; Winston AI took its place on 2026-11-28 (version pinned in the request and checked in the answer,
+# deterministic). Originality.ai is supported but not in the crown (it pins a model's name, not a version).
+# It's AI is a simulation proxy only (D-33).
+CROWN_DETECTORS = ("gptzero", "pangram", "winston")
 
 
 def build_detector(
@@ -28,6 +38,10 @@ def build_detector(
     kw = {"ledger": led, "cache": cache, "transport": transport}
     if name == "gptzero":
         return GPTZero.build(s.gptzero_api_key, **kw)
+    if name == "winston":
+        return Winston.build(s.winston_api_key, **kw)
+    if name == "originality":
+        return Originality.build(s.originality_api_key, **kw)
     if name == "zerogpt":
         return ZeroGPT.build(s.zerogpt_api_key, **kw)
     if name == "pangram":

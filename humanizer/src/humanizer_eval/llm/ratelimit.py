@@ -38,7 +38,7 @@ class ModelRateLimiter:
         self.skew = skew
         self.now, self.sleep = now, sleep
         self._lock = threading.Lock()
-        self._windows: dict[str, tuple[int, int]] = {}  # model -> (minute, calls in it)
+        self._counts: dict[str, dict[int, int]] = {}  # model -> {minute: calls counted in it}
 
     def wait(self, model: str) -> float:
         """Block until ``model`` may be called; returns the seconds waited."""
@@ -48,14 +48,18 @@ class ModelRateLimiter:
         while True:
             with self._lock:
                 t = self.now()
-                minute = int((t - self.skew) // 60)  # a call just after :00 still counts in the old minute
-                cur, n = self._windows.get(model, (minute, 0))
-                if cur != minute:
-                    cur, n = minute, 0
-                if n < self.rpm:
-                    self._windows[model] = (cur, n + 1)
+                # our clock may differ from OpenRouter's by up to ``skew``: a call in the first ``skew``
+                # seconds of a minute may land in either minute, so it needs room in both and counts in both
+                minutes = sorted({int((t - self.skew) // 60), int(t // 60)})
+                counts = self._counts.setdefault(model, {})
+                for old in [m for m in counts if m < minutes[0]]:
+                    del counts[old]
+                if all(counts.get(m, 0) < self.rpm for m in minutes):
+                    for m in minutes:
+                        counts[m] = counts.get(m, 0) + 1
                     return waited
-                pause = (minute + 1) * 60 + self.skew - t + 0.05
+                full = max(m for m in minutes if counts.get(m, 0) >= self.rpm)
+                pause = (full + 1) * 60 + self.skew - t + 0.05
             self.sleep(pause)
             waited += pause
 

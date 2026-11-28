@@ -122,12 +122,13 @@ class ModelPricing:
         self.transport = transport
         self._prices: dict[str, tuple[float, float]] | None = None
 
-    def _load(self) -> dict[str, tuple[float, float]]:
-        if self._prices is not None:
+    def _load(self, fresh: bool = False) -> dict[str, tuple[float, float]]:
+        if self._prices is not None and not fresh:
             return self._prices
         data = None
         if (
-            self.cache_path
+            not fresh
+            and self.cache_path
             and self.cache_path.exists()
             and time.time() - self.cache_path.stat().st_mtime < 86400
         ):
@@ -153,8 +154,10 @@ class ModelPricing:
 
     def per_token(self, model: str) -> tuple[float, float]:
         prices = self._load()
-        if model not in prices:
-            raise KeyError(f"unknown OpenRouter model {model!r}")
+        if model not in prices:  # a day-old cache may predate the model (or its dated id): ask once again
+            prices = self._load(fresh=True)
+        if model not in prices:  # a provider-side error for the caller (never a crash of its thread)
+            raise RuntimeError(f"unknown OpenRouter model {model!r}")
         return prices[model]
 
     def estimate(self, model: str, prompt_chars: int, max_tokens: int) -> float:

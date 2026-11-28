@@ -97,7 +97,7 @@ def test_budget_refuses_expensive_call(tmp_path):
 
 def test_unknown_model_refused(tmp_path):
     client, _ = make(tmp_path, ok_chat([]))
-    with pytest.raises(KeyError):
+    with pytest.raises(RuntimeError, match="unknown OpenRouter model"):
         client.chat("nope/model", [{"role": "user", "content": "hi"}])
 
 

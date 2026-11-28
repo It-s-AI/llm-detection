@@ -690,3 +690,36 @@ def test_rank_prefers_a_single_h100_hbm3_and_falls_back_to_h200():
     assert [e["id"] for e in rank_executors([pcie, h200, whole, h100, pricey], 4.5, exact=EVAL_MACHINES)] == [
         "h100", "h200"]  # fmt: skip
     assert [e["id"] for e in rank_executors([pcie, h200, whole], 4.5, exact=EVAL_MACHINES)] == ["h200"]
+
+
+def test_winston_canary_outvotes_odd_answers_and_catches_a_model_change(monkeypatch):
+    """Winston answers about one call in ten with another value (0.6602 -> 0.8047): odd answers must not
+    hold the queue (median of 5, confirmed by 5 more), a model change (every call moved) must."""
+    from humanizer_eval.evaluation import conditions
+
+    base = {"winston": {"versions": ["5.2"], "canary": {"texts": ["t"], "scores": [0.6602]}}}
+
+    def answers(seq):
+        it = iter(seq)
+        monkeypatch.setattr(conditions, "_score_texts", lambda det, texts: [next(it)])
+
+    answers([0.8047, 0.6602, 0.6602, 0.81, 0.6602])
+    assert conditions.check(base, {"winston": object()}) == []
+    answers([0.8047, 0.81, 0.6602, 0.80, 0.6602] + [0.6602] * 5)  # unlucky median, outvoted by 5 more
+    assert conditions.check(base, {"winston": object()}) == []
+    answers([0.79] * 10)  # the model moved
+    assert len(conditions.check(base, {"winston": object()})) == 1
+
+
+def test_winston_baseline_skips_an_odd_stored_h_answer_but_catches_a_stale_h(monkeypatch):
+    from humanizer_eval.evaluation import conditions
+
+    texts = [f"t{i}" for i in range(8)]
+    hs = [0.5, 0.45, 0.55, 0.4, 0.6, 0.35, 0.0, 1.0]
+    truth = dict(zip(texts, hs, strict=True)) | {"t0": 0.62}  # t0's stored answer was the odd one
+    monkeypatch.setattr(conditions, "_score_texts", lambda det, ts: [truth[t] for t in ts])
+    b = conditions.take_baseline({"winston": ["5.2"]}, {"winston": object()}, texts, {"winston": hs})
+    assert b["winston"]["canary"]["texts"] == ["t1", "t2"]
+    truth = {t: min(1.0, v + 0.1) for t, v in zip(texts, hs, strict=True)}  # H from an older model
+    with pytest.raises(RuntimeError, match="differ from the vendor"):
+        conditions.take_baseline({"winston": ["5.2"]}, {"winston": object()}, texts, {"winston": hs})

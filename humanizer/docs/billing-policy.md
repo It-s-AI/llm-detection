@@ -13,10 +13,11 @@ sha256, so a statement can always be recomputed.
 All money here is **USDC** (1 USDC = 1 US dollar on the card): your balance, quotes, holds, charges and
 refunds. You pay in **TAO**; it is converted to USDC when it arrives.
 
-| Item | Unit | Rate (card 2026-11-27) |
+| Item | Unit | Rate (card 2026-11-28) |
 |---|---|---|
 | Pangram | words per output | 0.05 USDC per 100 words, rounded up per text |
 | GPTZero | words | 0.15 USDC per 1,000 words |
+| Winston AI | words | 0.075 USDC per 1,000 words |
 | LLM judges | tokens | OpenRouter list price of each judge model |
 | GPU pod (H100 80GB HBM3, else H200) | hours | 4.50 USDC per hour |
 

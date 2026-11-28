@@ -156,7 +156,7 @@ def load_period(
     texts = [human_texts[h["id"]] for h in human]
     ids = [h["id"] for h in human]
     cached = load_human_scores(human_cache, key) if human_cache else None
-    if cached is None and human_cache:  # a detector left: reuse the larger set's file
+    if cached is None and human_cache:  # the crown set changed: reuse what the sets share
         cached = _subset_of_larger(Path(human_cache), key, set(detectors))
     scores: dict[str, list[float]] = {}
     same = bool(cached) and cached["ids"] == ids
@@ -225,20 +225,22 @@ def save_human_scores(
 
 
 def _subset_of_larger(path: Path, key: bytes, want: set[str]) -> dict[str, Any] | None:
-    """H's scores for ``want`` from another file of the same period that has every one of those detectors
-    (``human_scores.<tag>.enc`` for a larger set): the same texts scored by the same models, so nothing is
-    paid again when a detector leaves the crown set. Their baseline (versions, canaries) comes along and is
-    checked again at the load like any cached one."""
+    """H's scores from another file of the same period (``human_scores.<tag>.enc`` of another detector set):
+    the detectors both sets share, with their baseline (versions, canaries; checked again at the load like
+    any cached one). The same texts scored by the same models, so a change of the crown set pays only for
+    the detectors that are new; the file sharing the most detectors is used."""
+    best: dict[str, Any] | None = None
     for other in sorted(path.parent.glob("human_scores.*.enc")):
         if other == path:
             continue
         got = load_human_scores(other, key)
-        if not got or not want <= set(got.get("scores") or {}):
+        common = want & set((got or {}).get("scores") or {})
+        if not common or (best is not None and len(common) <= len(best["scores"])):
             continue
         base = got.get("baseline") or {}
-        return {"ids": got["ids"], "scores": {d: got["scores"][d] for d in want},
-                "baseline": {d: base[d] for d in want if d in base}}  # fmt: skip
-    return None
+        best = {"ids": got["ids"], "scores": {d: got["scores"][d] for d in common},
+                "baseline": {d: base[d] for d in common if d in base}}  # fmt: skip
+    return best
 
 
 def load_human_scores(path: Path | str, key: bytes) -> dict[str, Any] | None:

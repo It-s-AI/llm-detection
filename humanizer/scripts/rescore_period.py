@@ -26,7 +26,7 @@ from pathlib import Path
 from humanizer_eval.intake.worker import CONDITIONS_FILE
 from humanizer_eval.paths import var_dir
 
-CROWN = ("gptzero", "pangram")
+CROWN = ("gptzero", "pangram", "winston")
 
 
 def main() -> int:
@@ -51,6 +51,12 @@ def main() -> int:
     files = [var_dir() / "periods" / args.period / f"human_scores.{tag}.enc",
              state / "periods" / args.period / f"king_run.{tag}.enc",
              var_dir() / "periods" / args.period / CONDITIONS_FILE]  # fmt: skip  # the hold: lifted
+    # every other H file holding a rescored detector's scores: H reuse (_subset_of_larger) would bring them back
+    for f in sorted((var_dir() / "periods" / args.period).glob("human_scores.*.enc")):
+        if f not in files and set(f.name[len("human_scores.") : -len(".enc")].split("-")) & set(
+            args.detector
+        ):
+            files.insert(1, f)
     cache = var_dir() / "detector_cache.sqlite"
     with sqlite3.connect(cache) as c:
         n = {d: c.execute("SELECT COUNT(*) FROM detector_cache WHERE detector = ?", (d,)).fetchone()[0]

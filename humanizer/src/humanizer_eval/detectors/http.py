@@ -44,6 +44,10 @@ class RetryPolicy:
     max_attempts: int = 5
     base_delay: float = 1.0
     max_delay: float = 60.0
+    #: a POST delivered with an unknown outcome (a read timeout, a dropped connection after sending) may have
+    #: been billed: it is sent again at most this many times in all (429 / 5xx answers are not billed and use
+    #: ``max_attempts``)
+    max_delivered: int = 2
 
     def delay(self, attempt: int, retry_after: str | None) -> float:
         if retry_after:
@@ -104,6 +108,7 @@ class HttpClient:
 
     def request(self, method: str, url: str, **kwargs) -> httpx.Response:
         last_exc: Exception | None = None
+        delivered = 0
         for attempt in range(1, self.retry.max_attempts + 1):
             self.bucket.acquire(self.sleep)
             try:
@@ -111,7 +116,11 @@ class HttpClient:
             except (httpx.TimeoutException, httpx.TransportError) as e:
                 self._count(method, None, e)
                 last_exc = e
-                if attempt == self.retry.max_attempts:
+                if method.upper() != "GET" and not isinstance(
+                    e, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+                ):
+                    delivered += 1  # possibly billed: not sent again without end
+                if attempt == self.retry.max_attempts or delivered >= self.retry.max_delivered:
                     break
                 self.sleep(self.retry.delay(attempt, None))
                 continue

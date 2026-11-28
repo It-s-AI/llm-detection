@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-27",
+  "version": "2026-11-28",
   "currency": "usdc",
   "comment": "Public price card (D-80). Miners pay quantity x rate per line item, in USDC (1 USDC = 1 USD on this card; payments arrive in TAO and are kept as USDC, billing/tao.py). Detector prices are the vendors' list prices; judge prices are OpenRouter list prices at card time; Lium is the hourly price of the GPU pod (H100 80GB HBM3, else H200) incl. setup. Changing any rate means a new version (its sha256 is pinned in every quote and statement).",
   "detectors": {
@@ -10,6 +10,11 @@
     },
     "gptzero": {
       "rate_usd": 0.15,
+      "per_words": 1000,
+      "rounding": "exact"
+    },
+    "winston": {
+      "rate_usd": 0.075,
       "per_words": 1000,
       "rounding": "exact"
     }

@@ -26,7 +26,7 @@ from humanizer_eval.paths import var_dir
 from humanizer_eval.period.chain import FINNEY_RPC, Chain
 from humanizer_eval.period.lifecycle import Lifecycle, LifecycleConfig
 
-CROWN_TAG = "gptzero-pangram"
+CROWN_TAG = "gptzero-pangram-winston"
 
 
 def human_cache_path(pdir: Path, tag: str = CROWN_TAG) -> Path:
@@ -138,7 +138,9 @@ def main() -> int:
         sdir = state / "periods" / pid
         rec = json.loads((periods / "schedule.json").read_text())["periods"].get(pid)
         cur = human_cache_path(pdir, args.detectors_tag)  # H as scored before a rescore_period.py run
-        older = [h for f in sorted(pdir.glob(cur.name + ".stale-*")) if (h := load_human_scores(f, key))]
+        # every other H of the period: stale ones (rescored) and those of an earlier crown detector set
+        older = [h for f in sorted(pdir.glob("human_scores.*.enc*"))
+                 if f != cur and (h := load_human_scores(f, key))]  # fmt: skip
         import subprocess
 
         from humanizer_eval.pool.store import PoolStore
